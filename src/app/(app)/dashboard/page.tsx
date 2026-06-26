@@ -2,11 +2,19 @@
 
 import { useState, useEffect, Fragment } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { FileSearch, Eye, ExternalLink, Download, Share2 } from 'lucide-react'
+import { FileSearch, Eye, ExternalLink, Download, Share2, Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { ScreeningResult } from '@/types'
+
 type SortKey = 'composite_score' | 'ats_score' | 'role_level_score' | 'verdict'
 type InputTab = 'urls' | 'text'
+
+interface JdEntry {
+  id: string
+  jd_text: string
+  job_title: string
+  company: string
+}
 
 const SORT_LABELS: Record<SortKey, string> = {
   composite_score: 'Composite score',
@@ -60,9 +68,9 @@ function countValidUrls(text: string) {
 export default function DashboardPage() {
   const [tab, setTab] = useState<InputTab>('urls')
   const [urlInput, setUrlInput] = useState('')
-  const [jdTitle, setJdTitle] = useState('')
-  const [jdCompany, setJdCompany] = useState('')
-  const [jdText, setJdText] = useState('')
+  const [jdEntries, setJdEntries] = useState<JdEntry[]>([
+    { id: crypto.randomUUID(), jd_text: '', job_title: '', company: '' },
+  ])
   const [screening, setScreening] = useState(false)
   const [results, setResults] = useState<ScreeningResult[]>([])
   const [batchTime, setBatchTime] = useState<string | null>(null)
@@ -97,7 +105,21 @@ export default function DashboardPage() {
     loadProfile()
   }, [])
 
-  const inputEmpty = tab === 'urls' ? !urlInput.trim() : !jdText.trim()
+  function addJdEntry() {
+    if (jdEntries.length >= 10) return
+    setJdEntries((prev) => [...prev, { id: crypto.randomUUID(), jd_text: '', job_title: '', company: '' }])
+  }
+  function removeJdEntry(id: string) {
+    setJdEntries((prev) => prev.filter((e) => e.id !== id))
+  }
+  function updateJdEntry(id: string, field: keyof Omit<JdEntry, 'id'>, value: string) {
+    setJdEntries((prev) => prev.map((e) => (e.id === id ? { ...e, [field]: value } : e)))
+  }
+
+  const inputEmpty =
+    tab === 'urls'
+      ? !urlInput.trim()
+      : jdEntries.every((e) => !e.jd_text.trim())
   const urlCount = countValidUrls(urlInput)
 
   async function handleScreen() {
@@ -107,7 +129,16 @@ export default function DashboardPage() {
       const payload =
         tab === 'urls'
           ? { urls: urlInput.split('\n').filter((u) => u.trim()), batch_id }
-          : { jd_text: jdText, job_title: jdTitle, company: jdCompany, batch_id }
+          : {
+              jd_entries: jdEntries
+                .filter((e) => e.jd_text.trim())
+                .map((e) => ({
+                  jd_text: e.jd_text,
+                  job_title: e.job_title || undefined,
+                  company: e.company || undefined,
+                })),
+              batch_id,
+            }
 
       const res = await fetch('/api/screen', {
         method: 'POST',
@@ -234,34 +265,61 @@ export default function DashboardPage() {
               )}
             </>
           ) : (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder="Job title (optional)"
-                  value={jdTitle}
-                  onChange={(e) => setJdTitle(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <input
-                  type="text"
-                  placeholder="Company (optional)"
-                  value={jdCompany}
-                  onChange={(e) => setJdCompany(e.target.value)}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <textarea
-                value={jdText}
-                onChange={(e) => setJdText(e.target.value)}
-                rows={7}
-                placeholder="Paste the full job description here..."
-                className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            <div className="space-y-3">
+              {jdEntries.map((entry, idx) => (
+                <div key={entry.id} className="rounded-lg border border-gray-200 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-400">
+                      JD {jdEntries.length > 1 ? `#${idx + 1}` : ''}
+                    </span>
+                    {jdEntries.length > 1 && (
+                      <button
+                        onClick={() => removeJdEntry(entry.id)}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        title="Remove this JD"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Job title (optional)"
+                      value={entry.job_title}
+                      onChange={(e) => updateJdEntry(entry.id, 'job_title', e.target.value)}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Company (optional)"
+                      value={entry.company}
+                      onChange={(e) => updateJdEntry(entry.id, 'company', e.target.value)}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <textarea
+                    value={entry.jd_text}
+                    onChange={(e) => updateJdEntry(entry.id, 'jd_text', e.target.value)}
+                    rows={6}
+                    placeholder="Paste the full job description here..."
+                    className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              ))}
+              {jdEntries.length < 10 && (
+                <button
+                  onClick={addJdEntry}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 border-dashed border-gray-300 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                >
+                  <Plus size={14} />
+                  Add another JD
+                </button>
+              )}
               <p className="text-xs text-gray-400">
-                Use this if the URL tab can&apos;t scrape the page
+                Use this tab when the URL scraper can&apos;t reach the page
               </p>
-            </>
+            </div>
           )}
 
           <button

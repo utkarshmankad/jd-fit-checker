@@ -43,9 +43,10 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { urls, jd_text, job_title, company, batch_id } = body as {
+  const { urls, jd_text, jd_entries, job_title, company, batch_id } = body as {
     urls?: string[]
     jd_text?: string
+    jd_entries?: Array<{ jd_text: string; job_title?: string; company?: string }>
     job_title?: string
     company?: string
     batch_id: string
@@ -131,6 +132,33 @@ export async function POST(request: NextRequest) {
         job_title: result.job_title ?? null,
         company: result.company ?? null,
         jd_text: result.jd_text ?? '',
+        ats_score: result.ats_score,
+        role_level_score: result.role_level_score,
+        composite_score: result.composite_score,
+        verdict: result.verdict,
+        hard_reject_reasons: result.hard_reject_reasons,
+        analysis_json: result as AnalysisResult,
+        created_at: new Date().toISOString(),
+      })
+      if (saved) count++
+    }
+  } else if (jd_entries && Array.isArray(jd_entries) && jd_entries.length > 0) {
+    const entries = jd_entries.filter((e) => e.jd_text?.trim())
+    for (const entry of entries) {
+      const result = await callFastAPI({ jd_text: entry.jd_text })
+      if ('_error' in result) {
+        results.push({ id: '', user_id: user.id, batch_id, job_url: null, job_title: entry.job_title ?? null, company: entry.company ?? null, jd_text: entry.jd_text, ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
+        continue
+      }
+      const saved = await saveResult(result, { jd_text: entry.jd_text, job_title: entry.job_title, company: entry.company })
+      results.push(saved ?? {
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        batch_id,
+        job_url: null,
+        job_title: entry.job_title ?? result.job_title ?? null,
+        company: entry.company ?? result.company ?? null,
+        jd_text: entry.jd_text,
         ats_score: result.ats_score,
         role_level_score: result.role_level_score,
         composite_score: result.composite_score,
