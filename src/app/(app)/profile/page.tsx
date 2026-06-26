@@ -40,9 +40,22 @@ function joinList(arr: string[]): string {
   return arr.join(', ')
 }
 
+type ParsedProfile = {
+  preferred_tech_stack?: string[]
+  target_industries?: string[]
+  title_floor?: string
+  geography_allowed?: string[]
+  tech_stack_dealbreakers?: string[]
+  company_type_excluded?: string[]
+  role_type_excluded?: string[]
+  min_company_size?: number | null
+  max_company_size?: number | null
+}
+
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [parsing, setParsing] = useState(false)
 
   const [fullName, setFullName] = useState('')
   const [resumeText, setResumeText] = useState('')
@@ -92,6 +105,42 @@ export default function ProfilePage() {
     }
     load()
   }, [])
+
+  async function handleParseResume() {
+    if (!resumeText.trim()) {
+      toast.error('Paste your resume first')
+      return
+    }
+    setParsing(true)
+    try {
+      const res = await fetch('/api/parse-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resume_text: resumeText }),
+      })
+      if (!res.ok) {
+        const { error } = (await res.json()) as { error: string }
+        throw new Error(error)
+      }
+      const { parsed } = (await res.json()) as { parsed: ParsedProfile }
+
+      if (parsed.preferred_tech_stack?.length) setPrefTech(joinList(parsed.preferred_tech_stack))
+      if (parsed.target_industries?.length) setPrefIndustries(joinList(parsed.target_industries))
+      if (parsed.title_floor) setTitleFloor(parsed.title_floor)
+      if (parsed.geography_allowed?.length) setGeoAllowed(joinList(parsed.geography_allowed))
+      if (parsed.tech_stack_dealbreakers?.length) setTechDealbreakers(joinList(parsed.tech_stack_dealbreakers))
+      if (parsed.company_type_excluded?.length) setCompanyExcluded(joinList(parsed.company_type_excluded))
+      if (parsed.role_type_excluded?.length) setRoleExcluded(joinList(parsed.role_type_excluded))
+      if (parsed.min_company_size != null) setMinSize(String(parsed.min_company_size))
+      if (parsed.max_company_size != null) setMaxSize(String(parsed.max_company_size))
+
+      toast.success('Preferences autofilled from resume')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Parse failed')
+    } finally {
+      setParsing(false)
+    }
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -182,6 +231,20 @@ export default function ProfilePage() {
             className={`${inputCls} resize-y`}
           />
         </Field>
+        <button
+          onClick={handleParseResume}
+          disabled={parsing || !resumeText.trim()}
+          className="mt-1 flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          {parsing ? (
+            <>
+              <span className="w-4 h-4 border-2 border-gray-400 border-t-blue-600 rounded-full animate-spin" />
+              Parsing…
+            </>
+          ) : (
+            'Parse & Autofill preferences'
+          )}
+        </button>
       </Section>
 
       {/* API key */}
