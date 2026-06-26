@@ -273,11 +273,11 @@ export default function ProfilePage() {
       </Section>
 
       {/* Hard reject filters */}
-      <Section title="Hard reject filters">
+      <Section title="Auto-reject rules">
         <p className="text-sm text-gray-500 -mt-1 mb-3">
-          Jobs matching these will be auto-rejected regardless of other scores.
+          Any job matching these gets instantly rejected — no score calculated.
         </p>
-        <Field label="Tech stack dealbreakers (comma-separated)">
+        <Field label="Tech I won't work with (comma-separated)">
           <input
             type="text"
             value={techDealbreakers}
@@ -286,7 +286,7 @@ export default function ProfilePage() {
             className={inputCls}
           />
         </Field>
-        <Field label="Title floor (minimum seniority)">
+        <Field label="Minimum seniority level">
           <input
             type="text"
             value={titleFloor}
@@ -295,7 +295,7 @@ export default function ProfilePage() {
             className={inputCls}
           />
         </Field>
-        <Field label="Geography allowed (comma-separated)">
+        <Field label="Locations I'm open to (comma-separated)">
           <input
             type="text"
             value={geoAllowed}
@@ -304,7 +304,7 @@ export default function ProfilePage() {
             className={inputCls}
           />
         </Field>
-        <Field label="Company types to exclude (comma-separated)">
+        <Field label="Company types to avoid (comma-separated)">
           <input
             type="text"
             value={companyExcluded}
@@ -313,7 +313,7 @@ export default function ProfilePage() {
             className={inputCls}
           />
         </Field>
-        <Field label="Role types to exclude (comma-separated)">
+        <Field label="Job types to avoid (comma-separated)">
           <input
             type="text"
             value={roleExcluded}
@@ -326,7 +326,7 @@ export default function ProfilePage() {
 
       {/* Preferences */}
       <Section title="Preferences">
-        <Field label="Preferred tech stack (comma-separated)">
+        <Field label="Tech stack I enjoy (comma-separated)">
           <input
             type="text"
             value={prefTech}
@@ -335,7 +335,7 @@ export default function ProfilePage() {
             className={inputCls}
           />
         </Field>
-        <Field label="Target industries (comma-separated)">
+        <Field label="Industries I'm targeting (comma-separated)">
           <input
             type="text"
             value={prefIndustries}

@@ -5,8 +5,6 @@ import { createClient } from '@/lib/supabase/client'
 import { FileSearch, Eye, ExternalLink, Download, Share2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { ScreeningResult } from '@/types'
-import PaymentModal from '@/components/payment/PaymentModal'
-
 type SortKey = 'composite_score' | 'ats_score' | 'role_level_score' | 'verdict'
 type InputTab = 'urls' | 'text'
 
@@ -59,8 +57,6 @@ function countValidUrls(text: string) {
     }).length
 }
 
-const FREE_LIMIT = 5
-
 export default function DashboardPage() {
   const [tab, setTab] = useState<InputTab>('urls')
   const [urlInput, setUrlInput] = useState('')
@@ -75,8 +71,6 @@ export default function DashboardPage() {
   const [shareLoading, setShareLoading] = useState(false)
   const [hasResume, setHasResume] = useState<boolean | null>(null)
   const [userTier, setUserTier] = useState<'free' | 'paid'>('free')
-  const [screensUsed, setScreensUsed] = useState(0)
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
 
   useEffect(() => {
     async function loadProfile() {
@@ -88,13 +82,12 @@ export default function DashboardPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('tier, screens_used_this_month, resume_text')
+        .select('tier, resume_text')
         .eq('id', user.id)
         .single()
 
       if (profile) {
         setUserTier((profile.tier as 'free' | 'paid') ?? 'free')
-        setScreensUsed((profile.screens_used_this_month as number) ?? 0)
         setHasResume(!!(profile.resume_text as string | null))
       } else {
         setHasResume(false)
@@ -104,7 +97,6 @@ export default function DashboardPage() {
     loadProfile()
   }, [])
 
-  const isOverLimit = userTier === 'free' && screensUsed >= FREE_LIMIT
   const inputEmpty = tab === 'urls' ? !urlInput.trim() : !jdText.trim()
   const urlCount = countValidUrls(urlInput)
 
@@ -182,12 +174,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      <PaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onSuccess={() => setUserTier('paid')}
-      />
-
       {/* Profile incomplete banner */}
       {hasResume === false && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
@@ -204,25 +190,6 @@ export default function DashboardPage() {
       {/* Top bar */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Screen JDs</h1>
-        <div className="flex items-center gap-2">
-          <span
-            className="px-3 py-1 rounded-full text-xs font-bold tracking-wide text-white"
-            style={{ backgroundColor: '#1B3A5C' }}
-          >
-            {userTier === 'paid' ? 'PAID' : 'FREE'}
-          </span>
-          <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-            {userTier === 'paid' ? 'Unlimited' : `${screensUsed} of ${FREE_LIMIT} used`}
-          </span>
-          {userTier === 'free' && (
-            <button
-              onClick={() => setShowPaymentModal(true)}
-              className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors"
-            >
-              Upgrade →
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Input section */}
@@ -298,8 +265,8 @@ export default function DashboardPage() {
           )}
 
           <button
-            onClick={isOverLimit ? () => setShowPaymentModal(true) : handleScreen}
-            disabled={screening || (!isOverLimit && inputEmpty)}
+            onClick={handleScreen}
+            disabled={screening || inputEmpty}
             className="w-full py-3 rounded-lg font-medium text-sm text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ backgroundColor: '#1B3A5C' }}
           >
@@ -322,8 +289,6 @@ export default function DashboardPage() {
                 </svg>
                 Screening...
               </span>
-            ) : isOverLimit ? (
-              'Upgrade to screen more'
             ) : (
               'Screen JDs →'
             )}

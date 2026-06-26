@@ -3,8 +3,6 @@ import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/utils/crypto'
 import type { AnalysisResult, ScreeningResult } from '@/types'
 
-const FREE_LIMIT = 5
-
 type FastAPIResult = AnalysisResult & {
   job_title?: string
   company?: string
@@ -28,13 +26,6 @@ export async function POST(request: NextRequest) {
 
   if (profileError || !profile) {
     return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-  }
-
-  if (profile.tier === 'free' && profile.screens_used_this_month >= FREE_LIMIT) {
-    return NextResponse.json(
-      { error: 'Monthly limit reached', upgrade_required: true },
-      { status: 403 }
-    )
   }
 
   if (!profile.api_key_encrypted) {
