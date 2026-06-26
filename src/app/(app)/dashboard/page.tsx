@@ -60,7 +60,6 @@ function countValidUrls(text: string) {
 }
 
 const FREE_LIMIT = 5
-const LS_KEY = 'jd-fit-checker-last-results'
 
 export default function DashboardPage() {
   const [tab, setTab] = useState<InputTab>('urls')
@@ -80,17 +79,6 @@ export default function DashboardPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(LS_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved) as { results: ScreeningResult[]; batchTime: string }
-        if (parsed.results?.length) {
-          setResults(parsed.results)
-          setBatchTime(parsed.batchTime ?? null)
-        }
-      }
-    } catch {}
-
     async function loadProfile() {
       const supabase = createClient()
       const {
@@ -141,10 +129,8 @@ export default function DashboardPage() {
       }
 
       const data = (await res.json()) as { results: ScreeningResult[] }
-      const now = new Date().toISOString()
       setResults(data.results)
-      setBatchTime(now)
-      localStorage.setItem(LS_KEY, JSON.stringify({ results: data.results, batchTime: now }))
+      setBatchTime(new Date().toISOString())
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Screening failed')
     } finally {
@@ -249,7 +235,7 @@ export default function DashboardPage() {
             {(['urls', 'text'] as InputTab[]).map((t) => (
               <button
                 key={t}
-                onClick={() => setTab(t)}
+                onClick={() => { setTab(t); setResults([]); setBatchTime(null); }}
                 className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
                   tab === t
                     ? 'border-blue-600 text-blue-600'
@@ -466,27 +452,33 @@ export default function DashboardPage() {
                       <tr className="bg-slate-50">
                         <td colSpan={7} className="px-6 py-5">
                           <div className="space-y-4 max-w-3xl">
+                            {result.hard_reject_reasons?.length > 0 && !result.analysis_json?.matching_skills && (
+                              <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200">
+                                <p className="text-xs font-semibold text-red-600 mb-0.5">Error</p>
+                                <p className="text-sm text-red-700">{result.hard_reject_reasons[0]}</p>
+                              </div>
+                            )}
                             <SkillPills
                               label="Matching skills"
-                              skills={result.analysis_json.matching_skills}
+                              skills={result.analysis_json?.matching_skills ?? []}
                               color="green"
                             />
                             <SkillPills
                               label="Missing skills"
-                              skills={result.analysis_json.missing_skills}
+                              skills={result.analysis_json?.missing_skills ?? []}
                               color="red"
                             />
                             <AnalysisBlock
                               label="Role level assessment"
-                              text={result.analysis_json.role_level_assessment}
+                              text={result.analysis_json?.role_level_assessment ?? ''}
                             />
                             <AnalysisBlock
                               label="Gap analysis"
-                              text={result.analysis_json.gap_analysis}
+                              text={result.analysis_json?.gap_analysis ?? ''}
                             />
                             <AnalysisBlock
                               label="Recommendation"
-                              text={result.analysis_json.recommendation}
+                              text={result.analysis_json?.recommendation ?? ''}
                             />
                           </div>
                         </td>

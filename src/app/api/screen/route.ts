@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createServiceClient } from '@/lib/supabase/service'
 import { decrypt } from '@/lib/utils/crypto'
 import type { AnalysisResult, ScreeningResult } from '@/types'
 
@@ -66,7 +65,6 @@ export async function POST(request: NextRequest) {
   }
 
   const apiUrl = process.env.NEXT_PUBLIC_SCREENING_API_URL!
-  const service = createServiceClient()
   const results: ScreeningResult[] = []
   let count = 0
 
@@ -94,7 +92,7 @@ export async function POST(request: NextRequest) {
     analysis: FastAPIResult,
     overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }
   ): Promise<ScreeningResult | null> {
-    const { data: saved, error } = await service
+    const { data: saved, error } = await supabase
       .from('screening_results')
       .insert({
         user_id: user!.id,
@@ -113,7 +111,10 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (error) return null
+    if (error) {
+      console.error('screening_results insert failed:', error.message)
+      return null
+    }
     return saved as ScreeningResult
   }
 
@@ -127,10 +128,23 @@ export async function POST(request: NextRequest) {
         continue
       }
       const saved = await saveResult(result, { job_url: url })
-      if (saved) {
-        results.push(saved)
-        count++
-      }
+      results.push(saved ?? {
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        batch_id,
+        job_url: url,
+        job_title: result.job_title ?? null,
+        company: result.company ?? null,
+        jd_text: result.jd_text ?? '',
+        ats_score: result.ats_score,
+        role_level_score: result.role_level_score,
+        composite_score: result.composite_score,
+        verdict: result.verdict,
+        hard_reject_reasons: result.hard_reject_reasons,
+        analysis_json: result as AnalysisResult,
+        created_at: new Date().toISOString(),
+      })
+      if (saved) count++
     }
   } else if (jd_text) {
     const result = await callFastAPI({ jd_text })
@@ -138,16 +152,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result._error }, { status: result._status })
     }
     const saved = await saveResult(result, { jd_text, job_title, company })
-    if (saved) {
-      results.push(saved)
-      count++
-    }
+    results.push(saved ?? {
+      id: crypto.randomUUID(),
+      user_id: user.id,
+      batch_id,
+      job_url: null,
+      job_title: job_title ?? result.job_title ?? null,
+      company: company ?? result.company ?? null,
+      jd_text: jd_text ?? result.jd_text ?? '',
+      ats_score: result.ats_score,
+      role_level_score: result.role_level_score,
+      composite_score: result.composite_score,
+      verdict: result.verdict,
+      hard_reject_reasons: result.hard_reject_reasons,
+      analysis_json: result as AnalysisResult,
+      created_at: new Date().toISOString(),
+    })
+    if (saved) count++
   } else {
     return NextResponse.json({ error: 'Provide urls or jd_text' }, { status: 400 })
   }
 
   if (count > 0) {
-    await service
+    await supabase
       .from('profiles')
       .update({ screens_used_this_month: (profile.screens_used_this_month as number) + count })
       .eq('id', user.id)
