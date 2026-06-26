@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        jd_text: '',
         ...body,
         resume_text: profile!.resume_text,
         hard_reject_filters: profile!.hard_reject_filters,
@@ -81,8 +82,11 @@ export async function POST(request: NextRequest) {
       }),
     })
     if (!res.ok) {
-      const errBody = await res.json().catch(() => ({})) as Record<string, string>
-      const msg = errBody.detail ?? errBody.error ?? res.statusText
+      const errBody = await res.json().catch(() => ({})) as Record<string, unknown>
+      const detail = errBody.detail
+      const msg = Array.isArray(detail)
+        ? (detail as Array<{ msg: string; loc: string[] }>).map((e) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(', ')
+        : (detail as string | undefined) ?? (errBody.error as string | undefined) ?? res.statusText
       return { _error: msg, _status: res.status }
     }
     return res.json() as Promise<FastAPIResult>
