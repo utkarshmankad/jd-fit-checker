@@ -3,8 +3,8 @@ import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto'
 const ALGO = 'aes-256-cbc'
 
 function getKey(): Buffer {
-  const raw = process.env.ENCRYPTION_KEY
-  if (!raw) throw new Error('ENCRYPTION_KEY not set')
+  const raw = process.env.ENCRYPTION_SECRET ?? process.env.ENCRYPTION_KEY
+  if (!raw) throw new Error('ENCRYPTION_SECRET (or ENCRYPTION_KEY) not set')
   // Accept 64-char hex or base64
   if (/^[0-9a-f]{64}$/i.test(raw)) return Buffer.from(raw, 'hex')
   return Buffer.from(raw, 'base64')
