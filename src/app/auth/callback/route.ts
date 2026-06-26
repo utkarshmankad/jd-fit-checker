@@ -8,9 +8,14 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
-      redirect('/dashboard')
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (!error && data.user) {
+      const user = data.user
+      // Google / OAuth users already have a name — skip registration
+      const isOAuth = (user.app_metadata?.provider ?? 'email') !== 'email'
+      const isRegistered = isOAuth || user.user_metadata?.registration_completed === true
+      redirect(isRegistered ? '/dashboard' : '/auth/register')
     }
   }
 
