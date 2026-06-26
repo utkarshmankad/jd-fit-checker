@@ -49,8 +49,9 @@ export async function PUT(request: NextRequest) {
   if (body.api_key) {
     try {
       updates.api_key_encrypted = encrypt(body.api_key)
-    } catch {
-      return NextResponse.json({ error: 'Failed to encrypt API key' }, { status: 500 })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return NextResponse.json({ error: `Failed to encrypt API key: ${msg}` }, { status: 500 })
     }
   }
 
