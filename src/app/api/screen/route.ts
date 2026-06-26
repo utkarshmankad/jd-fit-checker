@@ -1,0 +1,157 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { decrypt } from '@/lib/utils/crypto'
+import type { AnalysisResult, ScreeningResult } from '@/types'
+
+const FREE_LIMIT = 5
+
+type FastAPIResult = AnalysisResult & {
+  job_title?: string
+  company?: string
+  jd_text?: string
+}
+
+export async function POST(request: NextRequest) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select(
+      'resume_text, hard_reject_filters, api_key_encrypted, api_provider, tier, screens_used_this_month'
+    )
+    .eq('id', user.id)
+    .single()
+
+  if (profileError || !profile) {
+    return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+  }
+
+  if (profile.tier === 'free' && profile.screens_used_this_month >= FREE_LIMIT) {
+    return NextResponse.json(
+      { error: 'Monthly limit reached', upgrade_required: true },
+      { status: 403 }
+    )
+  }
+
+  if (!profile.api_key_encrypted) {
+    return NextResponse.json(
+      { error: 'No API key configured. Set up your profile first.' },
+      { status: 400 }
+    )
+  }
+
+  let apiKey: string
+  try {
+    apiKey = decrypt(profile.api_key_encrypted as string)
+  } catch {
+    return NextResponse.json({ error: 'Failed to decrypt API key' }, { status: 500 })
+  }
+
+  const body = await request.json()
+  const { urls, jd_text, job_title, company, batch_id } = body as {
+    urls?: string[]
+    jd_text?: string
+    job_title?: string
+    company?: string
+    batch_id: string
+  }
+
+  if (!batch_id) {
+    return NextResponse.json({ error: 'batch_id is required' }, { status: 400 })
+  }
+
+  const apiUrl = process.env.NEXT_PUBLIC_SCREENING_API_URL!
+  const service = createServiceClient()
+  const results: ScreeningResult[] = []
+  let count = 0
+
+  async function callFastAPI(body: Record<string, unknown>): Promise<FastAPIResult | { _error: string; _status: number }> {
+    const res = await fetch(`${apiUrl}/screen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...body,
+        resume_text: profile!.resume_text,
+        hard_reject_filters: profile!.hard_reject_filters,
+        api_key: apiKey,
+        api_provider: profile!.api_provider,
+      }),
+    })
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({})) as Record<string, string>
+      const msg = errBody.detail ?? errBody.error ?? res.statusText
+      return { _error: msg, _status: res.status }
+    }
+    return res.json() as Promise<FastAPIResult>
+  }
+
+  async function saveResult(
+    analysis: FastAPIResult,
+    overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }
+  ): Promise<ScreeningResult | null> {
+    const { data: saved, error } = await service
+      .from('screening_results')
+      .insert({
+        user_id: user!.id,
+        batch_id,
+        job_url: overrides.job_url ?? null,
+        job_title: overrides.job_title ?? analysis.job_title ?? null,
+        company: overrides.company ?? analysis.company ?? null,
+        jd_text: overrides.jd_text ?? analysis.jd_text ?? '',
+        ats_score: analysis.ats_score,
+        role_level_score: analysis.role_level_score,
+        composite_score: analysis.composite_score,
+        verdict: analysis.verdict,
+        hard_reject_reasons: analysis.hard_reject_reasons,
+        analysis_json: analysis,
+      })
+      .select()
+      .single()
+
+    if (error) return null
+    return saved as ScreeningResult
+  }
+
+  if (urls && Array.isArray(urls) && urls.length > 0) {
+    const urlList = urls.slice(0, 20).filter((u) => u.trim())
+    for (const url of urlList) {
+      const result = await callFastAPI({ job_url: url })
+      if ('_error' in result) {
+        // Forward the error but continue processing other URLs
+        results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
+        continue
+      }
+      const saved = await saveResult(result, { job_url: url })
+      if (saved) {
+        results.push(saved)
+        count++
+      }
+    }
+  } else if (jd_text) {
+    const result = await callFastAPI({ jd_text })
+    if ('_error' in result) {
+      return NextResponse.json({ error: result._error }, { status: result._status })
+    }
+    const saved = await saveResult(result, { jd_text, job_title, company })
+    if (saved) {
+      results.push(saved)
+      count++
+    }
+  } else {
+    return NextResponse.json({ error: 'Provide urls or jd_text' }, { status: 400 })
+  }
+
+  if (count > 0) {
+    await service
+      .from('profiles')
+      .update({ screens_used_this_month: (profile.screens_used_this_month as number) + count })
+      .eq('id', user.id)
+  }
+
+  return NextResponse.json({ results })
+}
