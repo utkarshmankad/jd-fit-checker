@@ -147,55 +147,63 @@ export async function POST(request: NextRequest) {
   const provider = profile.api_provider ?? 'anthropic'
   let rawText: string
 
+  function aiErrorMessage(status: number): string {
+    if (status === 401) return 'Invalid key — check you copied it correctly'
+    if (status === 429) return 'Key is valid but rate limited — try again in a moment'
+    return `API error (${status})`
+  }
+
   if (provider === 'anthropic') {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-opus-4-8',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: `${PARSE_PROMPT}\n\nResume:\n${resumeText}` }],
-      }),
-    })
+    let res: Response
+    try {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-8',
+          max_tokens: 1024,
+          messages: [{ role: 'user', content: `${PARSE_PROMPT}\n\nResume:\n${resumeText}` }],
+        }),
+      })
+    } catch {
+      return NextResponse.json({ error: 'Could not reach the API provider' }, { status: 503 })
+    }
 
     if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { error?: { message?: string } }
-      return NextResponse.json(
-        { error: err.error?.message ?? `Anthropic API error (${res.status})` },
-        { status: res.status }
-      )
+      return NextResponse.json({ error: aiErrorMessage(res.status) }, { status: res.status })
     }
 
     const data = (await res.json()) as { content: Array<{ type: string; text: string }> }
     rawText = data.content.find((b) => b.type === 'text')?.text ?? ''
   } else {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        max_tokens: 1024,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: PARSE_PROMPT },
-          { role: 'user', content: `Resume:\n${resumeText}` },
-        ],
-      }),
-    })
+    let res: Response
+    try {
+      res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          max_tokens: 1024,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: PARSE_PROMPT },
+            { role: 'user', content: `Resume:\n${resumeText}` },
+          ],
+        }),
+      })
+    } catch {
+      return NextResponse.json({ error: 'Could not reach the API provider' }, { status: 503 })
+    }
 
     if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as { error?: { message?: string } }
-      return NextResponse.json(
-        { error: err.error?.message ?? `OpenAI API error (${res.status})` },
-        { status: res.status }
-      )
+      return NextResponse.json({ error: aiErrorMessage(res.status) }, { status: res.status })
     }
 
     const data = (await res.json()) as { choices: Array<{ message: { content: string } }> }

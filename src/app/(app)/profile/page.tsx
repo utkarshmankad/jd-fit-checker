@@ -82,8 +82,8 @@ function ResumeUploader({ onParsed }: { onParsed: (p: ParsedProfile) => void }) 
     try {
       const res = await fetch('/api/parse-resume', { method: 'POST', body: formData })
       if (!res.ok) {
-        const { error } = (await res.json()) as { error: string }
-        throw new Error(error)
+        const json = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(json.error ?? 'Parse failed')
       }
       const { parsed } = (await res.json()) as { parsed: ParsedProfile }
       onParsed(parsed)
@@ -91,8 +91,9 @@ function ResumeUploader({ onParsed }: { onParsed: (p: ParsedProfile) => void }) 
       toast.success('Preferences autofilled from resume')
     } catch (err) {
       setStatus('error')
-      setErrorMsg(err instanceof Error ? err.message : 'Parse failed')
-      toast.error(err instanceof Error ? err.message : 'Parse failed')
+      // #8: specific inline error — keep upload area visible so they can retry
+      const msg = err instanceof Error ? err.message : 'Parse failed'
+      setErrorMsg(msg)
     }
   }
 
@@ -137,13 +138,19 @@ function ResumeUploader({ onParsed }: { onParsed: (p: ParsedProfile) => void }) 
       )}
 
       {status === 'error' && (
-        <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2">
-          <AlertCircle size={13} />
-          <span>{errorMsg}</span>
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2.5">
+            <AlertCircle size={13} className="shrink-0 mt-0.5" />
+            <span>
+              {errorMsg
+                ? `${errorMsg} — try a different PDF, or paste your resume text manually.`
+                : 'Could not parse this resume. Try a different PDF, or paste your resume text manually.'}
+            </span>
+          </div>
         </div>
       )}
 
-      {status === 'idle' && (
+      {(status === 'idle' || status === 'error') && (
         <p className="text-xs text-gray-400">
           Your resume is used only to autofill preferences below — it is never stored.
         </p>
@@ -155,6 +162,7 @@ function ResumeUploader({ onParsed }: { onParsed: (p: ParsedProfile) => void }) 
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const [fullName, setFullName] = useState('')
   const [apiKey, setApiKey] = useState('')
@@ -230,6 +238,7 @@ export default function ProfilePage() {
 
   async function handleSave() {
     setSaving(true)
+    setSaveError(null)
     try {
       const res = await fetch('/api/profile', {
         method: 'PUT',
@@ -254,14 +263,16 @@ export default function ProfilePage() {
       })
 
       if (!res.ok) {
-        const { error } = (await res.json()) as { error: string }
-        throw new Error(error)
+        const json = (await res.json().catch(() => ({}))) as { error?: string }
+        // #10: inline save error — form stays filled so user doesn't retype
+        setSaveError(json.error ?? `Save failed (${res.status}). Try again.`)
+        return
       }
 
       toast.success('Profile saved')
       if (apiKey) setApiKey('')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Save failed')
+    } catch {
+      setSaveError('Save failed — could not reach the server. Check your connection and try again.')
     } finally {
       setSaving(false)
     }
@@ -441,6 +452,14 @@ export default function ProfilePage() {
           </Field>
         </div>
       </Section>
+
+      {/* #10: inline save error */}
+      {saveError && (
+        <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <AlertCircle size={15} className="shrink-0 mt-0.5" />
+          <span>Save failed — {saveError}</span>
+        </div>
+      )}
 
       <button
         onClick={handleSave}

@@ -3,10 +3,18 @@ import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/utils/crypto'
 import type { AnalysisResult, ScreeningResult } from '@/types'
 
+const FREE_TIER_LIMIT = 5
+
 type FastAPIResult = AnalysisResult & {
   job_title?: string
   company?: string
   jd_text?: string
+}
+
+export type FatalScreenError = {
+  type: 'invalid_key' | 'rate_limit'
+  message: string
+  provider: string
 }
 
 export async function POST(request: NextRequest) {
@@ -32,6 +40,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: 'No API key configured. Set up your profile first.' },
       { status: 400 }
+    )
+  }
+
+  if (profile.tier === 'free' && (profile.screens_used_this_month as number) >= FREE_TIER_LIMIT) {
+    return NextResponse.json(
+      { error: 'Monthly screen limit reached. Upgrade to continue.', upgrade_required: true },
+      { status: 403 }
     )
   }
 
@@ -64,6 +79,8 @@ export async function POST(request: NextRequest) {
   const apiUrl = process.env.NEXT_PUBLIC_SCREENING_API_URL!
   const results: ScreeningResult[] = []
   let count = 0
+  let fatalError: FatalScreenError | null = null
+  const provider = (profile.api_provider as string) ?? 'anthropic'
 
   async function callFastAPI(body: Record<string, unknown>): Promise<FastAPIResult | { _error: string; _status: number }> {
     let res: Response
@@ -129,7 +146,14 @@ export async function POST(request: NextRequest) {
     for (const url of urlList) {
       const result = await callFastAPI({ job_url: url })
       if ('_error' in result) {
-        // Forward the error but continue processing other URLs
+        if (result._status === 401) {
+          fatalError = { type: 'invalid_key', message: result._error, provider }
+          break
+        }
+        if (result._status === 429) {
+          fatalError = { type: 'rate_limit', message: result._error, provider }
+          break
+        }
         results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
         continue
       }
@@ -157,6 +181,14 @@ export async function POST(request: NextRequest) {
     for (const entry of entries) {
       const result = await callFastAPI({ jd_text: entry.jd_text })
       if ('_error' in result) {
+        if (result._status === 401) {
+          fatalError = { type: 'invalid_key', message: result._error, provider }
+          break
+        }
+        if (result._status === 429) {
+          fatalError = { type: 'rate_limit', message: result._error, provider }
+          break
+        }
         results.push({ id: '', user_id: user.id, batch_id, job_url: null, job_title: entry.job_title ?? null, company: entry.company ?? null, jd_text: entry.jd_text, ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
         continue
       }
@@ -182,26 +214,29 @@ export async function POST(request: NextRequest) {
   } else if (jd_text) {
     const result = await callFastAPI({ jd_text })
     if ('_error' in result) {
-      return NextResponse.json({ error: result._error }, { status: result._status })
+      if (result._status === 401) fatalError = { type: 'invalid_key', message: result._error, provider }
+      else if (result._status === 429) fatalError = { type: 'rate_limit', message: result._error, provider }
+      else return NextResponse.json({ error: result._error }, { status: result._status })
+    } else {
+      const saved = await saveResult(result, { jd_text, job_title, company })
+      results.push(saved ?? {
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        batch_id,
+        job_url: null,
+        job_title: job_title ?? result.job_title ?? null,
+        company: company ?? result.company ?? null,
+        jd_text: jd_text ?? result.jd_text ?? '',
+        ats_score: result.ats_score,
+        role_level_score: result.role_level_score,
+        composite_score: result.composite_score,
+        verdict: result.verdict,
+        hard_reject_reasons: result.hard_reject_reasons,
+        analysis_json: result as AnalysisResult,
+        created_at: new Date().toISOString(),
+      })
+      if (saved) count++
     }
-    const saved = await saveResult(result, { jd_text, job_title, company })
-    results.push(saved ?? {
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      batch_id,
-      job_url: null,
-      job_title: job_title ?? result.job_title ?? null,
-      company: company ?? result.company ?? null,
-      jd_text: jd_text ?? result.jd_text ?? '',
-      ats_score: result.ats_score,
-      role_level_score: result.role_level_score,
-      composite_score: result.composite_score,
-      verdict: result.verdict,
-      hard_reject_reasons: result.hard_reject_reasons,
-      analysis_json: result as AnalysisResult,
-      created_at: new Date().toISOString(),
-    })
-    if (saved) count++
   } else {
     return NextResponse.json({ error: 'Provide urls or jd_text' }, { status: 400 })
   }
@@ -213,7 +248,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
   }
 
-  return NextResponse.json({ results })
+  return NextResponse.json({ results, ...(fatalError ? { fatalError } : {}) })
 }
 
 // LinkedIn collection/recommended URLs include ?currentJobId=XXX but redirect to an
