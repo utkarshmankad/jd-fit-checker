@@ -65,13 +65,7 @@ function countValidUrls(text: string) {
     }).length
 }
 
-// Bookmarklet: opens this app with the collected job URLs as a query param (no clipboard needed).
-// appOrigin is injected at render time so the bookmarklet always points to the right host.
-function getLinkedInBookmarklet(appOrigin: string): string {
-  return `javascript:(async()=>{const s=new Set();function c(){document.querySelectorAll('[data-job-id],[data-occludable-job-id]').forEach(e=>{const i=e.getAttribute('data-job-id')||e.getAttribute('data-occludable-job-id');if(i&&/^\\d{5,}$/.test(i))s.add(i)});document.querySelectorAll('a[href*="/jobs/view/"]').forEach(e=>{const m=(e.getAttribute('href')||'').match(/\\/jobs\\/view\\/(\\d+)/);if(m)s.add(m[1])})}c();for(let i=0;i<10;i++){window.scrollBy(0,800);await new Promise(r=>setTimeout(r,800));c()}const u=[...s].slice(0,20).map(i=>'https://www.linkedin.com/jobs/view/'+i+'/').join('\\n');if(!u){alert('No jobs found. Make sure you are on the LinkedIn recommended jobs page.');return;}window.open('${appOrigin}/dashboard?linkedin_import='+encodeURIComponent(u),'_blank');})()`
-}
-
-// Console script fallback: copies to clipboard for advanced users.
+// Console script: run in browser DevTools on the LinkedIn recommended jobs page.
 const LINKEDIN_CONSOLE_SCRIPT = `(async () => {
   const ids = new Set();
   function collect() {
@@ -111,22 +105,6 @@ export default function DashboardPage() {
   const [userTier, setUserTier] = useState<'free' | 'paid'>('free')
   const [showLinkedInHelper, setShowLinkedInHelper] = useState(false)
   const [scriptCopied, setScriptCopied] = useState(false)
-  const [appOrigin, setAppOrigin] = useState('')
-
-  // Detect ?linkedin_import= param set by the bookmarklet and auto-fill the URL input.
-  useEffect(() => {
-    setAppOrigin(window.location.origin)
-    const params = new URLSearchParams(window.location.search)
-    const li = params.get('linkedin_import')
-    if (li) {
-      const urls = decodeURIComponent(li).trim()
-      const count = urls.split('\n').filter(Boolean).length
-      setUrlInput(urls)
-      setTab('urls')
-      window.history.replaceState({}, '', '/dashboard')
-      toast.success(`${count} LinkedIn job${count !== 1 ? 's' : ''} loaded — ready to screen`)
-    }
-  }, [])
 
   useEffect(() => {
     async function loadProfile() {
@@ -326,28 +304,14 @@ export default function DashboardPage() {
                 {showLinkedInHelper && (
                   <div className="border-t border-gray-100 px-4 py-4 space-y-4 bg-gray-50 text-sm text-gray-700">
                     <p className="text-xs text-gray-500">
-                      Install the bookmarklet once. Click it on the LinkedIn recommended page — it
-                      auto-scrolls, collects all visible jobs, and opens this app with the URLs
-                      pre-loaded. No copy/paste needed.
+                      Run this script in your browser console while on the LinkedIn recommended jobs
+                      page. It auto-scrolls, collects up to 20 jobs, and copies the URLs — then
+                      paste them into the URL input above.
                     </p>
 
-                    <ol className="space-y-4 text-sm">
+                    <ol className="space-y-3 text-sm">
                       <li className="flex gap-2">
                         <span className="font-bold text-gray-400 shrink-0">1.</span>
-                        <span>
-                          <strong>Install once:</strong> drag this button to your bookmarks bar —{' '}
-                          <a
-                            href={appOrigin ? getLinkedInBookmarklet(appOrigin) : '#'}
-                            onClick={(e) => { if (!appOrigin) e.preventDefault() }}
-                            className="inline-block px-3 py-1 bg-blue-600 text-white rounded text-xs font-semibold no-underline hover:bg-blue-700"
-                            title="Drag me to your bookmarks bar"
-                          >
-                            📋 JD Fit – LinkedIn Import
-                          </a>
-                        </span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="font-bold text-gray-400 shrink-0">2.</span>
                         <span>
                           Go to{' '}
                           <a
@@ -358,37 +322,40 @@ export default function DashboardPage() {
                           >
                             LinkedIn Recommended Jobs
                           </a>{' '}
-                          while logged in, then click the bookmarklet.
+                          while logged in.
+                        </span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="font-bold text-gray-400 shrink-0">2.</span>
+                        <span>
+                          Open DevTools — press <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-xs">F12</kbd> on Windows/Linux or{' '}
+                          <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-xs">Cmd ⌥ J</kbd> on Mac — and go to the <strong>Console</strong> tab.
                         </span>
                       </li>
                       <li className="flex gap-2">
                         <span className="font-bold text-gray-400 shrink-0">3.</span>
-                        <span>
-                          It auto-scrolls (~10 sec), extracts up to 20 jobs, and opens this page
-                          with the URLs ready to screen. Click <strong>Screen JDs</strong>.
-                        </span>
+                        <span>Copy the script below, paste it into the console, and press Enter. Wait ~10 seconds.</span>
                       </li>
                     </ol>
 
-                    <details className="text-xs">
-                      <summary className="cursor-pointer text-gray-400 hover:text-gray-600 select-none">
-                        Advanced: run in browser console instead
-                      </summary>
-                      <div className="mt-2 relative">
-                        <pre className="bg-gray-900 text-green-300 rounded-lg px-4 py-3 text-xs overflow-x-auto leading-relaxed whitespace-pre-wrap break-all">{LINKEDIN_CONSOLE_SCRIPT}</pre>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await navigator.clipboard.writeText(LINKEDIN_CONSOLE_SCRIPT)
-                            setScriptCopied(true)
-                            setTimeout(() => setScriptCopied(false), 2000)
-                          }}
-                          className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs text-gray-200 transition-colors"
-                        >
-                          {scriptCopied ? <><Check size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
-                        </button>
-                      </div>
-                    </details>
+                    <div className="relative">
+                      <pre className="bg-gray-900 text-green-300 rounded-lg px-4 py-3 text-xs overflow-x-auto leading-relaxed whitespace-pre-wrap break-all">{LINKEDIN_CONSOLE_SCRIPT}</pre>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(LINKEDIN_CONSOLE_SCRIPT)
+                          setScriptCopied(true)
+                          setTimeout(() => setScriptCopied(false), 2000)
+                        }}
+                        className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs text-gray-200 transition-colors"
+                      >
+                        {scriptCopied ? <><Check size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-gray-500">
+                      The script copies up to 20 job URLs to your clipboard and shows an alert. Paste them into the URL input above, then click <strong>Screen JDs</strong>.
+                    </p>
                   </div>
                 )}
               </div>
