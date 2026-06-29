@@ -1,13 +1,27 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
 type AuthTab = 'signin' | 'signup'
 
-export default function LoginPage() {
+function formatAuthError(raw: string): string {
+  const lower = raw.toLowerCase()
+  if (lower.includes('rate limit') || lower.includes('email rate') || lower.includes('over_email')) {
+    return 'Too many emails sent. Wait a few minutes, then try again.'
+  }
+  if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) {
+    return 'Wrong email or password.'
+  }
+  if (lower.includes('email not confirmed')) {
+    return 'Email not confirmed — check your inbox for a verification link.'
+  }
+  return raw
+}
+
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -21,7 +35,6 @@ export default function LoginPage() {
   const [magicLinkSent, setMagicLinkSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Redirect away if already authenticated
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
@@ -96,24 +109,10 @@ export default function LoginPage() {
     }
   }
 
-  function formatAuthError(raw: string): string {
-    const lower = raw.toLowerCase()
-    if (lower.includes('rate limit') || lower.includes('email rate') || lower.includes('over_email')) {
-      return 'Too many emails sent. Wait a few minutes, then try again. (Supabase OTP rate limit)'
-    }
-    if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) {
-      return 'Wrong email or password.'
-    }
-    if (lower.includes('email not confirmed')) {
-      return 'Email not confirmed — check your inbox for a verification link.'
-    }
-    return raw
-  }
-
   const benefits = [
     'Screen 20 JDs in 60 seconds',
     'ATS score before you apply',
-    'Auto-reject roles that don\'t fit',
+    "Auto-reject roles that don't fit",
   ]
 
   return (
@@ -180,7 +179,7 @@ export default function LoginPage() {
             <p className="text-sm text-gray-500 mt-1">
               {tab === 'signin'
                 ? 'Sign in with your email and password.'
-                : 'Enter your email — we\'ll send a sign-up link.'}
+                : "Enter your email — we'll send a sign-up link."}
             </p>
           </div>
 
@@ -314,5 +313,17 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
