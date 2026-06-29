@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Download, Share2, History } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Download, History, Search, ArrowUpDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { ScreeningResult } from '@/types'
 
@@ -12,12 +12,8 @@ interface Batch {
   results: ScreeningResult[]
 }
 
-const VERDICT_ORDER: Record<string, number> = {
-  STRONG: 0,
-  DECENT: 1,
-  WEAK: 2,
-  REJECT: 3,
-}
+const VERDICTS = ['ALL', 'STRONG', 'DECENT', 'WEAK', 'REJECT'] as const
+type VerdictFilter = (typeof VERDICTS)[number]
 
 function verdictClass(v: string) {
   const map: Record<string, string> = {
@@ -29,26 +25,48 @@ function verdictClass(v: string) {
   return map[v] ?? 'bg-gray-100 text-gray-700'
 }
 
+function verdictFilterClass(v: VerdictFilter, active: boolean) {
+  if (!active) return 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
+  if (v === 'ALL') return 'bg-gray-900 text-white border border-gray-900'
+  const map: Record<string, string> = {
+    STRONG: 'bg-green-600 text-white border border-green-600',
+    DECENT: 'bg-amber-500 text-white border border-amber-500',
+    WEAK: 'bg-gray-500 text-white border border-gray-500',
+    REJECT: 'bg-red-600 text-white border border-red-600',
+  }
+  return map[v] ?? 'bg-gray-900 text-white border border-gray-900'
+}
+
 function scoreClass(n: number) {
   if (n >= 70) return 'text-green-700 font-semibold'
   if (n >= 50) return 'text-amber-600 font-semibold'
   return 'text-red-600 font-semibold'
 }
 
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString('en-US', {
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+  })
+}
+
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   })
 }
 
+type FlatResult = ScreeningResult & { batch_created_at: string }
+
 export default function HistoryPage() {
   const [batches, setBatches] = useState<Batch[]>([])
   const [loading, setLoading] = useState(true)
-  const [sharingBatch, setSharingBatch] = useState<string | null>(null)
+
+  const [search, setSearch] = useState('')
+  const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>('ALL')
+  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
 
   useEffect(() => {
     async function load() {
@@ -66,28 +84,33 @@ export default function HistoryPage() {
     load()
   }, [])
 
-  async function handleShare(batch_id: string) {
-    setSharingBatch(batch_id)
-    try {
-      const res = await fetch('/api/share', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batch_id }),
-      })
-      if (!res.ok) throw new Error('Share failed')
-      const { url } = (await res.json()) as { url: string }
-      await navigator.clipboard.writeText(url)
-      toast.success('Share link copied!')
-    } catch {
-      toast.error('Could not create share link')
-    } finally {
-      setSharingBatch(null)
-    }
-  }
-
   function handleExport(batch_id: string) {
     window.location.href = `/api/export?batch_id=${batch_id}`
   }
+
+  const flatResults = useMemo<FlatResult[]>(() => {
+    return batches.flatMap((b) =>
+      b.results.map((r) => ({ ...r, batch_created_at: b.created_at }))
+    )
+  }, [batches])
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    return flatResults
+      .filter((r) => {
+        if (verdictFilter !== 'ALL' && r.verdict !== verdictFilter) return false
+        if (q) {
+          const inCompany = r.company?.toLowerCase().includes(q) ?? false
+          const inTitle = r.job_title?.toLowerCase().includes(q) ?? false
+          if (!inCompany && !inTitle) return false
+        }
+        return true
+      })
+      .sort((a, b) => {
+        const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        return sortDir === 'desc' ? diff : -diff
+      })
+  }, [flatResults, search, verdictFilter, sortDir])
 
   if (loading) {
     return (
@@ -113,99 +136,101 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="space-y-4 max-w-4xl">
-      <h1 className="text-2xl font-bold text-gray-900">Screening history</h1>
+    <div className="space-y-5 max-w-4xl">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Screening history</h1>
+        <span className="text-sm text-gray-400">
+          {filtered.length} of {flatResults.length} roles
+        </span>
+      </div>
 
-      {batches.map((batch) => {
-        const sortedResults = [...batch.results].sort(
-          (a, b) => VERDICT_ORDER[a.verdict] - VERDICT_ORDER[b.verdict]
-        )
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search company or role..."
+            className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
 
-        return (
-          <div
-            key={batch.batch_id}
-            className="bg-white rounded-xl border border-gray-200 overflow-hidden"
-          >
-            {/* Batch header */}
-            <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-gray-100 bg-gray-50">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900">
-                  {formatDateTime(batch.created_at)}
+        {/* Verdict chips */}
+        <div className="flex gap-1.5">
+          {VERDICTS.map((v) => (
+            <button
+              key={v}
+              onClick={() => setVerdictFilter(v)}
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${verdictFilterClass(v, verdictFilter === v)}`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+
+        {/* Sort toggle */}
+        <button
+          onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <ArrowUpDown size={12} />
+          {sortDir === 'desc' ? 'Newest first' : 'Oldest first'}
+        </button>
+      </div>
+
+      {/* Results list */}
+      {filtered.length === 0 ? (
+        <div className="py-16 text-center text-gray-400 text-sm">
+          No results match your filters.
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+          {filtered.map((r) => (
+            <div key={r.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+              {/* Company + role */}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm truncate">
+                  {r.company ?? '—'}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {batch.count} role{batch.count !== 1 ? 's' : ''} screened
+                <p className="text-xs text-gray-500 mt-0.5 truncate">
+                  {r.job_title ?? '—'}
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                {/* All verdict pills */}
-                <div className="flex gap-1 flex-wrap justify-end">
-                  {sortedResults.map((r) => (
-                    <span
-                      key={r.id}
-                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${verdictClass(r.verdict)}`}
-                    >
-                      {r.verdict}
-                    </span>
-                  ))}
-                </div>
+              {/* Score */}
+              <span className={`hidden sm:block text-sm shrink-0 ${scoreClass(r.composite_score)}`}>
+                {r.composite_score}%
+              </span>
 
-                <button
-                  onClick={() => handleExport(batch.batch_id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-white transition-colors"
-                >
-                  <Download size={12} />
-                  CSV
-                </button>
-                <button
-                  onClick={() => handleShare(batch.batch_id)}
-                  disabled={sharingBatch === batch.batch_id}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-white transition-colors disabled:opacity-50"
-                >
-                  <Share2 size={12} />
-                  {sharingBatch === batch.batch_id ? 'Sharing...' : 'Share'}
-                </button>
+              {/* Verdict */}
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${verdictClass(r.verdict)}`}
+              >
+                {r.verdict}
+              </span>
+
+              {/* Date + time */}
+              <div className="hidden md:flex flex-col items-end shrink-0 text-xs text-gray-400 leading-tight">
+                <span>{formatDate(r.created_at)}</span>
+                <span>{formatTime(r.created_at)}</span>
               </div>
+
+              {/* Export */}
+              <button
+                onClick={() => handleExport(r.batch_id)}
+                title="Export batch as CSV"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
+              >
+                <Download size={11} />
+                CSV
+              </button>
             </div>
-
-            {/* All results — always visible */}
-            <div className="divide-y divide-gray-100">
-              {sortedResults.map((r) => (
-                <div key={r.id} className="flex items-center gap-4 px-6 py-4">
-                  {/* Company + role */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm truncate">
-                      {r.company ?? '—'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5 truncate">
-                      {r.job_title ?? '—'}
-                    </p>
-                  </div>
-
-                  {/* Scores */}
-                  <div className="hidden sm:flex items-center gap-3 text-xs shrink-0">
-                    <span className={scoreClass(r.composite_score)}>
-                      {r.composite_score}%
-                    </span>
-                  </div>
-
-                  {/* Verdict */}
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${verdictClass(r.verdict)}`}
-                  >
-                    {r.verdict}
-                  </span>
-
-                  {/* Date + time */}
-                  <p className="hidden md:block text-xs text-gray-400 whitespace-nowrap shrink-0">
-                    {formatDateTime(r.created_at)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })}
+          ))}
+        </div>
+      )}
     </div>
   )
 }

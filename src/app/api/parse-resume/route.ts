@@ -29,15 +29,40 @@ type ParsedProfile = {
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await request.json() as { resume_text?: string }
-  const resumeText = body.resume_text?.trim()
-  if (!resumeText) {
-    return NextResponse.json({ error: 'resume_text is required' }, { status: 400 })
+  // Accept multipart/form-data with a `file` field
+  let resumeText: string
+  try {
+    const contentType = request.headers.get('content-type') ?? ''
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData()
+      const file = formData.get('file') as File | null
+      if (!file) {
+        return NextResponse.json({ error: 'file is required' }, { status: 400 })
+      }
+
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const data = await pdfParse(buffer)
+        resumeText = data.text
+      } else {
+        resumeText = await file.text()
+      }
+    } else {
+      // Legacy JSON path
+      const body = await request.json() as { resume_text?: string }
+      resumeText = body.resume_text?.trim() ?? ''
+    }
+  } catch {
+    return NextResponse.json({ error: 'Failed to read file' }, { status: 400 })
+  }
+
+  if (!resumeText.trim()) {
+    return NextResponse.json({ error: 'Resume is empty or could not be read' }, { status: 400 })
   }
 
   const { data: profile } = await supabase
@@ -74,12 +99,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: 'claude-opus-4-8',
         max_tokens: 1024,
-        messages: [
-          {
-            role: 'user',
-            content: `${PARSE_PROMPT}\n\nResume:\n${resumeText}`,
-          },
-        ],
+        messages: [{ role: 'user', content: `${PARSE_PROMPT}\n\nResume:\n${resumeText}` }],
       }),
     })
 
@@ -91,12 +111,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const data = (await res.json()) as {
-      content: Array<{ type: string; text: string }>
-    }
+    const data = (await res.json()) as { content: Array<{ type: string; text: string }> }
     rawText = data.content.find((b) => b.type === 'text')?.text ?? ''
   } else {
-    // OpenAI
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -122,13 +139,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const data = (await res.json()) as {
-      choices: Array<{ message: { content: string } }>
-    }
+    const data = (await res.json()) as { choices: Array<{ message: { content: string } }> }
     rawText = data.choices[0]?.message?.content ?? ''
   }
 
-  // Strip code fences if model wrapped anyway
   rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
 
   let parsed: ParsedProfile

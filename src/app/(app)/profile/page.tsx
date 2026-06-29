@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Upload, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { HardRejectFilters, UserPreferences } from '@/types'
 
 interface ProfileData {
   full_name: string | null
-  resume_text: string | null
   hard_reject_filters: HardRejectFilters
   preferences: UserPreferences
   api_provider: 'openai' | 'anthropic' | null
@@ -30,10 +30,7 @@ const DEFAULT_PREFS: UserPreferences = {
 }
 
 function parseList(val: string): string[] {
-  return val
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
+  return val.split(',').map((s) => s.trim()).filter(Boolean)
 }
 
 function joinList(arr: string[]): string {
@@ -52,13 +49,100 @@ type ParsedProfile = {
   max_company_size?: number | null
 }
 
+type UploadStatus = 'idle' | 'parsing' | 'done' | 'error'
+
+function ResumeUploader({ onParsed }: { onParsed: (p: ParsedProfile) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [status, setStatus] = useState<UploadStatus>('idle')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [fileName, setFileName] = useState('')
+
+  async function handleFile(file: File) {
+    setFileName(file.name)
+    setStatus('parsing')
+    setErrorMsg('')
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const res = await fetch('/api/parse-resume', { method: 'POST', body: formData })
+      if (!res.ok) {
+        const { error } = (await res.json()) as { error: string }
+        throw new Error(error)
+      }
+      const { parsed } = (await res.json()) as { parsed: ParsedProfile }
+      onParsed(parsed)
+      setStatus('done')
+      toast.success('Preferences autofilled from resume')
+    } catch (err) {
+      setStatus('error')
+      setErrorMsg(err instanceof Error ? err.message : 'Parse failed')
+      toast.error(err instanceof Error ? err.message : 'Parse failed')
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,.txt"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) handleFile(file)
+          e.target.value = ''
+        }}
+      />
+
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={status === 'parsing'}
+        className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg border-2 border-dashed border-gray-300 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full justify-center"
+      >
+        {status === 'parsing' ? (
+          <>
+            <Loader2 size={15} className="animate-spin" />
+            Parsing resume…
+          </>
+        ) : (
+          <>
+            <Upload size={15} />
+            Upload resume (PDF or TXT)
+          </>
+        )}
+      </button>
+
+      {status === 'done' && (
+        <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">
+          <CheckCircle2 size={13} />
+          <span>Preferences autofilled from <strong>{fileName}</strong>. Resume not stored.</span>
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2">
+          <AlertCircle size={13} />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {status === 'idle' && (
+        <p className="text-xs text-gray-400">
+          Your resume is used only to autofill preferences below — it is never stored.
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [parsing, setParsing] = useState(false)
 
   const [fullName, setFullName] = useState('')
-  const [resumeText, setResumeText] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [apiProvider, setApiProvider] = useState<'openai' | 'anthropic'>('anthropic')
 
@@ -83,7 +167,6 @@ export default function ProfilePage() {
       const { profile } = (await res.json()) as { profile: ProfileData }
 
       setFullName(profile.full_name ?? '')
-      setResumeText(profile.resume_text ?? '')
       setApiProvider(profile.api_provider ?? 'anthropic')
       setTier(profile.tier)
       setScreensUsed(profile.screens_used_this_month)
@@ -106,40 +189,29 @@ export default function ProfilePage() {
     load()
   }, [])
 
-  async function handleParseResume() {
-    if (!resumeText.trim()) {
-      toast.error('Paste your resume first')
-      return
-    }
-    setParsing(true)
-    try {
-      const res = await fetch('/api/parse-resume', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resume_text: resumeText }),
-      })
-      if (!res.ok) {
-        const { error } = (await res.json()) as { error: string }
-        throw new Error(error)
-      }
-      const { parsed } = (await res.json()) as { parsed: ParsedProfile }
+  function applyParsed(parsed: ParsedProfile) {
+    if (parsed.preferred_tech_stack?.length) setPrefTech(joinList(parsed.preferred_tech_stack))
+    if (parsed.target_industries?.length) setPrefIndustries(joinList(parsed.target_industries))
+    if (parsed.title_floor) setTitleFloor(parsed.title_floor)
+    if (parsed.geography_allowed?.length) setGeoAllowed(joinList(parsed.geography_allowed))
+    if (parsed.tech_stack_dealbreakers?.length) setTechDealbreakers(joinList(parsed.tech_stack_dealbreakers))
+    if (parsed.company_type_excluded?.length) setCompanyExcluded(joinList(parsed.company_type_excluded))
+    if (parsed.role_type_excluded?.length) setRoleExcluded(joinList(parsed.role_type_excluded))
+    if (parsed.min_company_size != null) setMinSize(String(parsed.min_company_size))
+    if (parsed.max_company_size != null) setMaxSize(String(parsed.max_company_size))
+  }
 
-      if (parsed.preferred_tech_stack?.length) setPrefTech(joinList(parsed.preferred_tech_stack))
-      if (parsed.target_industries?.length) setPrefIndustries(joinList(parsed.target_industries))
-      if (parsed.title_floor) setTitleFloor(parsed.title_floor)
-      if (parsed.geography_allowed?.length) setGeoAllowed(joinList(parsed.geography_allowed))
-      if (parsed.tech_stack_dealbreakers?.length) setTechDealbreakers(joinList(parsed.tech_stack_dealbreakers))
-      if (parsed.company_type_excluded?.length) setCompanyExcluded(joinList(parsed.company_type_excluded))
-      if (parsed.role_type_excluded?.length) setRoleExcluded(joinList(parsed.role_type_excluded))
-      if (parsed.min_company_size != null) setMinSize(String(parsed.min_company_size))
-      if (parsed.max_company_size != null) setMaxSize(String(parsed.max_company_size))
-
-      toast.success('Preferences autofilled from resume')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Parse failed')
-    } finally {
-      setParsing(false)
-    }
+  function clearPrefs() {
+    setTechDealbreakers('')
+    setTitleFloor('')
+    setGeoAllowed('')
+    setCompanyExcluded('')
+    setRoleExcluded('')
+    setPrefTech('')
+    setPrefIndustries('')
+    setMinSize('')
+    setMaxSize('')
+    toast.success('Preferences cleared')
   }
 
   async function handleSave() {
@@ -150,7 +222,6 @@ export default function ProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: fullName,
-          resume_text: resumeText,
           ...(apiKey ? { api_key: apiKey, api_provider: apiProvider } : { api_provider: apiProvider }),
           hard_reject_filters: {
             tech_stack_dealbreakers: parseList(techDealbreakers),
@@ -220,31 +291,9 @@ export default function ProfilePage() {
         </Field>
       </Section>
 
-      {/* Resume */}
+      {/* Resume upload */}
       <Section title="Resume">
-        <Field label="Paste resume text">
-          <textarea
-            value={resumeText}
-            onChange={(e) => setResumeText(e.target.value)}
-            rows={10}
-            placeholder="Paste your full resume here. This is used to match you against job descriptions."
-            className={`${inputCls} resize-y`}
-          />
-        </Field>
-        <button
-          onClick={handleParseResume}
-          disabled={parsing || !resumeText.trim()}
-          className="mt-1 flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          {parsing ? (
-            <>
-              <span className="w-4 h-4 border-2 border-gray-400 border-t-blue-600 rounded-full animate-spin" />
-              Parsing…
-            </>
-          ) : (
-            'Parse & Autofill preferences'
-          )}
-        </button>
+        <ResumeUploader onParsed={applyParsed} />
       </Section>
 
       {/* API key */}
@@ -273,7 +322,18 @@ export default function ProfilePage() {
       </Section>
 
       {/* Hard reject filters */}
-      <Section title="Auto-reject rules">
+      <Section
+        title="Auto-reject rules"
+        action={
+          <button
+            type="button"
+            onClick={clearPrefs}
+            className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+          >
+            Clear prefs
+          </button>
+        }
+      >
         <p className="text-sm text-gray-500 -mt-1 mb-3">
           Any job matching these gets instantly rejected — no score calculated.
         </p>
@@ -383,10 +443,21 @@ export default function ProfilePage() {
 const inputCls =
   'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  action,
+}: {
+  title: string
+  children: React.ReactNode
+  action?: React.ReactNode
+}) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 px-6 py-5 space-y-4">
-      <h2 className="font-semibold text-gray-900">{title}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-gray-900">{title}</h2>
+        {action}
+      </div>
       {children}
     </div>
   )
