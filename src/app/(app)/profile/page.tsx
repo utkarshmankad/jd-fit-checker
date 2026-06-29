@@ -58,6 +58,20 @@ function ResumeUploader({ onParsed }: { onParsed: (p: ParsedProfile) => void }) 
   const [fileName, setFileName] = useState('')
 
   async function handleFile(file: File) {
+    const MAX_MB = 5
+    if (file.size > MAX_MB * 1024 * 1024) {
+      setStatus('error')
+      setErrorMsg(`File too large — max ${MAX_MB} MB (got ${(file.size / 1024 / 1024).toFixed(1)} MB)`)
+      return
+    }
+
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    if (ext !== 'pdf' && ext !== 'txt') {
+      setStatus('error')
+      setErrorMsg('Only PDF and TXT files are supported')
+      return
+    }
+
     setFileName(file.name)
     setStatus('parsing')
     setErrorMsg('')

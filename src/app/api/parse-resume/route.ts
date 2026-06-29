@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/utils/crypto'
 
+const MAX_FILE_BYTES = 5 * 1024 * 1024        // 5 MB
+const MAX_TEXT_CHARS = 50_000                  // ~25 pages of text
+
 const PARSE_PROMPT = `Extract structured information from this resume. Return ONLY a valid JSON object with these exact keys:
 - preferred_tech_stack: string[] (programming languages, frameworks, tools used in jobs or listed as skills)
 - target_industries: string[] (industries the candidate has worked in, e.g. fintech, SaaS, healthtech, e-commerce)
@@ -27,43 +30,99 @@ type ParsedProfile = {
   max_company_size: number | null
 }
 
+function validatePdfBytes(buf: Buffer): string | null {
+  // Must start with PDF magic bytes
+  if (!buf.slice(0, 5).toString('ascii').startsWith('%PDF-')) {
+    return 'File does not appear to be a valid PDF'
+  }
+  // Reject PDFs containing embedded JavaScript (/JS or /JavaScript actions)
+  const raw = buf.toString('latin1')
+  if (/\/JavaScript\s*\(/.test(raw) || /\/JS\s*\(/.test(raw) || /\/AA\s*<</.test(raw)) {
+    return 'PDF contains active content and cannot be processed'
+  }
+  return null
+}
+
+function validateTextContent(text: string): string | null {
+  // Reject if overwhelmingly binary / non-printable (>15% non-ASCII-printable chars)
+  const nonPrintable = (text.match(/[\x00-\x08\x0b\x0e-\x1f\x7f]/g) ?? []).length
+  if (nonPrintable / text.length > 0.15) {
+    return 'File content appears to be binary or corrupt'
+  }
+  // Reject suspiciously large text (could be an attempt to overflow the AI context)
+  if (text.length > MAX_TEXT_CHARS) {
+    return `File text exceeds ${MAX_TEXT_CHARS.toLocaleString()} characters — please trim your resume`
+  }
+  return null
+}
+
+async function extractText(file: File): Promise<{ text: string; error?: string }> {
+  const bytes = file.size
+  if (bytes > MAX_FILE_BYTES) {
+    return { text: '', error: `File too large (max 5 MB, got ${(bytes / 1024 / 1024).toFixed(1)} MB)` }
+  }
+
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+
+  if (isPdf) {
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const pdfError = validatePdfBytes(buffer)
+    if (pdfError) return { text: '', error: pdfError }
+
+    try {
+      // Use lib path to avoid pdf-parse v1 test-file access issue in serverless
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const pdfParse = require('pdf-parse/lib/pdf-parse.js') as (
+        buf: Buffer,
+        opts?: Record<string, unknown>
+      ) => Promise<{ text: string }>
+      const data = await pdfParse(buffer, { max: 0 })
+      return { text: data.text }
+    } catch (e) {
+      return { text: '', error: `PDF parsing failed: ${e instanceof Error ? e.message : 'unknown error'}` }
+    }
+  }
+
+  // Plain text / markdown
+  const text = await file.text()
+  return { text }
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Accept multipart/form-data with a `file` field
   let resumeText: string
+
   try {
     const contentType = request.headers.get('content-type') ?? ''
+
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData()
       const file = formData.get('file') as File | null
       if (!file) {
-        return NextResponse.json({ error: 'file is required' }, { status: 400 })
+        return NextResponse.json({ error: 'No file provided' }, { status: 400 })
       }
 
-      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
-        const buffer = Buffer.from(await file.arrayBuffer())
-        const data = await pdfParse(buffer)
-        resumeText = data.text
-      } else {
-        resumeText = await file.text()
-      }
+      const { text, error } = await extractText(file)
+      if (error) return NextResponse.json({ error }, { status: 400 })
+      resumeText = text
     } else {
-      // Legacy JSON path
       const body = await request.json() as { resume_text?: string }
       resumeText = body.resume_text?.trim() ?? ''
     }
   } catch {
-    return NextResponse.json({ error: 'Failed to read file' }, { status: 400 })
+    return NextResponse.json({ error: 'Failed to read uploaded file' }, { status: 400 })
   }
 
-  if (!resumeText.trim()) {
+  resumeText = resumeText.trim()
+  if (!resumeText) {
     return NextResponse.json({ error: 'Resume is empty or could not be read' }, { status: 400 })
   }
+
+  const textError = validateTextContent(resumeText)
+  if (textError) return NextResponse.json({ error: textError }, { status: 400 })
 
   const { data: profile } = await supabase
     .from('profiles')
