@@ -13,14 +13,15 @@ export async function GET() {
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, email, full_name, resume_text, hard_reject_filters, preferences, api_provider, tier, screens_used_this_month, created_at, updated_at'
+      'id, email, full_name, resume_text, hard_reject_filters, preferences, api_provider, api_key_encrypted, tier, screens_used_this_month, created_at, updated_at'
     )
     .eq('id', user.id)
     .single()
 
   if (error || !data) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
 
-  return NextResponse.json({ profile: data })
+  const { api_key_encrypted, ...safeProfile } = data as typeof data & { api_key_encrypted: string | null }
+  return NextResponse.json({ profile: { ...safeProfile, has_api_key: !!api_key_encrypted } })
 }
 
 export async function PUT(request: NextRequest) {

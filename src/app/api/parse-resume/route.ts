@@ -219,5 +219,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'AI returned unparseable response. Try again.' }, { status: 500 })
   }
 
-  return NextResponse.json({ parsed })
+  const wordCount = resumeText.split(/\s+/).filter(Boolean).length
+  return NextResponse.json({ parsed, word_count: wordCount })
 }
