@@ -21,9 +21,19 @@ export default function LoginPage() {
   const [magicLinkSent, setMagicLinkSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Redirect away if already authenticated
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      const isOAuth = (user.app_metadata?.provider ?? 'email') !== 'email'
+      const registered = isOAuth || user.user_metadata?.registration_completed === true
+      router.replace(registered ? '/dashboard' : '/auth/register')
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const err = searchParams.get('error')
-    if (err) setError(err)
+    if (err) setError(decodeURIComponent(err))
   }, [searchParams])
 
   function switchTab(t: AuthTab) {
@@ -41,8 +51,9 @@ export default function LoginPage() {
       options: { redirectTo: window.location.origin + '/auth/callback' },
     })
     if (error) {
-      setError(error.message)
-      toast.error(error.message)
+      const msg = formatAuthError(error.message)
+      setError(msg)
+      toast.error(msg)
       setOauthLoading(false)
     }
   }
@@ -55,8 +66,9 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
     if (error) {
-      setError(error.message)
-      toast.error(error.message)
+      const msg = formatAuthError(error.message)
+      setError(msg)
+      toast.error(msg)
     } else {
       router.push('/dashboard')
     }
@@ -76,11 +88,26 @@ export default function LoginPage() {
     })
     setLoading(false)
     if (error) {
-      setError(error.message)
-      toast.error(error.message)
+      const msg = formatAuthError(error.message)
+      setError(msg)
+      toast.error(msg)
     } else {
       setMagicLinkSent(true)
     }
+  }
+
+  function formatAuthError(raw: string): string {
+    const lower = raw.toLowerCase()
+    if (lower.includes('rate limit') || lower.includes('email rate') || lower.includes('over_email')) {
+      return 'Too many emails sent. Wait a few minutes, then try again. (Supabase OTP rate limit)'
+    }
+    if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) {
+      return 'Wrong email or password.'
+    }
+    if (lower.includes('email not confirmed')) {
+      return 'Email not confirmed — check your inbox for a verification link.'
+    }
+    return raw
   }
 
   const benefits = [
