@@ -90,13 +90,13 @@ export default function DashboardPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('tier, resume_text')
+        .select('tier, api_key_encrypted')
         .eq('id', user.id)
         .single()
 
       if (profile) {
         setUserTier((profile.tier as 'free' | 'paid') ?? 'free')
-        setHasResume(!!(profile.resume_text as string | null))
+        setHasResume(!!(profile.api_key_encrypted as string | null))
       } else {
         setHasResume(false)
       }
@@ -210,7 +210,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
           <span>⚠️</span>
           <span>
-            Your profile is incomplete — add your resume to get accurate scores.{' '}
+            Profile incomplete — add your AI provider API key to enable screening.{' '}
             <a href="/profile" className="font-semibold underline">
               Set up profile →
             </a>
