@@ -5,11 +5,13 @@ import { Download, History, Search, ArrowUpDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { ScreeningResult } from '@/types'
 
+type HistoryRow = Omit<ScreeningResult, 'jd_text' | 'analysis_json'>
+
 interface Batch {
   batch_id: string
   created_at: string
   count: number
-  results: ScreeningResult[]
+  results: HistoryRow[]
 }
 
 const VERDICTS = ['ALL', 'STRONG', 'DECENT', 'WEAK', 'REJECT'] as const
@@ -58,7 +60,7 @@ function formatTime(iso: string) {
   })
 }
 
-type FlatResult = ScreeningResult & { batch_created_at: string }
+type FlatResult = HistoryRow & { batch_created_at: string }
 
 export default function HistoryPage() {
   const [batches, setBatches] = useState<Batch[]>([])

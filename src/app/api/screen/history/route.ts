@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { ScreeningResult } from '@/types'
 
+// Lightweight row — omits jd_text and analysis_json (not needed for list view)
+type HistoryRow = Omit<ScreeningResult, 'jd_text' | 'analysis_json'>
+
 export async function GET(_request: NextRequest) {
   const supabase = await createClient()
   const {
@@ -11,20 +14,20 @@ export async function GET(_request: NextRequest) {
 
   const { data, error } = await supabase
     .from('screening_results')
-    .select('*')
+    .select('id, batch_id, user_id, job_url, job_title, company, ats_score, role_level_score, composite_score, verdict, hard_reject_reasons, created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .limit(50)
+    .limit(200)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const batchMap = new Map<
     string,
-    { batch_id: string; created_at: string; results: ScreeningResult[] }
+    { batch_id: string; created_at: string; results: HistoryRow[] }
   >()
 
   for (const row of data ?? []) {
-    const r = row as ScreeningResult
+    const r = row as HistoryRow
     if (!batchMap.has(r.batch_id)) {
       batchMap.set(r.batch_id, { batch_id: r.batch_id, created_at: r.created_at, results: [] })
     }
