@@ -36,10 +36,33 @@ export async function proxy(request: NextRequest) {
   // Refresh session — must run before any auth checks
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
+  const sp = request.nextUrl.searchParams
 
-  // Always allow: OAuth callback and public share pages
-  if (path.startsWith('/auth/callback') || path.startsWith('/share/')) {
+  // Always allow: auth routes and public share pages
+  if (
+    path.startsWith('/auth/callback') ||
+    path.startsWith('/auth/confirm') ||
+    path.startsWith('/share/')
+  ) {
     return response
+  }
+
+  // Forward Supabase auth params that land on root (when Site URL is not /auth/callback).
+  // Invite links: ?token_hash=xxx&type=invite  → /auth/confirm
+  // Magic/OAuth:  ?code=xxx                    → /auth/callback
+  if (path === '/') {
+    const token_hash = sp.get('token_hash')
+    const code = sp.get('code')
+    if (token_hash) {
+      const url = new URL('/auth/confirm', request.url)
+      url.search = request.nextUrl.search
+      return NextResponse.redirect(url)
+    }
+    if (code) {
+      const url = new URL('/auth/callback', request.url)
+      url.search = request.nextUrl.search
+      return NextResponse.redirect(url)
+    }
   }
 
   // /auth/register: only for authenticated users who haven't completed registration
