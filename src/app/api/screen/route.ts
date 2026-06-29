@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select(
-      'resume_text, hard_reject_filters, api_key_encrypted, api_provider, tier, screens_used_this_month'
+      'resume_text, preferences, hard_reject_filters, api_key_encrypted, api_provider, tier, screens_used_this_month'
     )
     .eq('id', user.id)
     .single()
@@ -56,6 +56,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'batch_id is required' }, { status: 400 })
   }
 
+  // Use stored resume_text if available; otherwise synthesize from saved preferences so
+  // the FastAPI gets a non-null string and ATS matching has something to work with.
+  const storedResume = (profile.resume_text as string | null) ?? ''
+  const effectiveResumeText = storedResume.trim() || buildResumeFromPreferences(profile)
+
   const apiUrl = process.env.NEXT_PUBLIC_SCREENING_API_URL!
   const results: ScreeningResult[] = []
   let count = 0
@@ -67,7 +72,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         jd_text: '',
         ...body,
-        resume_text: profile!.resume_text,
+        resume_text: effectiveResumeText,
         hard_reject_filters: profile!.hard_reject_filters,
         api_key: apiKey,
         api_provider: profile!.api_provider,
@@ -204,4 +209,24 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ results })
+}
+
+function buildResumeFromPreferences(profile: Record<string, unknown>): string {
+  const prefs = (profile.preferences ?? {}) as Record<string, unknown>
+  const hrf = (profile.hard_reject_filters ?? {}) as Record<string, unknown>
+  const lines: string[] = []
+
+  const tech = prefs.preferred_tech_stack as string[] | undefined
+  if (tech?.length) lines.push(`Technical skills: ${tech.join(', ')}`)
+
+  const industries = prefs.target_industries as string[] | undefined
+  if (industries?.length) lines.push(`Industries: ${industries.join(', ')}`)
+
+  const titleFloor = hrf.title_floor as string | undefined
+  if (titleFloor) lines.push(`Seniority: ${titleFloor}`)
+
+  const geo = hrf.geography_allowed as string[] | undefined
+  if (geo?.length) lines.push(`Preferred locations: ${geo.join(', ')}`)
+
+  return lines.join('\n')
 }
