@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Fragment } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { FileSearch, Eye, ExternalLink, Download, Share2, Plus, X } from 'lucide-react'
+import { FileSearch, Eye, ExternalLink, Download, Share2, Plus, X, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { ScreeningResult } from '@/types'
 
@@ -65,6 +65,29 @@ function countValidUrls(text: string) {
     }).length
 }
 
+const LINKEDIN_SCRIPT = `(async () => {
+  const ids = new Set();
+  function collect() {
+    document.querySelectorAll('[data-job-id],[data-occludable-job-id]').forEach(el => {
+      const id = el.getAttribute('data-job-id') || el.getAttribute('data-occludable-job-id');
+      if (id && /^\\d{5,}$/.test(id)) ids.add(id);
+    });
+    document.querySelectorAll('a[href*="/jobs/view/"]').forEach(el => {
+      const m = (el.getAttribute('href') || '').match(/\\/jobs\\/view\\/(\\d+)/);
+      if (m) ids.add(m[1]);
+    });
+  }
+  collect();
+  for (let i = 0; i < 10; i++) {
+    window.scrollBy(0, 800);
+    await new Promise(r => setTimeout(r, 800));
+    collect();
+  }
+  const urls = [...ids].map(id => 'https://www.linkedin.com/jobs/view/' + id + '/').join('\\n');
+  try { await navigator.clipboard.writeText(urls); } catch (e) { prompt('Copy URLs:', urls); }
+  alert('Copied ' + ids.size + ' job URLs! Paste into JD Fit Checker.');
+})();`
+
 export default function DashboardPage() {
   const [tab, setTab] = useState<InputTab>('urls')
   const [urlInput, setUrlInput] = useState('')
@@ -79,6 +102,8 @@ export default function DashboardPage() {
   const [shareLoading, setShareLoading] = useState(false)
   const [hasResume, setHasResume] = useState<boolean | null>(null)
   const [userTier, setUserTier] = useState<'free' | 'paid'>('free')
+  const [showLinkedInHelper, setShowLinkedInHelper] = useState(false)
+  const [scriptCopied, setScriptCopied] = useState(false)
 
   useEffect(() => {
     async function loadProfile() {
@@ -263,6 +288,82 @@ export default function DashboardPage() {
                   {urlCount} URL{urlCount !== 1 ? 's' : ''} detected
                 </p>
               )}
+
+              {/* LinkedIn recommended importer */}
+              <div className="rounded-lg border border-gray-200 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowLinkedInHelper((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="font-medium">Bulk import from LinkedIn Recommended →</span>
+                  {showLinkedInHelper ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+
+                {showLinkedInHelper && (
+                  <div className="border-t border-gray-100 px-4 py-4 space-y-4 bg-gray-50 text-sm text-gray-700">
+                    <p className="text-xs text-gray-500">
+                      LinkedIn's recommended page requires you to be logged in. Run this script in
+                      your browser while on the recommended jobs page — it auto-scrolls to collect
+                      all visible jobs and copies their URLs.
+                    </p>
+
+                    <ol className="space-y-3 text-sm">
+                      <li className="flex gap-2">
+                        <span className="font-bold text-gray-400 shrink-0">1.</span>
+                        <span>
+                          Go to{' '}
+                          <a
+                            href="https://www.linkedin.com/jobs/collections/recommended/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline"
+                          >
+                            linkedin.com/jobs/collections/recommended/
+                          </a>{' '}
+                          while logged in.
+                        </span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="font-bold text-gray-400 shrink-0">2.</span>
+                        <span>
+                          Drag this to your bookmarks bar and click it on that page —{' '}
+                          <a
+                            href={`javascript:(async()=>{const s=new Set();function c(){document.querySelectorAll('[data-job-id],[data-occludable-job-id]').forEach(e=>{const i=e.getAttribute('data-job-id')||e.getAttribute('data-occludable-job-id');if(i&&/^\\d{5,}$/.test(i))s.add(i)});document.querySelectorAll('a[href*="/jobs/view/"]').forEach(e=>{const m=(e.getAttribute('href')||'').match(/\\/jobs\\/view\\/(\\d+)/);if(m)s.add(m[1])})}c();for(let i=0;i<10;i++){window.scrollBy(0,800);await new Promise(r=>setTimeout(r,800));c()}const u=[...s].map(i=>'https://www.linkedin.com/jobs/view/'+i+'/').join('\\n');try{await navigator.clipboard.writeText(u)}catch(e){prompt('Copy URLs:',u)}alert('Copied '+s.size+' job URLs! Paste into JD Fit Checker.')})()`}
+                            className="inline-block px-2 py-0.5 bg-blue-600 text-white rounded text-xs font-semibold no-underline hover:bg-blue-700"
+                          >
+                            📋 JD Fit – LinkedIn Import
+                          </a>
+                          {' '}OR open DevTools (F12 / Cmd+Option+J) and paste into Console:
+                        </span>
+                      </li>
+                      <li>
+                        <div className="relative">
+                          <pre className="bg-gray-900 text-green-300 rounded-lg px-4 py-3 text-xs overflow-x-auto leading-relaxed whitespace-pre-wrap break-all">{LINKEDIN_SCRIPT}</pre>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await navigator.clipboard.writeText(LINKEDIN_SCRIPT)
+                              setScriptCopied(true)
+                              setTimeout(() => setScriptCopied(false), 2000)
+                            }}
+                            className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs text-gray-200 transition-colors"
+                          >
+                            {scriptCopied ? <><Check size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
+                          </button>
+                        </div>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="font-bold text-gray-400 shrink-0">3.</span>
+                        <span>
+                          The script scrolls (~10 seconds) and copies all job URLs. Paste them into
+                          the URL input above.
+                        </span>
+                      </li>
+                    </ol>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <div className="space-y-3">

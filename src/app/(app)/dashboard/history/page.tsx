@@ -67,6 +67,7 @@ export default function HistoryPage() {
   const [search, setSearch] = useState('')
   const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>('ALL')
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
+  const [showDuplicates, setShowDuplicates] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -94,9 +95,31 @@ export default function HistoryPage() {
     )
   }, [batches])
 
+  // Deduplicate: for each (company, job_title) exact pair keep only the latest entry.
+  // Only dedup when both fields are known; null-field entries always pass through.
+  const deduplicatedResults = useMemo<FlatResult[]>(() => {
+    if (showDuplicates) return flatResults
+    const sorted = [...flatResults].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+    const seen = new Set<string>()
+    const out: FlatResult[] = []
+    for (const r of sorted) {
+      if (r.company && r.job_title) {
+        const key = `${r.company.toLowerCase().trim()}|||${r.job_title.toLowerCase().trim()}`
+        if (seen.has(key)) continue
+        seen.add(key)
+      }
+      out.push(r)
+    }
+    return out
+  }, [flatResults, showDuplicates])
+
+  const dupCount = flatResults.length - deduplicatedResults.length
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim()
-    return flatResults
+    return deduplicatedResults
       .filter((r) => {
         if (verdictFilter !== 'ALL' && r.verdict !== verdictFilter) return false
         if (q) {
@@ -137,11 +160,22 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-5 max-w-4xl">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-gray-900">Screening history</h1>
-        <span className="text-sm text-gray-400">
-          {filtered.length} of {flatResults.length} roles
-        </span>
+        <div className="flex items-center gap-3">
+          {dupCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowDuplicates((v) => !v)}
+              className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
+            >
+              {showDuplicates ? `Hide ${dupCount} duplicate${dupCount !== 1 ? 's' : ''}` : `${dupCount} duplicate${dupCount !== 1 ? 's' : ''} hidden`}
+            </button>
+          )}
+          <span className="text-sm text-gray-400">
+            {filtered.length} of {deduplicatedResults.length} roles
+          </span>
+        </div>
       </div>
 
       {/* Controls */}
