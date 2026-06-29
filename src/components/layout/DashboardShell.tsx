@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { FileSearch, History, User, LogOut, Menu, X } from 'lucide-react'
 
 const navLinks = [
@@ -14,11 +14,19 @@ const navLinks = [
 interface DashboardShellProps {
   children: React.ReactNode
   userEmail: string
+  isNewUser?: boolean
 }
 
-export default function DashboardShell({ children, userEmail }: DashboardShellProps) {
+export default function DashboardShell({ children, userEmail, isNewUser }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (isNewUser && pathname === '/dashboard') {
+      router.replace('/profile?onboarding=true')
+    }
+  }, [isNewUser, pathname, router])
 
   return (
     <div className="min-h-screen flex">
@@ -101,7 +109,7 @@ export default function DashboardShell({ children, userEmail }: DashboardShellPr
           <span className="font-semibold text-gray-900">JD Fit Checker</span>
         </header>
 
-        <main className="flex-1 bg-surface p-6 md:p-8">{children}</main>
+        <main className="flex-1 bg-surface p-4 md:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   )

@@ -108,6 +108,7 @@ export default function DashboardPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('composite_score')
   const [shareLoading, setShareLoading] = useState(false)
+  const [showAllColumns, setShowAllColumns] = useState(false)
 
   // profile state
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
@@ -470,7 +471,7 @@ export default function DashboardPage() {
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
                       placeholder="Job title (optional)"
@@ -594,7 +595,7 @@ export default function DashboardPage() {
         </div>
       ) : results.length > 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-4 border-b border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
             <div>
               <h2 className="font-semibold text-gray-900">
                 Results
@@ -619,6 +620,12 @@ export default function DashboardPage() {
                   {SORT_LABELS[k]}
                 </button>
               ))}
+              <button
+                onClick={() => setShowAllColumns((v) => !v)}
+                className="md:hidden ml-1 px-2 py-1 rounded text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+              >
+                {showAllColumns ? 'Fewer columns' : 'All columns'}
+              </button>
             </div>
           </div>
 
@@ -626,10 +633,10 @@ export default function DashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left px-6 py-3 font-medium text-gray-500 whitespace-nowrap">Company</th>
+                  <th className="text-left px-4 sm:px-6 py-3 font-medium text-gray-500 whitespace-nowrap">Company</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Job title</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-500 whitespace-nowrap">ATS %</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Role fit %</th>
+                  <th className={`text-center px-4 py-3 font-medium text-gray-500 whitespace-nowrap ${showAllColumns ? '' : 'hidden md:table-cell'}`}>ATS %</th>
+                  <th className={`text-center px-4 py-3 font-medium text-gray-500 whitespace-nowrap ${showAllColumns ? '' : 'hidden md:table-cell'}`}>Role fit %</th>
                   <th className="text-center px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Composite %</th>
                   <th className="text-center px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Verdict</th>
                   <th className="px-4 py-3" />
@@ -644,7 +651,7 @@ export default function DashboardPage() {
                   return (
                     <Fragment key={result.id || result.job_url || result.created_at}>
                       <tr className={`border-b border-gray-100 transition-colors ${isErrorRow ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-gray-50'}`}>
-                        <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
+                        <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
                           {isErrorRow ? <span className="text-amber-700">Unknown</span> : (result.company ?? '—')}
                         </td>
                         <td className="px-4 py-4 text-gray-700 max-w-48">
@@ -656,10 +663,10 @@ export default function DashboardPage() {
                             <span className="line-clamp-2">{result.job_title ?? '—'}</span>
                           )}
                         </td>
-                        <td className={`px-4 py-4 text-center whitespace-nowrap ${isErrorRow ? 'text-gray-300' : scoreClass(result.ats_score)}`}>
+                        <td className={`px-4 py-4 text-center whitespace-nowrap ${isErrorRow ? 'text-gray-300' : scoreClass(result.ats_score)} ${showAllColumns ? '' : 'hidden md:table-cell'}`}>
                           {isErrorRow ? '—' : `${result.ats_score}%`}
                         </td>
-                        <td className={`px-4 py-4 text-center whitespace-nowrap ${isErrorRow ? 'text-gray-300' : scoreClass(result.role_level_score)}`}>
+                        <td className={`px-4 py-4 text-center whitespace-nowrap ${isErrorRow ? 'text-gray-300' : scoreClass(result.role_level_score)} ${showAllColumns ? '' : 'hidden md:table-cell'}`}>
                           {isErrorRow ? '—' : `${result.role_level_score}%`}
                         </td>
                         <td className={`px-4 py-4 text-center whitespace-nowrap ${isErrorRow ? 'text-gray-300' : scoreClass(result.composite_score)}`}>
@@ -739,12 +746,12 @@ export default function DashboardPage() {
             </table>
           </div>
 
-          <div className="flex items-center gap-3 px-6 py-4 border-t border-gray-100">
-            <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 px-4 sm:px-6 py-4 border-t border-gray-100">
+            <button onClick={exportCSV} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
               <Download size={15} />
               Export CSV
             </button>
-            <button onClick={handleShare} disabled={shareLoading} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
+            <button onClick={handleShare} disabled={shareLoading} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
               <Share2 size={15} />
               {shareLoading ? 'Sharing...' : 'Share results'}
             </button>

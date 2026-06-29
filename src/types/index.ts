@@ -38,6 +38,7 @@ export interface UserPreferences {
   target_industries: string[];
   min_company_size: number | null;
   max_company_size: number | null;
+  onboarding_completed?: boolean;
 }
 
 export interface ScreeningResult {

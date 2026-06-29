@@ -31,26 +31,26 @@ export default async function LandingPage() {
       </header>
 
       {/* ── Hero ── */}
-      <section style={{ backgroundColor: '#1B3A5C' }} className="px-6 py-28">
+      <section style={{ backgroundColor: '#1B3A5C' }} className="px-6 py-16 md:py-28">
         <div className="max-w-3xl mx-auto flex flex-col items-center text-center">
-          <h1 className="text-5xl font-bold tracking-tight leading-tight text-white">
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight leading-tight text-white">
             Screen 20 JDs in 60 seconds.
           </h1>
-          <p className="mt-6 text-xl text-blue-100 max-w-xl leading-relaxed">
+          <p className="mt-6 text-lg md:text-xl text-blue-100 max-w-xl leading-relaxed">
             Paste job URLs or JD text. Get ATS score, role-level fit, and an instant verdict —
             before you waste time applying.
           </p>
-          <div className="mt-10 flex flex-col items-center gap-3">
+          <div className="mt-10 flex flex-col items-center gap-3 w-full sm:w-auto">
             <Link
               href="/auth/login"
-              className="inline-block px-8 py-4 rounded-xl font-semibold text-lg bg-white hover:bg-gray-100 transition-colors"
+              className="w-full sm:w-auto inline-block px-8 py-4 rounded-xl font-semibold text-lg bg-white hover:bg-gray-100 transition-colors text-center"
               style={{ color: '#1B3A5C' }}
             >
               Start screening free →
             </Link>
             <span className="text-sm text-blue-200">Free tier — 5 screens/month. No credit card.</span>
           </div>
-          <div className="mt-12 flex flex-wrap justify-center gap-3">
+          <div className="mt-12 flex flex-col sm:flex-row sm:flex-wrap justify-center gap-2 sm:gap-3 w-full sm:w-auto">
             {[
               '⚡ Under 10 sec per JD',
               '🎯 3-score verdict',
@@ -58,7 +58,7 @@ export default async function LandingPage() {
             ].map((stat) => (
               <span
                 key={stat}
-                className="px-4 py-2 rounded-full text-sm font-medium bg-white"
+                className="px-4 py-2 rounded-full text-sm font-medium bg-white text-center"
                 style={{ color: '#1B3A5C' }}
               >
                 {stat}
@@ -211,15 +211,15 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Final CTA ── */}
-      <section className="px-6 py-24" style={{ backgroundColor: '#1B3A5C' }}>
+      <section className="px-6 py-16 md:py-24" style={{ backgroundColor: '#1B3A5C' }}>
         <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-white mb-3">
+          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
             Your next role is in that list of JDs.
           </h2>
-          <p className="text-blue-200 text-lg mb-10">Stop reading them one by one.</p>
+          <p className="text-blue-200 text-lg mb-8 md:mb-10">Stop reading them one by one.</p>
           <Link
             href="/auth/login"
-            className="inline-block px-8 py-4 rounded-xl font-semibold text-lg bg-white hover:bg-gray-100 transition-colors"
+            className="w-full sm:w-auto inline-block px-8 py-4 rounded-xl font-semibold text-lg bg-white hover:bg-gray-100 transition-colors"
             style={{ color: '#1B3A5C' }}
           >
             Start screening free →
@@ -229,7 +229,7 @@ export default async function LandingPage() {
 
       {/* ── Footer ── */}
       <footer className="bg-white border-t border-gray-200 px-6 py-5">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="font-bold text-sm" style={{ color: '#1B3A5C' }}>
             JD Fit Checker
           </span>

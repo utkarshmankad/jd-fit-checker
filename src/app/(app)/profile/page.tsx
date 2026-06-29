@@ -163,6 +163,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [isOnboarding, setIsOnboarding] = useState(false)
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false)
 
   const [fullName, setFullName] = useState('')
   const [apiKey, setApiKey] = useState('')
@@ -183,6 +185,9 @@ export default function ProfilePage() {
   const [screensUsed, setScreensUsed] = useState(0)
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setIsOnboarding(params.get('onboarding') === 'true')
+
     async function load() {
       const res = await fetch('/api/profile')
       if (!res.ok) { setLoading(false); return }
@@ -205,6 +210,8 @@ export default function ProfilePage() {
       setPrefIndustries(joinList(prefs.target_industries))
       setMinSize(prefs.min_company_size != null ? String(prefs.min_company_size) : '')
       setMaxSize(prefs.max_company_size != null ? String(prefs.max_company_size) : '')
+
+      if (prefs.onboarding_completed) setOnboardingCompleted(true)
 
       setLoading(false)
     }
@@ -258,6 +265,7 @@ export default function ProfilePage() {
             target_industries: parseList(prefIndustries),
             min_company_size: minSize ? parseInt(minSize, 10) : null,
             max_company_size: maxSize ? parseInt(maxSize, 10) : null,
+            ...(isOnboarding ? { onboarding_completed: true } : {}),
           } satisfies UserPreferences,
         }),
       })
@@ -271,12 +279,18 @@ export default function ProfilePage() {
 
       toast.success('Profile saved')
       if (apiKey) setApiKey('')
+      if (isOnboarding) setOnboardingCompleted(true)
     } catch {
       setSaveError('Save failed — could not reach the server. Check your connection and try again.')
     } finally {
       setSaving(false)
     }
   }
+
+  const step1Done = !!(prefTech.trim() || prefIndustries.trim() || minSize || maxSize)
+  const step2Done = !!(techDealbreakers.trim() || titleFloor.trim() || geoAllowed.trim() || companyExcluded.trim() || roleExcluded.trim())
+  const step3Done = !!apiKey.trim()
+  const allStepsDone = step1Done && step2Done && step3Done
 
   if (loading) {
     return (
@@ -287,7 +301,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-2xl w-full space-y-8 overflow-x-hidden">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
         <div className="flex items-center gap-2">
@@ -302,6 +316,47 @@ export default function ProfilePage() {
           </span>
         </div>
       </div>
+
+      {/* Onboarding welcome banner */}
+      {isOnboarding && !onboardingCompleted && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-6 py-5 space-y-4">
+          <div>
+            <h2 className="font-semibold text-blue-900">Welcome to JD Fit Checker!</h2>
+            <p className="text-sm text-blue-700 mt-1">Complete these 3 steps for accurate job screening.</p>
+          </div>
+          <ol className="space-y-2.5">
+            {([
+              { done: step1Done, label: 'Set preferences — tech stack, industries, company size' },
+              { done: step2Done, label: 'Set hard-reject filters — auto-rejects bad fits' },
+              { done: step3Done, label: 'Add your API key — powers AI screening' },
+            ] as { done: boolean; label: string }[]).map((step, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm">
+                <span
+                  className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold mt-0.5 ${
+                    step.done ? 'bg-green-500 text-white' : 'bg-blue-200 text-blue-700'
+                  }`}
+                >
+                  {step.done ? '✓' : i + 1}
+                </span>
+                <span className={step.done ? 'line-through text-gray-400' : 'text-blue-800'}>
+                  {step.label}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {/* Completion banner — appears once all steps filled, before saving */}
+      {isOnboarding && !onboardingCompleted && allStepsDone && (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-6 py-4 flex items-center gap-3">
+          <CheckCircle2 size={20} className="text-green-600 shrink-0" />
+          <div>
+            <p className="font-medium text-green-900 text-sm">Profile complete!</p>
+            <p className="text-xs text-green-700 mt-0.5">Save your profile to start screening jobs.</p>
+          </div>
+        </div>
+      )}
 
       {/* Basic info */}
       <Section title="Basic info">
@@ -429,7 +484,7 @@ export default function ProfilePage() {
             className={inputCls}
           />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Min company size">
             <input
               type="number"
@@ -486,7 +541,7 @@ function Section({
   action?: React.ReactNode
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 px-6 py-5 space-y-4">
+    <div className="bg-white rounded-xl border border-gray-200 px-4 sm:px-6 py-5 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-gray-900">{title}</h2>
         {action}
