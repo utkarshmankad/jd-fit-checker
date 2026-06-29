@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { Upload, Cpu, CheckSquare } from 'lucide-react'
+import AuthHashRedirect from '@/components/auth-hash-redirect'
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col bg-white text-gray-900">
+      <AuthHashRedirect />
       {/* Nav */}
       <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-white border-b border-gray-100">
         <span className="font-bold text-lg" style={{ color: '#1B3A5C' }}>
