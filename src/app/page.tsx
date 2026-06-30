@@ -34,11 +34,11 @@ export default async function LandingPage() {
       <section style={{ backgroundColor: '#1B3A5C' }} className="px-6 py-16 md:py-28">
         <div className="max-w-3xl mx-auto flex flex-col items-center text-center">
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight leading-tight text-white">
-            Screen 20 JDs in 60 seconds.
+            Stop applying to jobs that were never going to work.
           </h1>
           <p className="mt-6 text-lg md:text-xl text-blue-100 max-w-xl leading-relaxed">
-            Paste job URLs or JD text. Get ATS score, role-level fit, and an instant verdict —
-            before you waste time applying.
+            Jobscan tells you how to apply to one job. JD Fit Checker tells you which twenty are
+            even worth your time. Paste your job URLs — get a ranked verdict in 60 seconds.
           </p>
           <div className="mt-10 flex flex-col items-center gap-3 w-full sm:w-auto">
             <Link
@@ -46,15 +46,15 @@ export default async function LandingPage() {
               className="w-full sm:w-auto inline-block px-8 py-4 rounded-xl font-semibold text-lg bg-white hover:bg-gray-100 transition-colors text-center"
               style={{ color: '#1B3A5C' }}
             >
-              Start screening free →
+              Screen my first 20 JDs free →
             </Link>
-            <span className="text-sm text-blue-200">Free tier — 5 screens/month. No credit card.</span>
+            <span className="text-sm text-blue-200">5 free screens. No credit card. Bring your own AI key.</span>
           </div>
           <div className="mt-12 flex flex-col sm:flex-row sm:flex-wrap justify-center gap-2 sm:gap-3 w-full sm:w-auto">
             {[
               '⚡ Under 10 sec per JD',
-              '🎯 3-score verdict',
-              '🚫 Auto-rejects .NET roles',
+              '🎯 Ranked verdict table',
+              '🚫 Auto-rejects bad fits',
             ].map((stat) => (
               <span
                 key={stat}
@@ -64,6 +64,64 @@ export default async function LandingPage() {
                 {stat}
               </span>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Positioning contrast ── */}
+      <section className="bg-white px-6 py-20 border-b border-gray-100">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-2xl md:text-3xl font-bold text-center mb-3" style={{ color: '#1B3A5C' }}>
+            Built for a different moment in your search.
+          </h2>
+          <p className="text-center text-gray-500 mb-12 text-sm">
+            Resume optimizers are great — just not for this problem.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left: competitors */}
+            <div className="rounded-xl border border-gray-200 p-7">
+              <p className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-5">
+                Resume optimizers (Jobscan, Rezi, Enhancv)
+              </p>
+              <ul className="space-y-3.5">
+                {[
+                  'Screen one job at a time',
+                  "Assume you've already decided to apply",
+                  'Optimize keywords to pass the bot',
+                  'Built for volume applying',
+                  '$30–50/month subscription',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm text-gray-500">
+                    <span className="mt-0.5 shrink-0 text-gray-300">—</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Right: JD Fit Checker */}
+            <div
+              className="rounded-xl p-7"
+              style={{ border: '2px solid #1B3A5C', backgroundColor: '#F0F4F8' }}
+            >
+              <p className="text-sm font-semibold uppercase tracking-wide mb-5" style={{ color: '#1B3A5C' }}>
+                JD Fit Checker
+              </p>
+              <ul className="space-y-3.5">
+                {[
+                  'Screen up to 20 jobs at once, ranked',
+                  'Decide which jobs deserve an application',
+                  'Auto-reject roles that fail your hard rules',
+                  'Built for selective, senior job seekers',
+                  '₹499 one-time, or bring your own AI key',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm" style={{ color: '#1B3A5C' }}>
+                    <span className="mt-0.5 shrink-0 text-green-500 font-bold">✓</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </section>
@@ -111,12 +169,12 @@ export default async function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {[
               {
-                persona: 'Engineering managers',
-                body: "Screening 10–20 JDs a week across LinkedIn and Naukri. Tired of reading 3 pages before discovering it's a .NET role.",
+                persona: 'Senior engineering managers',
+                body: "You're screening 15–20 roles a week. Half are .NET shops or IC roles in disguise. You don't need help applying — you need help deciding what's worth applying to.",
               },
               {
-                persona: 'Staff+ engineers',
-                body: 'Applying selectively, not spraying. Need a signal-to-noise filter that matches your actual seniority and domain.',
+                persona: 'Staff+ engineers who apply selectively',
+                body: "You're not spraying 100 applications. You want the right 5. You need a fast signal on seniority match and dealbreakers before you invest time in any single role.",
               },
             ].map(({ persona, body }) => (
               <div key={persona} className="bg-white rounded-xl p-8 border border-gray-200">
@@ -133,9 +191,12 @@ export default async function LandingPage() {
       {/* ── Pricing ── */}
       <section className="bg-white px-6 py-24">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-14" style={{ color: '#1B3A5C' }}>
+          <h2 className="text-3xl font-bold text-center mb-3" style={{ color: '#1B3A5C' }}>
             Simple pricing.
           </h2>
+          <p className="text-center text-gray-500 text-sm mb-14">
+            No $50/month subscription. No editing-then-rescanning treadmill. Screen, decide, move on.
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl mx-auto">
 
             {/* Free */}
