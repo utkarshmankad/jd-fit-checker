@@ -4,6 +4,7 @@ import { decrypt } from '@/lib/utils/crypto'
 import type { AnalysisResult, ScreeningResult } from '@/types'
 
 const FREE_TIER_LIMIT = 5
+const SCREEN_LIMIT_ENABLED = process.env.NEXT_PUBLIC_FEATURE_SCREEN_LIMIT !== 'false'
 
 type FastAPIResult = AnalysisResult & {
   job_title?: string
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (profile.tier === 'free' && (profile.screens_used_this_month as number) >= FREE_TIER_LIMIT) {
+  if (SCREEN_LIMIT_ENABLED && profile.tier === 'free' && (profile.screens_used_this_month as number) >= FREE_TIER_LIMIT) {
     return NextResponse.json(
       { error: 'Monthly screen limit reached. Upgrade to continue.', upgrade_required: true },
       { status: 403 }
