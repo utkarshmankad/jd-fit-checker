@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { createServiceClient } from '@/lib/supabase/service'
 import type { SharedReport, ScreeningResult } from '@/types'
+import { calculateTimeSaved } from '@/lib/utils/time-saved'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://jdfit.in'
 
@@ -193,6 +194,21 @@ export default async function ReportPage({
       {/* ── Main content ── */}
       <main className="flex-1 px-6 py-8">
         <div className="max-w-5xl mx-auto space-y-6">
+
+          {/* Time-saved hero card */}
+          {counts.REJECT > 0 ? (
+            <div style={{ backgroundColor: '#1B3A5C' }} className="rounded-xl px-6 py-6 text-white">
+              <p className="text-5xl font-bold tracking-tight leading-none">{calculateTimeSaved(counts.REJECT)}</p>
+              <p className="text-blue-200 mt-3 text-base">
+                saved — by skipping {counts.REJECT} job{counts.REJECT !== 1 ? 's' : ''} that weren&apos;t worth the time
+              </p>
+            </div>
+          ) : results.length > 0 ? (
+            <div style={{ backgroundColor: '#1B3A5C' }} className="rounded-xl px-6 py-4 text-white flex items-center gap-3">
+              <span className="text-green-400 text-xl font-bold">✓</span>
+              <p>All {results.length} jobs cleared the dealbreaker filters — none were obvious time-wasters.</p>
+            </div>
+          ) : null}
 
           {/* Results table */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">

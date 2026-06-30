@@ -91,7 +91,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
             if (verify.ok) {
               onSuccess()
               onClose()
-              toast.success('Payment successful! Enjoy unlimited screens.')
+              toast.success('Upgraded! Unlimited rejections unlocked.')
             } else {
               toast.error('Payment verification failed. Contact support.')
             }
@@ -123,16 +123,18 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
       {/* Modal */}
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-5">
         <div className="text-center">
-          <h2 className="text-xl font-bold text-gray-900">Upgrade to Paid</h2>
-          <p className="text-gray-500 text-sm mt-1">Unlock unlimited JD screenings</p>
+          <h2 className="text-xl font-bold text-gray-900">Keep rejecting unlimited jobs</h2>
+          <p className="text-gray-500 text-sm mt-1">
+            You&apos;ve used your 5 free batches. Upgrade once for unlimited rejections — no monthly subscription.
+          </p>
         </div>
 
         {/* Feature list */}
         <ul className="space-y-2 text-sm text-gray-700">
           {[
-            'Unlimited screenings per month',
-            'Full analysis with gap report',
-            'CSV export & shareable links',
+            'Unlimited batch screenings, forever',
+            'Full gap analysis + requirements check',
+            'CSV export & shareable report links',
             'Priority support',
           ].map((f) => (
             <li key={f} className="flex items-center gap-2">
@@ -145,7 +147,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
         {/* Price */}
         <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 text-center">
           <span className="text-3xl font-bold text-gray-900">₹499</span>
-          <span className="text-gray-500 text-sm"> / month</span>
+          <span className="text-gray-500 text-sm"> one-time</span>
         </div>
 
         <button
@@ -154,7 +156,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
           className="w-full py-3 rounded-xl font-semibold text-white text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           style={{ backgroundColor: '#1B3A5C' }}
         >
-          {loading ? 'Opening payment...' : 'Pay ₹499 →'}
+          {loading ? 'Opening payment...' : 'Unlock unlimited rejections →'}
         </button>
 
         <button

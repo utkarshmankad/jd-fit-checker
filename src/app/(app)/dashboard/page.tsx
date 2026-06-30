@@ -4,13 +4,14 @@ import { useState, useEffect, useRef, Fragment } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   FileSearch, Eye, ExternalLink, Download, Share2, Plus, X,
-  ChevronDown, ChevronUp, Copy, Check, AlertTriangle, WifiOff, Pencil, Info, Zap,
+  ChevronDown, ChevronUp, Copy, Check, AlertTriangle, WifiOff, Pencil, Info,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { ScreeningResult, HardRejectFilters } from '@/types'
 import type { FatalScreenError } from '@/app/api/screen/route'
 import PaymentModal from '@/components/payment/PaymentModal'
 import { SAMPLE_RESULTS } from '@/lib/sample-data'
+import { calculateTimeSaved } from '@/lib/utils/time-saved'
 
 type SortKey = 'composite_score' | 'ats_score' | 'role_level_score' | 'verdict'
 type InputTab = 'urls' | 'text'
@@ -49,21 +50,15 @@ const VERDICT_CONFIG: Record<string, { cls: string; label: string }> = {
 }
 
 const SCORE_TOOLTIPS = {
-  ats: 'How many of the JD\'s required skills appear in your resume, weighted by importance. Not a guess at the company\'s actual ATS.',
+  ats: "How many of the JD's required skills appear in your resume, weighted by importance.",
   role: 'How well your seniority, scope, and team-size experience matches what this role needs.',
-  composite: 'Weighted blend: 45% ATS keyword match, 55% role-level fit. Role fit matters more at senior levels.',
-}
-
-function scoreBarColor(n: number) {
-  if (n >= 70) return 'bg-green-500'
-  if (n >= 50) return 'bg-amber-500'
-  return 'bg-red-500'
+  composite: 'Weighted blend: 45% ATS keyword match, 55% role-level fit.',
 }
 
 function scoreTextClass(n: number) {
-  if (n >= 70) return 'text-green-700'
-  if (n >= 50) return 'text-amber-600'
-  return 'text-red-600'
+  if (n >= 70) return 'text-green-600'
+  if (n >= 50) return 'text-amber-500'
+  return 'text-red-500'
 }
 
 function timeAgo(iso: string) {
@@ -118,6 +113,19 @@ function whyVerdict(r: ScreeningResult): string {
   return ''
 }
 
+function getReasonLine(r: ScreeningResult): string {
+  if (r.verdict === 'REJECT') return r.hard_reject_reasons?.[0] ?? 'Hard-reject rule triggered'
+  if (r.analysis_json?.headline) {
+    const h = r.analysis_json.headline
+    return h.length > 90 ? h.slice(0, 90) + '…' : h
+  }
+  if (r.analysis_json?.recommendation) {
+    const rec = r.analysis_json.recommendation.replace(/^(APPLY IF|APPLY|SKIP)\s*/i, '')
+    return rec.length > 90 ? rec.slice(0, 90) + '…' : rec
+  }
+  return ''
+}
+
 const LINKEDIN_CONSOLE_SCRIPT = `(async () => {
   const ids = new Set();
   function collect() {
@@ -143,57 +151,37 @@ const LINKEDIN_CONSOLE_SCRIPT = `(async () => {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function ScoreCell({ score }: { score: number }) {
-  return (
-    <div className="flex flex-col items-center gap-1.5 min-w-[3rem]">
-      <span className={`font-bold text-sm ${scoreTextClass(score)}`}>{score}</span>
-      <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-        <div className={`h-1.5 rounded-full ${scoreBarColor(score)}`} style={{ width: `${score}%` }} />
-      </div>
-    </div>
-  )
-}
-
 function ScoreTooltip({ tip, children }: { tip: string; children: React.ReactNode }) {
   return (
     <span className="relative group inline-flex items-center gap-1 cursor-default">
       {children}
-      <Info size={11} className="text-gray-400 opacity-60 shrink-0" />
-      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 bg-gray-900 text-white text-xs rounded-lg px-2.5 py-2 leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none whitespace-normal text-left shadow-lg">
+      <Info size={10} className="text-gray-300 opacity-60 shrink-0" />
+      <span className="absolute bottom-full right-0 mb-2 w-52 bg-gray-900 text-white text-xs rounded-lg px-2.5 py-2 leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none whitespace-normal text-left shadow-lg">
         {tip}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+        <span className="absolute top-full right-2 border-4 border-transparent border-t-gray-900" />
       </span>
     </span>
   )
 }
 
-function SkeletonRow({ showAllColumns }: { showAllColumns: boolean }) {
+function ScorePill({ label, score, tip }: { label: string; score: number; tip: string }) {
   return (
-    <tr className="border-b border-gray-100">
-      <td className="px-4 sm:px-6 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-24" /></td>
-      <td className="px-4 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-40" /></td>
-      <td className={`px-4 py-4 text-center ${showAllColumns ? '' : 'hidden md:table-cell'}`}><div className="h-4 bg-gray-200 rounded animate-pulse w-10 mx-auto" /></td>
-      <td className={`px-4 py-4 text-center ${showAllColumns ? '' : 'hidden md:table-cell'}`}><div className="h-4 bg-gray-200 rounded animate-pulse w-10 mx-auto" /></td>
-      <td className="px-4 py-4 text-center"><div className="h-4 bg-gray-200 rounded animate-pulse w-10 mx-auto" /></td>
-      <td className="px-4 py-4 text-center"><div className="h-5 bg-gray-200 rounded-full animate-pulse w-24 mx-auto" /></td>
-      <td className="px-4 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-6 ml-auto" /></td>
-    </tr>
+    <ScoreTooltip tip={tip}>
+      <span className="text-xs text-gray-400">{label}</span>
+      <span className={`text-xs font-semibold ${scoreTextClass(score)}`}>{score}</span>
+    </ScoreTooltip>
   )
 }
 
-function RejectReasonChips({ reasons }: { reasons: string[] }) {
-  if (!reasons?.length) return null
-  const shown = reasons.slice(0, 2)
-  const extra = reasons.length - 2
+function SkeletonRow() {
   return (
-    <div className="flex flex-wrap gap-1 mt-1">
-      {shown.map((r, i) => (
-        <span key={i} className="inline-flex items-center px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded border border-red-200 font-medium leading-tight">
-          ✕ {r}
-        </span>
-      ))}
-      {extra > 0 && <span className="text-xs text-red-500 self-center">and {extra} more</span>}
-    </div>
+    <tr className="border-b border-gray-100">
+      <td className="px-4 sm:px-6 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-24" /></td>
+      <td className="px-4 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-32" /></td>
+      <td className="px-4 py-4"><div className="h-6 bg-gray-200 rounded-full animate-pulse w-28" /></td>
+      <td className="px-4 py-4 hidden md:table-cell"><div className="h-3 bg-gray-200 rounded animate-pulse w-16 ml-auto" /></td>
+      <td className="px-4 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-6 ml-auto" /></td>
+    </tr>
   )
 }
 
@@ -240,9 +228,7 @@ function SoftConcernsCallout({ concerns }: { concerns?: string[] }) {
 function ColoredRecommendation({ text }: { text: string }) {
   if (!text) return null
   const match = text.match(/^(APPLY IF|APPLY|SKIP)([\s\S]*)/)
-  if (!match) {
-    return <p className="text-sm text-blue-900 leading-relaxed">{text}</p>
-  }
+  if (!match) return <p className="text-sm text-blue-900 leading-relaxed">{text}</p>
   const keyword = match[1]
   const rest = match[2]
   const color = keyword === 'SKIP' ? 'text-red-600' : keyword === 'APPLY IF' ? 'text-amber-600' : 'text-green-600'
@@ -293,14 +279,13 @@ export default function DashboardPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('composite_score')
   const [shareLoading, setShareLoading] = useState(false)
-  const [showAllColumns, setShowAllColumns] = useState(false)
   const [rejectedCollapsed, setRejectedCollapsed] = useState(true)
   const [isSampleData, setIsSampleData] = useState(false)
+  const [lifetimeRejectCount, setLifetimeRejectCount] = useState<number | null>(null)
 
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
   const [hasPreferences, setHasPreferences] = useState(false)
   const [apiProvider, setApiProvider] = useState<string>('anthropic')
-  const [userTier, setUserTier] = useState<'free' | 'paid'>('free')
   const [hardRejectFilters, setHardRejectFilters] = useState<HardRejectFilters | null>(null)
 
   const [screenError, setScreenError] = useState<ScreenError | null>(null)
@@ -321,6 +306,16 @@ export default function DashboardPage() {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
   }, [])
 
+  async function fetchLifetimeCount(userId: string) {
+    const supabase = createClient()
+    const { count } = await supabase
+      .from('screening_results')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('verdict', 'REJECT')
+    if (count !== null) setLifetimeRejectCount(count)
+  }
+
   useEffect(() => {
     async function loadProfile() {
       const supabase = createClient()
@@ -332,15 +327,16 @@ export default function DashboardPage() {
         .eq('id', user.id)
         .single()
       if (!profile) { setHasApiKey(false); return }
-      setUserTier((profile.tier as 'free' | 'paid') ?? 'free')
       setApiProvider((profile.api_provider as string) ?? 'anthropic')
       setHasApiKey(!!(profile.api_key_encrypted as string | null))
       const prefs = (profile.preferences ?? {}) as { preferred_tech_stack?: string[]; target_industries?: string[] }
       const hrf = (profile.hard_reject_filters ?? {}) as HardRejectFilters
       setHardRejectFilters(hrf)
       setHasPreferences(!!(prefs.preferred_tech_stack?.length || prefs.target_industries?.length || hrf.title_floor?.trim() || hrf.geography_allowed?.length))
+      await fetchLifetimeCount(user.id)
     }
     loadProfile()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function startCountdown() {
@@ -448,13 +444,19 @@ export default function DashboardPage() {
       setBatchTime(new Date().toISOString())
       setSkeletonCount(0)
       setScreening(false)
+      // Refresh lifetime count after batch
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) fetchLifetimeCount(user.id)
     }
   }
 
   function exportCSV() {
     const header = 'Company,Job Title,ATS %,Role Fit %,Composite %,Verdict'
     const rows = results.map((r) => `"${r.company ?? ''}","${r.job_title ?? ''}",${r.ats_score},${r.role_level_score},${r.composite_score},${r.verdict}`)
-    const csv = [header, ...rows].join('\n')
+    const rejectCount = results.filter((r) => r.verdict === 'REJECT').length
+    const timeSavedComment = rejectCount > 0 ? `# ${calculateTimeSaved(rejectCount)} saved across this batch\n` : ''
+    const csv = timeSavedComment + [header, ...rows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -469,7 +471,7 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error('Share failed')
       const { url } = (await res.json()) as { url: string }
       await navigator.clipboard.writeText(url)
-      toast.success('Link copied!')
+      toast.success('Link copied — go brag about how much time you saved.')
     } catch {
       toast.error('Could not create share link')
     } finally {
@@ -480,7 +482,6 @@ export default function DashboardPage() {
   const goodResults = results.filter((r) => r.id !== '')
   const errorResults = results.filter((r) => r.id === '')
 
-  // Split: approved (non-REJECT + errors), rejected
   const sortedGood = [...goodResults].sort((a, b) => {
     if (sortKey === 'verdict') return VERDICT_ORDER[a.verdict] - VERDICT_ORDER[b.verdict]
     return b[sortKey] - a[sortKey]
@@ -495,12 +496,14 @@ export default function DashboardPage() {
     REJECT: rejectResults.length,
   }
 
-  const timeSaved = verdictCounts.REJECT * 10
+  const worthALook = goodResults.length - verdictCounts.REJECT
   const providerLabel = apiProvider === 'openai' ? 'OpenAI' : 'Anthropic'
   const hasAnyResults = results.length > 0 || skeletonCount > 0
   const batchDone = !screening && skeletonCount === 0 && goodResults.length > 0
-
   const activeRules = getActiveRules(hardRejectFilters)
+  const lifetimeSaved = lifetimeRejectCount !== null && lifetimeRejectCount > 0
+    ? calculateTimeSaved(lifetimeRejectCount)
+    : null
 
   function renderResultRow(result: ScreeningResult) {
     const isErrorRow = result.id === ''
@@ -508,6 +511,7 @@ export default function DashboardPage() {
     const isReject = !isErrorRow && result.verdict === 'REJECT'
     const rowKey = result.id || result.job_url || result.created_at
     const isExpanded = expandedId === rowKey
+    const reasonLine = !isErrorRow ? getReasonLine(result) : null
 
     return (
       <Fragment key={rowKey}>
@@ -516,49 +520,49 @@ export default function DashboardPage() {
           isErrorRow ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-gray-50',
           isReject ? 'border-l-4 border-red-400' : '',
         ].filter(Boolean).join(' ')}>
-          <td className="px-4 sm:px-6 py-4 font-medium text-gray-900">
-            {isErrorRow ? (
-              <span className="text-amber-700 whitespace-nowrap">Unknown</span>
-            ) : (
-              <span className="whitespace-nowrap">{result.company ?? '—'}</span>
-            )}
+          {/* Company */}
+          <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 whitespace-nowrap align-top">
+            {isErrorRow ? <span className="text-amber-700">Unknown</span> : (result.company ?? '—')}
           </td>
-          <td className="px-4 py-4 text-gray-700 max-w-48">
+          {/* Job title */}
+          <td className="px-4 py-4 text-gray-500 max-w-[10rem] align-top">
             {isErrorRow ? (
               <span className="text-amber-700 text-xs truncate block" title={result.job_url ?? ''}>
-                {(result.job_url ?? '').slice(0, 40)}{(result.job_url ?? '').length > 40 ? '…' : ''}
+                {(result.job_url ?? '').slice(0, 36)}{(result.job_url ?? '').length > 36 ? '…' : ''}
               </span>
             ) : (
+              <span className="text-xs line-clamp-2">{result.job_title ?? '—'}</span>
+            )}
+          </td>
+          {/* Verdict (PRIMARY) + reason line */}
+          <td className="px-4 py-4 align-top max-w-xs">
+            {isErrorRow ? (
+              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-amber-100 text-amber-800 border border-amber-300">⚠ Scrape failed</span>
+            ) : (
               <div>
-                {result.analysis_json?.headline && (
-                  <p className="text-xs font-semibold text-gray-800 mb-0.5 leading-snug line-clamp-2">{result.analysis_json.headline}</p>
-                )}
-                <span className="text-xs text-gray-500 line-clamp-1">{result.job_title ?? '—'}</span>
-                {isReject && result.hard_reject_reasons?.length > 0 && (
-                  <RejectReasonChips reasons={result.hard_reject_reasons} />
+                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold ${VERDICT_CONFIG[result.verdict]?.cls ?? 'bg-gray-100 text-gray-600 border border-gray-300'}`}>
+                  {VERDICT_CONFIG[result.verdict]?.label ?? result.verdict}
+                </span>
+                {reasonLine && (
+                  <p className={`text-xs mt-1.5 leading-snug ${isReject ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+                    {reasonLine}
+                  </p>
                 )}
               </div>
             )}
           </td>
-          <td className={`px-4 py-4 text-center ${showAllColumns ? '' : 'hidden md:table-cell'}`}>
-            {isErrorRow ? <span className="text-gray-300">—</span> : <ScoreCell score={result.ats_score} />}
-          </td>
-          <td className={`px-4 py-4 text-center ${showAllColumns ? '' : 'hidden md:table-cell'}`}>
-            {isErrorRow ? <span className="text-gray-300">—</span> : <ScoreCell score={result.role_level_score} />}
-          </td>
-          <td className="px-4 py-4 text-center">
-            {isErrorRow ? <span className="text-gray-300">—</span> : <ScoreCell score={result.composite_score} />}
-          </td>
-          <td className="px-4 py-4 text-center">
-            {isErrorRow ? (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">⚠ Scrape failed</span>
-            ) : (
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${VERDICT_CONFIG[result.verdict]?.cls ?? 'bg-gray-100 text-gray-600 border border-gray-300'}`}>
-                {VERDICT_CONFIG[result.verdict]?.label ?? result.verdict}
-              </span>
+          {/* Scores (SECONDARY — small, muted, right-aligned, hidden on mobile) */}
+          <td className="px-4 py-4 text-right align-top hidden md:table-cell">
+            {!isErrorRow && (
+              <div className="flex flex-col items-end gap-1.5">
+                <ScorePill label="ATS " score={result.ats_score} tip={SCORE_TOOLTIPS.ats} />
+                <ScorePill label="Role " score={result.role_level_score} tip={SCORE_TOOLTIPS.role} />
+                <ScorePill label="⊕ " score={result.composite_score} tip={SCORE_TOOLTIPS.composite} />
+              </div>
             )}
           </td>
-          <td className="px-4 py-4">
+          {/* Actions */}
+          <td className="px-4 py-4 align-top">
             <div className="flex items-center gap-2 justify-end">
               <button onClick={() => setExpandedId(isExpanded ? null : rowKey)}
                 className={`p-1.5 rounded transition-colors ${isExpanded ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-gray-500 hover:bg-gray-200'}`}
@@ -574,10 +578,10 @@ export default function DashboardPage() {
           </td>
         </tr>
 
-        {/* Expanded row */}
+        {/* Expanded detail row */}
         <tr className={isErrorRow ? 'bg-amber-50' : 'bg-slate-50'}>
-          <td colSpan={7} className="p-0">
-            <div className={`overflow-hidden transition-all duration-200 ease-in-out ${isExpanded ? 'max-h-[800px]' : 'max-h-0'}`}>
+          <td colSpan={5} className="p-0">
+            <div className={`overflow-hidden transition-all duration-200 ease-in-out ${isExpanded ? 'max-h-[900px]' : 'max-h-0'}`}>
               <div className="px-6 py-5">
                 {isErrorRow ? (
                   <div className="space-y-3 max-w-xl">
@@ -594,29 +598,36 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="space-y-4 max-w-3xl">
-                    {/* Why verdict */}
-                    {result.verdict && (
-                      <p className="text-xs text-gray-500 italic">{whyVerdict(result)}</p>
+                    {/* a. Headline + why verdict */}
+                    {result.analysis_json?.headline && (
+                      <p className="text-sm font-medium text-gray-700">{result.analysis_json.headline}</p>
                     )}
-                    {/* Score breakdown */}
-                    {result.verdict !== 'REJECT' && (
-                      <p className="text-xs font-mono text-gray-400 bg-gray-100 rounded px-2 py-1 inline-block">
-                        Composite {result.composite_score} = (ATS {result.ats_score} × 0.45) + (Role {result.role_level_score} × 0.55) = {(result.ats_score * 0.45 + result.role_level_score * 0.55).toFixed(1)}
-                      </p>
-                    )}
-                    {/* Hard reject box */}
+                    <p className="text-xs text-gray-400 italic">{whyVerdict(result)}</p>
+
+                    {/* Hard reject */}
                     {result.hard_reject_reasons?.length > 0 && result.verdict === 'REJECT' && (
                       <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200">
                         <p className="text-xs font-semibold text-red-600 mb-0.5">Hard reject</p>
                         <p className="text-sm text-red-700">{result.hard_reject_reasons[0]}</p>
                       </div>
                     )}
+
+                    {/* b. Requirements + skills */}
                     <RequirementsChecklist items={result.analysis_json?.requirements_met ?? []} />
                     <SkillPills label="Matching skills" skills={result.analysis_json?.matching_skills ?? []} variant="match" />
                     <SkillPills label="Missing skills" skills={result.analysis_json?.missing_skills ?? []} variant="miss" />
                     <SoftConcernsCallout concerns={result.analysis_json?.soft_concerns} />
                     <AnalysisBlock label="Role level assessment" text={result.analysis_json?.role_level_assessment ?? ''} />
                     <AnalysisBlock label="Gap analysis" text={result.analysis_json?.gap_analysis ?? ''} />
+
+                    {/* c. Score breakdown (supplementary) */}
+                    {result.verdict !== 'REJECT' && (
+                      <p className="text-xs font-mono text-gray-400 bg-gray-100 rounded px-2 py-1 inline-block">
+                        Composite {result.composite_score} = (ATS {result.ats_score} × 0.45) + (Role {result.role_level_score} × 0.55) = {(result.ats_score * 0.45 + result.role_level_score * 0.55).toFixed(1)}
+                      </p>
+                    )}
+
+                    {/* d. Recommendation */}
                     {result.analysis_json?.recommendation && (
                       <div>
                         <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1.5">Recommendation</p>
@@ -641,8 +652,8 @@ export default function DashboardPage() {
         <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
           <AlertTriangle size={16} className="shrink-0 mt-0.5" />
           <span className="flex-1">
-            Your profile is empty — screening accuracy will be low.{' '}
-            <a href="/profile" className="font-semibold underline">Add your resume or set preferences →</a>
+            No dealbreakers set — any job could slip through.{' '}
+            <a href="/profile" className="font-semibold underline">Tell us what to reject →</a>
           </span>
           <button onClick={dismissProfileBanner} className="shrink-0 text-amber-500 hover:text-amber-700 transition-colors" title="Dismiss">
             <X size={15} />
@@ -651,18 +662,22 @@ export default function DashboardPage() {
       )}
 
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Screen JDs</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Reject the bad ones</h1>
+          {lifetimeSaved && (
+            <p className="text-xs text-gray-400 mt-0.5">Lifetime: {lifetimeSaved} saved across your screening history</p>
+          )}
+        </div>
       </div>
 
       {/* Input card */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-6 pt-6 pb-0">
-          <h2 className="font-semibold text-gray-900 mb-4">Paste job URLs to screen</h2>
           <div className="flex border-b border-gray-200">
             {(['urls', 'text'] as InputTab[]).map((t) => (
               <button key={t} onClick={() => { setTab(t); setResults([]); setBatchTime(null); setScreenError(null); setIsSampleData(false) }}
                 className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                {t === 'urls' ? 'URLs' : 'Paste JD text'}
+                {t === 'urls' ? 'Job URLs' : 'Paste JD text'}
               </button>
             ))}
           </div>
@@ -672,7 +687,7 @@ export default function DashboardPage() {
           {tab === 'urls' ? (
             <>
               <textarea value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setScreenError(null) }} rows={5}
-                placeholder={'Paste one or more job URLs, one per line.\n\nWorks with LinkedIn, Naukri, Greenhouse, Lever, Workday, and most company career pages.'}
+                placeholder="Paste job URLs here, one per line. We'll tell you which ones aren't worth your time."
                 className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               {urlInput.trim() && <p className="text-xs text-gray-400">{urlCount} URL{urlCount !== 1 ? 's' : ''} detected</p>}
 
@@ -684,7 +699,7 @@ export default function DashboardPage() {
                 </button>
                 {showLinkedInHelper && (
                   <div className="border-t border-gray-100 px-4 py-4 space-y-4 bg-gray-50 text-sm text-gray-700">
-                    <p className="text-xs text-gray-500">Run this script in your browser console while on the LinkedIn recommended jobs page.</p>
+                    <p className="text-xs text-gray-500">Run this in your browser console on the LinkedIn recommended jobs page.</p>
                     <ol className="space-y-3 text-sm">
                       <li className="flex gap-2"><span className="font-bold text-gray-400 shrink-0">1.</span><span>Go to <a href="https://www.linkedin.com/jobs/collections/recommended/" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">LinkedIn Recommended Jobs</a> while logged in.</span></li>
                       <li className="flex gap-2"><span className="font-bold text-gray-400 shrink-0">2.</span><span>Open DevTools — <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-xs">F12</kbd> or <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-xs">Cmd ⌥ J</kbd> — Console tab.</span></li>
@@ -733,8 +748,8 @@ export default function DashboardPage() {
             <div className={`rounded-lg px-4 py-3 text-sm flex items-start gap-3 ${screenError.type === 'invalid_key' ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
               {screenError.type === 'network' ? <WifiOff size={15} className="shrink-0 mt-0.5" /> : <AlertTriangle size={15} className="shrink-0 mt-0.5" />}
               <div className="flex-1 space-y-2">
-                {screenError.type === 'no_api_key' && (<><p>⚠️ No API key saved. Add your Anthropic or OpenAI key in Profile settings to enable screening.</p><a href="/profile" className="inline-block font-semibold underline text-xs">→ Go to Profile</a></>)}
-                {screenError.type === 'invalid_key' && (<><p>✕ Your API key was rejected by {screenError.provider === 'openai' ? 'OpenAI' : 'Anthropic'}. It may have expired or been revoked.</p><a href="/profile" className="inline-block font-semibold underline text-xs">→ Update your API key in Profile</a></>)}
+                {screenError.type === 'no_api_key' && (<><p>⚠️ No API key saved. Add your Anthropic or OpenAI key in Profile settings.</p><a href="/profile" className="inline-block font-semibold underline text-xs">→ Go to Profile</a></>)}
+                {screenError.type === 'invalid_key' && (<><p>✕ API key rejected by {screenError.provider === 'openai' ? 'OpenAI' : 'Anthropic'}.</p><a href="/profile" className="inline-block font-semibold underline text-xs">→ Update your API key</a></>)}
                 {screenError.type === 'rate_limit' && (
                   <div className="flex items-center justify-between gap-4">
                     <p>Your {providerLabel} key hit a rate limit.{rateLimitCountdown > 0 ? ` Retry in ${rateLimitCountdown}s.` : ' Ready to retry.'}</p>
@@ -746,7 +761,7 @@ export default function DashboardPage() {
                 )}
                 {screenError.type === 'network' && (
                   <div className="flex items-center justify-between gap-4">
-                    <p>{screenError.message ?? 'Connection error — check your connection and try again.'}</p>
+                    <p>{screenError.message ?? 'Connection error.'}</p>
                     <button onClick={() => { setScreenError(null); handleScreen() }} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-700 text-white hover:bg-gray-800 transition-colors">Retry</button>
                   </div>
                 )}
@@ -766,21 +781,21 @@ export default function DashboardPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                 </svg>
-                Screening...
+                Working on it…
               </span>
-            ) : 'Screen JDs →'}
+            ) : 'Reject the bad ones →'}
           </button>
         </div>
       </div>
 
-      {/* Active reject rules strip */}
+      {/* Active dealbreakers strip */}
       {activeRules.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500 px-1">
-          <span className="font-medium text-gray-600">Active reject rules:</span>
+          <span className="font-medium text-gray-600">Active dealbreakers:</span>
           {activeRules.map((rule) => (
             <span key={rule} className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full font-medium">{rule}</span>
           ))}
-          <a href="/profile" className="text-blue-500 hover:underline ml-1">Edit rules →</a>
+          <a href="/profile" className="text-blue-500 hover:underline ml-1">Edit →</a>
         </div>
       )}
 
@@ -788,15 +803,15 @@ export default function DashboardPage() {
       {!hasAnyResults ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <FileSearch size={48} className="text-gray-300 mb-4" />
-          <p className="text-gray-500 font-medium">No JDs screened yet</p>
-          <p className="text-gray-400 text-sm mt-1">Paste job URLs above and click Screen JDs</p>
+          <p className="text-gray-700 font-semibold text-lg">Nothing rejected yet.</p>
+          <p className="text-gray-400 text-sm mt-1">Paste your job list below — we&apos;ll tell you which ones to skip.</p>
           <div className="mt-6 flex flex-col items-center gap-2">
             <button onClick={loadSampleData}
               className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors hover:opacity-90"
               style={{ backgroundColor: '#1B3A5C' }}>
-              Try a sample screening →
+              See a sample batch →
             </button>
-            <p className="text-xs text-gray-400">No API key needed — see how verdicts and auto-reject work</p>
+            <p className="text-xs text-gray-400">No API key needed — see how auto-reject works</p>
           </div>
         </div>
       ) : (
@@ -804,33 +819,26 @@ export default function DashboardPage() {
           {/* Sample data banner */}
           {isSampleData && (
             <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg bg-blue-50 border border-blue-200 text-sm">
-              <p className="text-blue-800">👆 This is sample data showing how JD Fit Checker works. Set up your profile to screen real jobs.</p>
+              <p className="text-blue-800">👆 Sample batch — showing how auto-reject and verdicts work.</p>
               <a href="/profile?onboarding=true" className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors hover:opacity-90" style={{ backgroundColor: '#1B3A5C' }}>
-                Complete setup →
+                Set up your dealbreakers →
               </a>
             </div>
           )}
 
-          {/* Rejection savings banner */}
+          {/* TIME-SAVED HERO CARD */}
           {batchDone && !isSampleData && verdictCounts.REJECT > 0 && (
-            <div className="flex items-start gap-3 px-4 py-4 rounded-lg border-l-4" style={{ backgroundColor: '#EEF2F7', borderLeftColor: '#1B3A5C' }}>
-              <Zap size={16} className="shrink-0 mt-0.5 text-blue-700" />
-              <div>
-                <p className="text-sm font-semibold text-gray-900">
-                  ⚡ Auto-rejected {verdictCounts.REJECT} of {goodResults.length} JDs — saved you ~{timeSaved} minutes of reading.
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {verdictCounts.REJECT} role{verdictCounts.REJECT !== 1 ? 's' : ''} failed your hard-reject rules before scoring. See why below.
-                </p>
-              </div>
+            <div style={{ backgroundColor: '#1B3A5C' }} className="rounded-xl px-6 py-6 text-white">
+              <p className="text-5xl font-bold tracking-tight leading-none">{calculateTimeSaved(verdictCounts.REJECT)}</p>
+              <p className="text-blue-200 mt-3 text-base">
+                saved — by skipping {verdictCounts.REJECT} job{verdictCounts.REJECT !== 1 ? 's' : ''} that weren&apos;t worth your time
+              </p>
             </div>
           )}
-
-          {/* Zero-reject positive state */}
           {batchDone && !isSampleData && verdictCounts.REJECT === 0 && goodResults.length > 0 && (
-            <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-800">
-              <Check size={15} className="shrink-0" />
-              All {goodResults.length} JDs passed your hard filters — none were obvious time-wasters.
+            <div style={{ backgroundColor: '#1B3A5C' }} className="rounded-xl px-6 py-4 text-white flex items-center gap-3">
+              <span className="text-green-400 text-xl font-bold">✓</span>
+              <p>All {goodResults.length} jobs cleared your dealbreakers — no time-wasters in this batch.</p>
             </div>
           )}
 
@@ -843,14 +851,15 @@ export default function DashboardPage() {
                   {errorResults.length > 0 && <span className="ml-2 text-xs font-normal text-amber-600">({errorResults.length} failed to scrape)</span>}
                 </h2>
                 {goodResults.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <p className="text-xs text-gray-500 mt-1">
                     <span className="font-medium text-gray-700">{goodResults.length} JD{goodResults.length !== 1 ? 's' : ''} screened</span>
-                    <span className="text-gray-300">—</span>
-                    {verdictCounts.STRONG > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />{verdictCounts.STRONG} Strong</span>}
-                    {verdictCounts.DECENT > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />{verdictCounts.DECENT} Decent</span>}
-                    {verdictCounts.WEAK > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />{verdictCounts.WEAK} Weak</span>}
-                    {verdictCounts.REJECT > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" />{verdictCounts.REJECT} Rejected</span>}
-                    {skeletonCount > 0 && <span className="text-gray-400 italic">{skeletonCount} screening…</span>}
+                    {verdictCounts.REJECT > 0 && (
+                      <span className="ml-1">— <span className="text-red-600 font-medium">{verdictCounts.REJECT} rejected</span>, {worthALook} worth a look</span>
+                    )}
+                    {verdictCounts.REJECT === 0 && worthALook > 0 && (
+                      <span className="ml-1">— <span className="text-green-600 font-medium">{worthALook} worth a look</span></span>
+                    )}
+                    {skeletonCount > 0 && <span className="text-gray-400 italic ml-1">{skeletonCount} in progress…</span>}
                   </p>
                 )}
                 {batchTime && skeletonCount === 0 && goodResults.length > 0 && (
@@ -865,10 +874,6 @@ export default function DashboardPage() {
                     {SORT_LABELS[k]}
                   </button>
                 ))}
-                <button onClick={() => setShowAllColumns((v) => !v)}
-                  className="md:hidden ml-1 px-2 py-1 rounded text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors">
-                  {showAllColumns ? 'Fewer cols' : 'All cols'}
-                </button>
               </div>
             </div>
 
@@ -877,24 +882,16 @@ export default function DashboardPage() {
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th className="text-left px-4 sm:px-6 py-3 font-medium text-gray-500 whitespace-nowrap">Company</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Job title / headline</th>
-                    <th className={`text-center px-4 py-3 font-medium text-gray-500 whitespace-nowrap ${showAllColumns ? '' : 'hidden md:table-cell'}`}>
-                      <ScoreTooltip tip={SCORE_TOOLTIPS.ats}>ATS</ScoreTooltip>
-                    </th>
-                    <th className={`text-center px-4 py-3 font-medium text-gray-500 whitespace-nowrap ${showAllColumns ? '' : 'hidden md:table-cell'}`}>
-                      <ScoreTooltip tip={SCORE_TOOLTIPS.role}>Role fit</ScoreTooltip>
-                    </th>
-                    <th className="text-center px-4 py-3 font-medium text-gray-500 whitespace-nowrap">
-                      <ScoreTooltip tip={SCORE_TOOLTIPS.composite}>Composite</ScoreTooltip>
-                    </th>
-                    <th className="text-center px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Verdict</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Job title</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Verdict</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-400 whitespace-nowrap text-xs hidden md:table-cell">Scores</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody>
                   {mainResults.map(renderResultRow)}
                   {Array.from({ length: skeletonCount }).map((_, i) => (
-                    <SkeletonRow key={`skel-${i}`} showAllColumns={showAllColumns} />
+                    <SkeletonRow key={`skel-${i}`} />
                   ))}
                 </tbody>
               </table>
@@ -908,7 +905,7 @@ export default function DashboardPage() {
                   className="w-full flex items-center justify-between px-4 sm:px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
                   <span className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
-                    Auto-rejected ({rejectResults.length}) — click to see why
+                    Rejected ({rejectResults.length}) — click to see why
                   </span>
                   {rejectedCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                 </button>
@@ -929,7 +926,6 @@ export default function DashboardPage() {
               <div className="px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50">
                 <p className="text-xs text-gray-400 leading-relaxed">
                   Scores reflect resume-to-JD fit, not a guarantee of callbacks. Use them to prioritize, not to predict.
-                  A &quot;STRONG&quot; means worth your time — not a promise.
                 </p>
               </div>
             )}
@@ -953,12 +949,12 @@ export default function DashboardPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowTierModal(false)} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h2 className="text-xl font-bold text-gray-900">Monthly limit reached</h2>
-            <p className="text-gray-500 text-sm">You&apos;ve used all 5 free screens this month. Upgrade for unlimited screens.</p>
+            <h2 className="text-xl font-bold text-gray-900">Free batches used up</h2>
+            <p className="text-gray-500 text-sm">You&apos;ve used your 5 free batches. Upgrade once for unlimited rejections — no monthly subscription.</p>
             <div className="flex flex-col gap-2 pt-1">
               <button onClick={() => { setShowTierModal(false); setShowPaymentModal(true) }}
                 className="w-full py-3 rounded-xl font-semibold text-sm text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: '#1B3A5C' }}>
-                Upgrade — ₹499 one-time
+                Unlock unlimited rejections — ₹499 one-time
               </button>
               <button onClick={() => setShowTierModal(false)} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 transition-colors py-2">Maybe later</button>
             </div>
@@ -967,7 +963,7 @@ export default function DashboardPage() {
       )}
 
       <PaymentModal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)}
-        onSuccess={() => { setUserTier('paid'); setShowPaymentModal(false); toast.success('Upgraded! Unlimited screens unlocked.') }} />
+        onSuccess={() => { setShowPaymentModal(false); toast.success('Upgraded! Unlimited rejections unlocked.') }} />
     </div>
   )
 }

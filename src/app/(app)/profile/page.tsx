@@ -495,7 +495,10 @@ export default function ProfilePage() {
     <div className="max-w-2xl w-full space-y-8 overflow-x-hidden">
       {/* Tier badge row */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Tell us your dealbreakers once. We&apos;ll reject anything that crosses them — automatically, every time.</p>
+        </div>
         <div className="flex items-center gap-2">
           <span className="px-3 py-1 rounded-full text-xs font-bold tracking-wide text-white" style={{ backgroundColor: '#1B3A5C' }}>
             {tier === 'paid' ? 'PAID' : 'FREE'}
@@ -533,8 +536,8 @@ export default function ProfilePage() {
       {isOnboarding && !onboardingCompleted && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 sm:px-6 py-5 space-y-4">
           <div>
-            <h2 className="font-semibold text-blue-900">Welcome to JD Fit Checker!</h2>
-            <p className="text-sm text-blue-700 mt-1">Complete these 3 steps for accurate job screening.</p>
+            <h2 className="font-semibold text-blue-900">Tell us what you won&apos;t accept.</h2>
+            <p className="text-sm text-blue-700 mt-1">We&apos;ll do the rejecting for you from here.</p>
           </div>
           <ol className="space-y-2.5">
             {([
@@ -616,13 +619,13 @@ export default function ProfilePage() {
         </Field>
       </Section>
 
-      {/* Auto-reject rules */}
+      {/* Dealbreakers */}
       <Section
-        title="Auto-reject rules"
+        title="Your dealbreakers"
         action={<SectionSaveButton state={filterSave} onClick={handleSaveFilters} />}
       >
         <p className="text-sm text-gray-500 -mt-1 mb-3">
-          Any job matching these gets instantly rejected — no score calculated.
+          Cross any of these and the job gets rejected before you ever have to read it.
         </p>
         <Field label="Tech I won't work with">
           <TagInput
