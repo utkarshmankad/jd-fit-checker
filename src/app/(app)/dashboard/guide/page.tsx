@@ -182,7 +182,8 @@ export default function GuidePage() {
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
         <h2 className="font-semibold text-amber-900 text-sm mb-2">Tips</h2>
         <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
-          <li>Scroll to bottom before running on infinite-scroll pages (LinkedIn, Indeed)</li>
+          <li>On LinkedIn search results pages the job list scrolls independently — the script handles this automatically, but wait the full ~15 seconds</li>
+          <li>Scroll to bottom before running on infinite-scroll pages (Indeed, Greenhouse listings)</li>
           <li>On Workday, navigate into a job category first — the root page may not list individual jobs</li>
           <li>If the panel shows 0 jobs, open the job listing page (not the company homepage)</li>
           <li>The script only reads the current page — run once per page/category</li>
