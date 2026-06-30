@@ -126,104 +126,26 @@ function getReasonLine(r: ScreeningResult): string {
   return ''
 }
 
-const LINKEDIN_CONSOLE_SCRIPT = `(async () => {
+const LINKEDIN_CONSOLE_SCRIPT = `(() => {
   const ids = new Set();
-
-  // --- Intercept XHR + fetch to catch each batch LinkedIn loads on scroll ---
-  const _fetch = window.fetch;
-  const _xhrOpen = XMLHttpRequest.prototype.open;
-  const _xhrSend = XMLHttpRequest.prototype.send;
-
-  function extractFromText(text) {
-    // Matches both "jobPosting:ID" and "jobPosting%3AID" (URL-encoded colon)
-    const re = /jobPosting[:%]3?[A:]?(\\d{7,})/g;
-    let m;
-    while ((m = re.exec(text)) !== null) ids.add(m[1]);
-  }
-
-  window.fetch = async function(...args) {
-    const res = await _fetch.apply(this, args);
-    try { extractFromText(await res.clone().text()); } catch (e) {}
-    return res;
-  };
-
-  XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-    this._url = url;
-    return _xhrOpen.call(this, method, url, ...rest);
-  };
-  XMLHttpRequest.prototype.send = function(...args) {
-    this.addEventListener('load', function() {
-      try { extractFromText(this.responseText); } catch (e) {}
-    });
-    return _xhrSend.apply(this, args);
-  };
-
-  // --- DOM snapshot (catches any page that DOES use standard attributes) ---
-  function snap() {
-    document.querySelectorAll('[data-occludable-job-id],[data-job-id],[data-occludable-entity-urn],[data-entity-urn]').forEach(el => {
-      const jid = el.getAttribute('data-occludable-job-id') || el.getAttribute('data-job-id');
-      if (jid && /^\\d{7,}$/.test(jid)) ids.add(jid);
-      const urn = el.getAttribute('data-occludable-entity-urn') || el.getAttribute('data-entity-urn') || '';
-      const m = urn.match(/jobPosting:(\\d{7,})/);
-      if (m) ids.add(m[1]);
-    });
-    // Search-results links use ?currentJobId=ID, not /jobs/view/ID
-    document.querySelectorAll('a[href]').forEach(el => {
-      const h = el.getAttribute('href') || '';
-      const m = h.match(/[?&]currentJobId=(\\d{7,})/) || h.match(/\\/jobs\\/view\\/(\\d{7,})/);
-      if (m) ids.add(m[1]);
-    });
-    const cj = new URL(location.href).searchParams.get('currentJobId');
-    if (cj && /^\\d+$/.test(cj)) ids.add(cj);
-  }
-
-  snap();
-
-  // --- Find scrollable panel ---
-  const panel = document.querySelector('.jobs-search-results-list')
-    || document.querySelector('.scaffold-layout__list');
-
-  // --- Click each visible card once — for the initial already-rendered batch ---
-  // On search-results pages, clicking a card updates currentJobId in the URL
-  const seen = new Set();
-  async function clickVisible() {
-    const items = (panel || document).querySelectorAll('li');
-    for (const li of items) {
-      const a = li.querySelector('a[href]');
-      if (!a || seen.has(a)) continue;
-      seen.add(a);
-      const h = a.getAttribute('href') || '';
-      const m = h.match(/[?&]currentJobId=(\\d{7,})/) || h.match(/\\/jobs\\/view\\/(\\d{7,})/);
-      if (m) { ids.add(m[1]); continue; }
-      // No ID visible in href — click it and read updated URL
-      a.click();
-      await new Promise(r => setTimeout(r, 350));
-      const cj = new URL(location.href).searchParams.get('currentJobId');
-      if (cj && /^\\d+$/.test(cj)) ids.add(cj);
-    }
-  }
-
-  await clickVisible();
-
-  // --- Scroll loop — XHR intercept picks up each new batch ---
-  let stale = 0, prev = ids.size;
-  for (let i = 0; i < 80; i++) {
-    if (panel) panel.scrollTop += 800; else window.scrollBy(0, 800);
-    await new Promise(r => setTimeout(r, 1500));
-    snap();
-    await clickVisible(); // click newly loaded cards
-    if (ids.size === prev) { if (++stale >= 5) break; } else { stale = 0; prev = ids.size; }
-  }
-
-  // --- Restore originals ---
-  window.fetch = _fetch;
-  XMLHttpRequest.prototype.open = _xhrOpen;
-  XMLHttpRequest.prototype.send = _xhrSend;
-
-  const all = [...ids];
+  document.querySelectorAll('[data-occludable-job-id],[data-job-id],[data-occludable-entity-urn],[data-entity-urn]').forEach(el => {
+    const jid = el.getAttribute('data-occludable-job-id') || el.getAttribute('data-job-id');
+    if (jid && /^\\d{7,}$/.test(jid)) ids.add(jid);
+    const urn = el.getAttribute('data-occludable-entity-urn') || el.getAttribute('data-entity-urn') || '';
+    const m = urn.match(/jobPosting:(\\d{7,})/);
+    if (m) ids.add(m[1]);
+  });
+  document.querySelectorAll('a[href]').forEach(el => {
+    const h = el.getAttribute('href') || '';
+    const m = h.match(/\\/jobs\\/view\\/(\\d{7,})/) || h.match(/[?&]currentJobId=(\\d{7,})/);
+    if (m) ids.add(m[1]);
+  });
+  const cj = new URL(location.href).searchParams.get('currentJobId');
+  if (cj && /^\\d+$/.test(cj)) ids.add(cj);
+  const all = [...ids].slice(0, 20);
   const urls = all.map(id => 'https://www.linkedin.com/jobs/view/' + id + '/').join('\\n');
-  try { await navigator.clipboard.writeText(urls); } catch (e) { prompt('Copy all ' + all.length + ' URLs:', urls); }
-  alert('Done! ' + all.length + ' jobs found.\\nPaste 20 at a time into JD Fit Checker.');
+  try { navigator.clipboard.writeText(urls); } catch (e) { prompt('Copy ' + all.length + ' URLs:', urls); }
+  alert('Copied ' + all.length + ' job URLs.\\nPaste into JD Fit Checker.\\nScroll down and run again for more.');
 })();`
 
 // ── Sub-components ────────────────────────────────────────────────────────────
