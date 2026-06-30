@@ -115,7 +115,7 @@ function Step({
       <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: '#1B3A5C' }}>
         {num}
       </div>
-      <div className="flex-1 pb-6 border-b border-gray-100 last:border-0 last:pb-0">
+      <div className="flex-1 min-w-0 pb-6 border-b border-gray-100 last:border-0 last:pb-0">
         <div className="flex items-center gap-2 mb-1">
           <Icon size={15} className="text-gray-400" />
           <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
@@ -149,7 +149,7 @@ export default function GuidePage() {
                 <span className="text-xs font-mono text-gray-500">Scraper script — paste into browser console</span>
                 <CopyButton text={SCRAPER_SCRIPT} />
               </div>
-              <pre className="px-4 py-3 text-xs font-mono text-gray-700 overflow-x-auto max-h-48 bg-gray-950 text-green-400 leading-relaxed">
+              <pre className="px-4 py-3 text-xs font-mono bg-gray-950 text-green-400 leading-relaxed overflow-x-auto max-h-48 whitespace-pre-wrap break-all">
                 {SCRAPER_SCRIPT}
               </pre>
             </div>
