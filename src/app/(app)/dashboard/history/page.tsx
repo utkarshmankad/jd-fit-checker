@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Download, History, Search, ArrowUpDown } from 'lucide-react'
+import { Download, History, Search, ArrowUpDown, ExternalLink } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { ScreeningResult } from '@/types'
 
@@ -228,9 +228,23 @@ export default function HistoryPage() {
             <div key={r.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
               {/* Company + role */}
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 text-sm truncate">
-                  {r.company ?? '—'}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="font-semibold text-gray-900 text-sm truncate">
+                    {r.company ?? '—'}
+                  </p>
+                  {r.job_url && (
+                    <a
+                      href={r.job_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open job posting"
+                      className="shrink-0 text-blue-400 hover:text-blue-600 transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ExternalLink size={12} />
+                    </a>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500 mt-0.5 truncate">
                   {r.job_title ?? '—'}
                 </p>
