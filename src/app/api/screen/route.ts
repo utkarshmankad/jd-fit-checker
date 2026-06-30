@@ -4,7 +4,7 @@ import { decrypt } from '@/lib/utils/crypto'
 import type { AnalysisResult, ScreeningResult } from '@/types'
 
 const FREE_TIER_LIMIT = 5
-const SCREEN_LIMIT_ENABLED = process.env.NEXT_PUBLIC_FEATURE_SCREEN_LIMIT !== 'false'
+const SCREEN_LIMIT_ENABLED = process.env.NEXT_PUBLIC_FEATURE_SCREEN_LIMIT === 'true'
 
 type FastAPIResult = AnalysisResult & {
   job_title?: string

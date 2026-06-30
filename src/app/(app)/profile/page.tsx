@@ -501,11 +501,9 @@ export default function ProfilePage() {
             {tier === 'paid' ? 'PAID' : 'FREE'}
           </span>
           <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-            {tier === 'paid'
-              ? 'Unlimited'
-              : process.env.NEXT_PUBLIC_FEATURE_SCREEN_LIMIT === 'false'
-                ? `${screensUsed} screens used`
-                : `${screensUsed} / 5 screens used`}
+            {tier === 'paid' || process.env.NEXT_PUBLIC_FEATURE_SCREEN_LIMIT !== 'true'
+              ? `${screensUsed} screens used`
+              : `${screensUsed} / 5 screens used`}
           </span>
         </div>
       </div>
