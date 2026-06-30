@@ -4,71 +4,61 @@ import { useState } from 'react'
 import { Copy, Check, Terminal, MousePointer, ClipboardList, Zap } from 'lucide-react'
 
 const SCRAPER_SCRIPT = `(function () {
-  var JOB_PATTERNS = [
-    /\\/jobs\\/[^\\/\\s?#]+/i,
-    /\\/job\\/[^\\/\\s?#]+/i,
-    /\\/careers\\/[a-zA-Z0-9_-]+/i,
-    /\\/career\\/[a-zA-Z0-9_-]+/i,
-    /\\/openings\\/[^\\/\\s?#]+/i,
-    /\\/positions\\/[^\\/\\s?#]+/i,
-    /\\/apply\\/[^\\/\\s?#]+/i,
-    /\\/posting\\/[^\\/\\s?#]+/i,
-    /\\/opportunities\\/[^\\/\\s?#]+/i,
-    /\\/role\\/[^\\/\\s?#]+/i,
+  var P = [
+    /\\/jobs\\/[^\\/\\s?#]+/i, /\\/job\\/[^\\/\\s?#]+/i,
+    /\\/careers\\/[a-zA-Z0-9_-]+/i, /\\/career\\/[a-zA-Z0-9_-]+/i,
+    /\\/openings\\/[^\\/\\s?#]+/i, /\\/positions\\/[^\\/\\s?#]+/i,
+    /\\/apply\\/[^\\/\\s?#]+/i, /\\/posting\\/[^\\/\\s?#]+/i,
+    /\\/opportunities\\/[^\\/\\s?#]+/i, /\\/role\\/[^\\/\\s?#]+/i,
     /greenhouse\\.io\\/.+\\/jobs\\/\\d+/i,
     /jobs\\.lever\\.co\\/.+\\/[a-f0-9]{8}-[a-f0-9]{4}/i,
-    /myworkdayjobs\\.com/i,
-    /icims\\.com\\/jobs\\/\\d+/i,
+    /myworkdayjobs\\.com/i, /icims\\.com\\/jobs\\/\\d+/i,
     /jobs\\.smartrecruiters\\.com/i,
     /jobs\\.ashbyhq\\.com\\/.+\\/[a-f0-9]{8}-[a-f0-9]{4}/i,
-    /linkedin\\.com\\/jobs\\/view\\/\\d+/i,
-    /indeed\\.com\\/viewjob/i,
-    /ats\\.rippling\\.com/i,
-    /bamboohr\\.com\\/careers\\/\\d+/i,
+    /linkedin\\.com\\/jobs\\/view\\/\\d+/i, /indeed\\.com\\/viewjob/i,
+    /ats\\.rippling\\.com/i, /bamboohr\\.com\\/careers\\/\\d+/i,
     /jobvite\\.com\\/[^\\/]+\\/job\\//i,
   ];
-
-  function isJob(href) {
-    return href && !href.startsWith('#') && !href.startsWith('mailto:') &&
-      JOB_PATTERNS.some(function (p) { return p.test(href); });
-  }
-
-  function abs(href) {
-    try { return new URL(href, location.href).href; } catch { return href; }
-  }
-
-  var seen = new Set();
-  var links = [];
-  document.querySelectorAll('a[href]').forEach(function (a) {
-    var url = abs(a.getAttribute('href'));
-    if (isJob(url) && !seen.has(url)) { seen.add(url); links.push(url); }
+  function isJob(h) { return h && h[0] !== "#" && !/^mailto:/i.test(h) && P.some(function(p){return p.test(h);}); }
+  function abs(h) { try { return new URL(h, location.href).href; } catch(e) { return h; } }
+  var seen = {}, urls = [];
+  document.querySelectorAll("a[href]").forEach(function(a) {
+    var u = abs(a.getAttribute("href"));
+    if (isJob(u) && !seen[u]) { seen[u] = 1; urls.push(u); }
   });
-
-  if (!links.length) {
-    alert('No job links found.\\n\\nTry: scroll down to load more listings, then run again.');
-    return;
+  if (!urls.length) { alert("No job links found. Scroll down to load more, then run again."); return; }
+  var text = urls.join("\\n");
+  function el(tag, css, txt) {
+    var e = document.createElement(tag);
+    if (css) e.style.cssText = css;
+    if (txt !== undefined) e.textContent = txt;
+    return e;
   }
-
-  var text = links.join('\\n');
-
   function showPanel() {
-    document.getElementById('jdfit-panel') && document.getElementById('jdfit-panel').remove();
-    var panel = document.createElement('div');
-    panel.id = 'jdfit-panel';
-    panel.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.18);padding:16px;width:400px;max-height:80vh;display:flex;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;';
-    panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="color:#1B3A5C;font-size:14px">JD Fit Checker — ' + links.length + ' job' + (links.length !== 1 ? 's' : '') + ' found</b><button onclick="document.getElementById(\'jdfit-panel\').remove()" style="border:none;background:none;cursor:pointer;font-size:20px;color:#94a3b8;line-height:1">×</button></div><textarea id="jdfit-ta" readonly style="flex:1;min-height:160px;max-height:280px;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;resize:vertical;outline:none;color:#334155;line-height:1.5">' + links.join('\\n') + '</textarea><div style="display:flex;gap:8px;margin-top:10px"><button id="jdfit-copy-btn" style="flex:1;background:#1B3A5C;color:#fff;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer">Copy all URLs</button><button onclick="document.getElementById(\'jdfit-panel\').remove()" style="background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 14px;font-size:13px;cursor:pointer">Close</button></div>';
-    document.body.appendChild(panel);
-    document.getElementById('jdfit-copy-btn').addEventListener('click', function () {
-      var btn = this;
-      navigator.clipboard.writeText(text).catch(function () {
-        var ta = document.getElementById('jdfit-ta'); ta.select(); document.execCommand('copy');
-      });
-      btn.textContent = 'Copied ✓'; btn.style.background = '#16a34a';
-      setTimeout(function () { btn.textContent = 'Copy all URLs'; btn.style.background = '#1B3A5C'; }, 2000);
+    var old = document.getElementById("jdfit-panel");
+    if (old) old.remove();
+    var panel = el("div", "position:fixed;top:16px;right:16px;z-index:2147483647;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.18);padding:16px;width:400px;max-height:80vh;display:flex;flex-direction:column;font-family:-apple-system,sans-serif;");
+    panel.id = "jdfit-panel";
+    var hdr = el("div", "display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;");
+    var title = el("b", "color:#1B3A5C;font-size:14px;", "JD Fit Checker — " + urls.length + " job" + (urls.length !== 1 ? "s" : "") + " found");
+    var xBtn = el("button", "border:none;background:none;cursor:pointer;font-size:20px;color:#94a3b8;line-height:1;", "\\u00d7");
+    xBtn.addEventListener("click", function() { panel.remove(); });
+    hdr.appendChild(title); hdr.appendChild(xBtn); panel.appendChild(hdr);
+    var ta = el("textarea", "flex:1;min-height:160px;max-height:280px;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:11px;font-family:monospace;resize:vertical;outline:none;color:#334155;line-height:1.5;");
+    ta.readOnly = true; ta.value = text; panel.appendChild(ta);
+    var ftr = el("div", "display:flex;gap:8px;margin-top:10px;");
+    var copyBtn = el("button", "flex:1;background:#1B3A5C;color:#fff;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;", "Copy all URLs");
+    copyBtn.addEventListener("click", function() {
+      navigator.clipboard.writeText(text).catch(function() { ta.select(); document.execCommand("copy"); });
+      copyBtn.textContent = "Copied \\u2713"; copyBtn.style.background = "#16a34a";
+      setTimeout(function() { copyBtn.textContent = "Copy all URLs"; copyBtn.style.background = "#1B3A5C"; }, 2000);
     });
+    var closeBtn = el("button", "background:#f1f5f9;color:#475569;border:none;border-radius:8px;padding:9px 14px;font-size:13px;cursor:pointer;", "Close");
+    closeBtn.addEventListener("click", function() { panel.remove(); });
+    ftr.appendChild(copyBtn); ftr.appendChild(closeBtn); panel.appendChild(ftr);
+    document.body.appendChild(panel);
   }
-
-  navigator.clipboard.writeText(text).catch(function () {}).finally(showPanel);
+  navigator.clipboard.writeText(text).catch(function(){}).finally(showPanel);
 })();`.trim()
 
 const SITES = [
@@ -135,26 +125,33 @@ export default function GuidePage() {
       </div>
 
       {/* Quick workflow */}
-      <div className="bg-white rounded-xl border border-gray-200 px-5 py-5 space-y-5">
-        <h2 className="font-semibold text-gray-900">Workflow</h2>
-        <div className="space-y-5">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-5 pt-5 pb-3">
+          <h2 className="font-semibold text-gray-900">Workflow</h2>
+        </div>
+        <div className="px-5 space-y-5">
           <Step num={1} icon={MousePointer} title="Go to a company's jobs page">
             <p>Open the careers or jobs listing page of any company in your browser. Works on Greenhouse, Lever, Workday, Ashby, LinkedIn, Indeed, and most custom career sites.</p>
           </Step>
 
           <Step num={2} icon={Terminal} title="Run the scraper script in browser console">
             <p>Open DevTools (<kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">F12</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">Cmd+Option+J</kbd>), paste the script below into the Console tab, and press Enter.</p>
-            <div className="mt-3 rounded-lg border border-gray-200 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
-                <span className="text-xs font-mono text-gray-500">Scraper script — paste into browser console</span>
-                <CopyButton text={SCRAPER_SCRIPT} />
-              </div>
-              <pre className="px-4 py-3 text-xs font-mono bg-gray-950 text-green-400 leading-relaxed overflow-x-auto max-h-48 whitespace-pre-wrap break-all">
-                {SCRAPER_SCRIPT}
-              </pre>
-            </div>
-            <p className="text-xs text-gray-400 mt-2">A panel will appear with all job URLs found. Scroll down to load more listings before running if the page uses infinite scroll.</p>
           </Step>
+        </div>
+
+        {/* Code block outside flex chain so it can fill full card width */}
+        <div className="mx-5 mb-3 rounded-lg border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
+            <span className="text-xs font-mono text-gray-500">Scraper script — paste into browser console</span>
+            <CopyButton text={SCRAPER_SCRIPT} />
+          </div>
+          <pre className="px-4 py-3 text-xs font-mono bg-gray-950 text-green-400 leading-relaxed overflow-x-auto max-h-48 w-full box-border">
+            {SCRAPER_SCRIPT}
+          </pre>
+        </div>
+        <p className="text-xs text-gray-400 px-5 pb-3">A panel will appear with all job URLs found. Scroll down to load more listings before running if the page uses infinite scroll.</p>
+
+        <div className="px-5 space-y-5 pb-5">
 
           <Step num={3} icon={ClipboardList} title="Copy the URLs">
             <p>Click <strong>Copy all URLs</strong> in the panel that appears. The URLs are newline-separated — one job per line.</p>
