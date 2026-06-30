@@ -58,6 +58,12 @@ export interface ScreeningResult {
   created_at: string;
 }
 
+export interface RequirementCheck {
+  requirement: string;
+  status: 'met' | 'partial' | 'missing';
+  evidence?: string;
+}
+
 export interface AnalysisResult {
   ats_score: number;
   role_level_score: number;
@@ -65,8 +71,11 @@ export interface AnalysisResult {
   verdict: 'STRONG' | 'DECENT' | 'WEAK' | 'REJECT';
   hard_reject_triggered: boolean;
   hard_reject_reasons: string[];
+  headline?: string;
   matching_skills: string[];
   missing_skills: string[];
+  requirements_met?: RequirementCheck[];
+  soft_concerns?: string[];
   role_level_assessment: string;
   gap_analysis: string;
   recommendation: string;
