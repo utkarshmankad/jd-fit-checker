@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
           hard_reject_filters: profile!.hard_reject_filters,
           api_key: apiKey,
           api_provider: profile!.api_provider,
-          user_id: user.id,
+          user_id: user!.id,
         }),
       })
     } catch (e) {
