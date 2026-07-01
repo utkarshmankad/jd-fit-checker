@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { Download, History, Search, ArrowUpDown, ExternalLink } from 'lucide-react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
+import { Download, History, Search, ChevronDown, ChevronUp, ExternalLink, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { ScreeningResult } from '@/types'
+import { VERDICT_CONFIG, SCORE_TOOLTIPS, getReasonLine, ScorePill, AnalysisDetailBody } from '@/components/analysis/AnalysisDetail'
+import TrackButton from '@/components/tracker/TrackButton'
 
-type HistoryRow = Omit<ScreeningResult, 'jd_text' | 'analysis_json'>
+type HistoryRow = Omit<ScreeningResult, 'jd_text'>
 
 interface Batch {
   batch_id: string
@@ -16,16 +18,6 @@ interface Batch {
 
 const VERDICTS = ['ALL', 'STRONG', 'DECENT', 'WEAK', 'REJECT'] as const
 type VerdictFilter = (typeof VERDICTS)[number]
-
-function verdictClass(v: string) {
-  const map: Record<string, string> = {
-    STRONG: 'bg-green-100 text-green-800',
-    DECENT: 'bg-amber-100 text-amber-800',
-    WEAK: 'bg-gray-100 text-gray-700',
-    REJECT: 'bg-red-100 text-red-800',
-  }
-  return map[v] ?? 'bg-gray-100 text-gray-700'
-}
 
 function verdictFilterClass(v: VerdictFilter, active: boolean) {
   if (!active) return 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
@@ -46,21 +38,12 @@ function scoreClass(n: number) {
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
-
-type FlatResult = HistoryRow & { batch_created_at: string }
 
 export default function HistoryPage() {
   const [batches, setBatches] = useState<Batch[]>([])
@@ -68,8 +51,9 @@ export default function HistoryPage() {
 
   const [search, setSearch] = useState('')
   const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>('ALL')
-  const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
-  const [showDuplicates, setShowDuplicates] = useState(false)
+  const [collapsedBatches, setCollapsedBatches] = useState<Set<string>>(new Set())
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+  const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     async function load() {
@@ -85,57 +69,49 @@ export default function HistoryPage() {
       }
     }
     load()
+
+    fetch('/api/tracker')
+      .then((r) => r.json())
+      .then((data: { items?: { screening_result_id: string | null }[] }) => {
+        setTrackedIds(new Set((data.items ?? []).filter((i) => i.screening_result_id).map((i) => i.screening_result_id as string)))
+      })
+      .catch(() => {})
   }, [])
 
   function handleExport(batch_id: string) {
     window.location.href = `/api/export?batch_id=${batch_id}`
   }
 
-  const flatResults = useMemo<FlatResult[]>(() => {
-    return batches.flatMap((b) =>
-      b.results.map((r) => ({ ...r, batch_created_at: b.created_at }))
-    )
-  }, [batches])
+  function toggleBatch(batch_id: string) {
+    setCollapsedBatches((prev) => {
+      const next = new Set(prev)
+      if (next.has(batch_id)) next.delete(batch_id)
+      else next.add(batch_id)
+      return next
+    })
+  }
 
-  // Deduplicate: for each (company, job_title) exact pair keep only the latest entry.
-  // Only dedup when both fields are known; null-field entries always pass through.
-  const deduplicatedResults = useMemo<FlatResult[]>(() => {
-    if (showDuplicates) return flatResults
-    const sorted = [...flatResults].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
-    const seen = new Set<string>()
-    const out: FlatResult[] = []
-    for (const r of sorted) {
-      if (r.company && r.job_title) {
-        const key = `${r.company.toLowerCase().trim()}|||${r.job_title.toLowerCase().trim()}`
-        if (seen.has(key)) continue
-        seen.add(key)
-      }
-      out.push(r)
-    }
-    return out
-  }, [flatResults, showDuplicates])
+  const totalCount = useMemo(() => batches.reduce((sum, b) => sum + b.results.length, 0), [batches])
 
-  const dupCount = flatResults.length - deduplicatedResults.length
-
-  const filtered = useMemo(() => {
+  const filteredBatches = useMemo(() => {
     const q = search.toLowerCase().trim()
-    return deduplicatedResults
-      .filter((r) => {
-        if (verdictFilter !== 'ALL' && r.verdict !== verdictFilter) return false
-        if (q) {
-          const inCompany = r.company?.toLowerCase().includes(q) ?? false
-          const inTitle = r.job_title?.toLowerCase().includes(q) ?? false
-          if (!inCompany && !inTitle) return false
-        }
-        return true
-      })
-      .sort((a, b) => {
-        const diff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        return sortDir === 'desc' ? diff : -diff
-      })
-  }, [flatResults, search, verdictFilter, sortDir])
+    return batches
+      .map((b) => ({
+        ...b,
+        results: b.results.filter((r) => {
+          if (verdictFilter !== 'ALL' && r.verdict !== verdictFilter) return false
+          if (q) {
+            const inCompany = r.company?.toLowerCase().includes(q) ?? false
+            const inTitle = r.job_title?.toLowerCase().includes(q) ?? false
+            if (!inCompany && !inTitle) return false
+          }
+          return true
+        }),
+      }))
+      .filter((b) => b.results.length > 0)
+  }, [batches, search, verdictFilter])
+
+  const filteredCount = useMemo(() => filteredBatches.reduce((sum, b) => sum + b.results.length, 0), [filteredBatches])
 
   if (loading) {
     return (
@@ -164,25 +140,13 @@ export default function HistoryPage() {
     <div className="space-y-5 max-w-4xl">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-gray-900">Screening history</h1>
-        <div className="flex items-center gap-3">
-          {dupCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowDuplicates((v) => !v)}
-              className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
-            >
-              {showDuplicates ? `Hide ${dupCount} duplicate${dupCount !== 1 ? 's' : ''}` : `${dupCount} duplicate${dupCount !== 1 ? 's' : ''} hidden`}
-            </button>
-          )}
-          <span className="text-sm text-gray-400">
-            {filtered.length} of {deduplicatedResults.length} roles
-          </span>
-        </div>
+        <span className="text-sm text-gray-400">
+          {filteredCount} of {totalCount} roles across {filteredBatches.length} batch{filteredBatches.length !== 1 ? 'es' : ''}
+        </span>
       </div>
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -194,7 +158,6 @@ export default function HistoryPage() {
           />
         </div>
 
-        {/* Verdict chips */}
         <div className="flex gap-1.5">
           {VERDICTS.map((v) => (
             <button
@@ -206,79 +169,115 @@ export default function HistoryPage() {
             </button>
           ))}
         </div>
-
-        {/* Sort toggle */}
-        <button
-          onClick={() => setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-        >
-          <ArrowUpDown size={12} />
-          {sortDir === 'desc' ? 'Newest first' : 'Oldest first'}
-        </button>
       </div>
 
-      {/* Results list */}
-      {filtered.length === 0 ? (
+      {/* Batch sections */}
+      {filteredBatches.length === 0 ? (
         <div className="py-16 text-center text-gray-400 text-sm">
           No results match your filters.
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
-          {filtered.map((r) => (
-            <div key={r.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
-              {/* Company + role */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <p className="font-semibold text-gray-900 text-sm truncate">
-                    {r.company ?? '—'}
-                  </p>
-                  {r.job_url && (
-                    <a
-                      href={r.job_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Open job posting"
-                      className="shrink-0 text-blue-400 hover:text-blue-600 transition-colors"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ExternalLink size={12} />
-                    </a>
-                  )}
+        <div className="space-y-4">
+          {filteredBatches.map((batch) => {
+            const isCollapsed = collapsedBatches.has(batch.batch_id)
+            return (
+              <div key={batch.batch_id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {/* Batch header */}
+                <div className="flex items-center justify-between px-5 py-3.5 bg-gray-50 border-b border-gray-100">
+                  <button
+                    onClick={() => toggleBatch(batch.batch_id)}
+                    className="flex items-center gap-2 text-sm font-semibold text-gray-900 hover:text-gray-700 transition-colors"
+                  >
+                    {isCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                    <span>{formatDate(batch.created_at)}</span>
+                    <span className="text-xs font-normal text-gray-400">{formatTime(batch.created_at)}</span>
+                    <span className="text-xs font-normal text-gray-400">· {batch.results.length} job{batch.results.length !== 1 ? 's' : ''}</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport(batch.batch_id)}
+                    title="Download batch as CSV"
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
+                  >
+                    <Download size={11} />
+                    Download CSV
+                  </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5 truncate">
-                  {r.job_title ?? '—'}
-                </p>
+
+                {!isCollapsed && (
+                  <div className="divide-y divide-gray-100">
+                    {batch.results.map((r) => {
+                      const rowKey = r.id
+                      const isExpanded = expandedRowId === rowKey
+                      const reasonLine = getReasonLine(r as ScreeningResult)
+                      return (
+                        <Fragment key={rowKey}>
+                          <div className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-semibold text-gray-900 text-sm truncate">{r.company ?? '—'}</p>
+                                {r.job_url && (
+                                  <a
+                                    href={r.job_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    title="Open job posting"
+                                    className="shrink-0 text-blue-400 hover:text-blue-600 transition-colors"
+                                  >
+                                    <ExternalLink size={12} />
+                                  </a>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5 truncate">{r.job_title ?? '—'}</p>
+                              {reasonLine && (
+                                <p className="text-xs text-gray-400 mt-1 truncate">{reasonLine}</p>
+                              )}
+                            </div>
+
+                            <div className="hidden md:flex items-center gap-3 shrink-0">
+                              <ScorePill label="ATS " score={r.ats_score} tip={SCORE_TOOLTIPS.ats} />
+                              <ScorePill label="Role " score={r.role_level_score} tip={SCORE_TOOLTIPS.role} />
+                            </div>
+
+                            <span className={`hidden sm:block text-sm shrink-0 w-10 text-right ${scoreClass(r.composite_score)}`}>
+                              {r.composite_score}
+                            </span>
+
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${VERDICT_CONFIG[r.verdict]?.cls ?? 'bg-gray-100 text-gray-600 border border-gray-300'}`}>
+                              {r.verdict}
+                            </span>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => setExpandedRowId(isExpanded ? null : rowKey)}
+                                className={`p-1.5 rounded transition-colors ${isExpanded ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-gray-500 hover:bg-gray-200'}`}
+                                title="View analysis"
+                              >
+                                <Eye size={15} />
+                              </button>
+                              <TrackButton
+                                screeningResultId={r.id}
+                                jobTitle={r.job_title}
+                                company={r.company}
+                                jobUrl={r.job_url}
+                                tracked={trackedIds.has(r.id)}
+                                onTracked={(item) => setTrackedIds((prev) => new Set(prev).add(item.screening_result_id as string))}
+                              />
+                            </div>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="bg-slate-50 px-6 py-5">
+                              <AnalysisDetailBody result={r as ScreeningResult} />
+                            </div>
+                          )}
+                        </Fragment>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-
-              {/* Score */}
-              <span className={`hidden sm:block text-sm shrink-0 ${scoreClass(r.composite_score)}`}>
-                {r.composite_score}%
-              </span>
-
-              {/* Verdict */}
-              <span
-                className={`px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 ${verdictClass(r.verdict)}`}
-              >
-                {r.verdict}
-              </span>
-
-              {/* Date + time */}
-              <div className="hidden md:flex flex-col items-end shrink-0 text-xs text-gray-400 leading-tight">
-                <span>{formatDate(r.created_at)}</span>
-                <span>{formatTime(r.created_at)}</span>
-              </div>
-
-              {/* Export */}
-              <button
-                onClick={() => handleExport(r.batch_id)}
-                title="Export batch as CSV"
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
-              >
-                <Download size={11} />
-                CSV
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

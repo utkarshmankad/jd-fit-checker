@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (urls && Array.isArray(urls) && urls.length > 0) {
-    const urlList = urls.slice(0, 20).filter((u) => u.trim()).map(normalizeJobUrl)
+    const urlList = urls.filter((u) => u.trim()).map(normalizeJobUrl)
     for (const url of urlList) {
       const result = await callFastAPI({ job_url: url })
       if ('_error' in result) {

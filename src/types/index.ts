@@ -90,3 +90,18 @@ export interface SharedReport {
   expires_at: string;
   created_at: string;
 }
+
+export type TrackedJobStatus = 'Applied' | 'Interviewing' | 'Offer' | 'Rejected' | 'Withdrawn';
+
+export interface TrackedJob {
+  id: string;
+  user_id: string;
+  screening_result_id: string | null;
+  job_title: string | null;
+  company: string | null;
+  job_url: string | null;
+  status: TrackedJobStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}

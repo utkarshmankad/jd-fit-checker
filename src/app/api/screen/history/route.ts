@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { ScreeningResult } from '@/types'
 
-// Lightweight row — omits jd_text and analysis_json (not needed for list view)
-type HistoryRow = Omit<ScreeningResult, 'jd_text' | 'analysis_json'>
+// Lightweight row — omits jd_text (full JD text not needed for the history view)
+type HistoryRow = Omit<ScreeningResult, 'jd_text'>
 
 export async function GET(_request: NextRequest) {
   const supabase = await createClient()
@@ -14,12 +14,15 @@ export async function GET(_request: NextRequest) {
 
   const { data, error } = await supabase
     .from('screening_results')
-    .select('id, batch_id, user_id, job_url, job_title, company, ats_score, role_level_score, composite_score, verdict, hard_reject_reasons, created_at')
+    .select('id, batch_id, user_id, job_url, job_title, company, ats_score, role_level_score, composite_score, verdict, hard_reject_reasons, analysis_json, created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(200)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('screen history fetch failed:', error)
+    return NextResponse.json({ error: 'Failed to load history' }, { status: 500 })
+  }
 
   const batchMap = new Map<
     string,
@@ -34,12 +37,14 @@ export async function GET(_request: NextRequest) {
     batchMap.get(r.batch_id)!.results.push(r)
   }
 
-  const batches = Array.from(batchMap.values()).map((b) => ({
-    batch_id: b.batch_id,
-    created_at: b.created_at,
-    count: b.results.length,
-    results: b.results,
-  }))
+  const batches = Array.from(batchMap.values())
+    .map((b) => ({
+      batch_id: b.batch_id,
+      created_at: b.created_at,
+      count: b.results.length,
+      results: b.results,
+    }))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return NextResponse.json({ batches })
 }

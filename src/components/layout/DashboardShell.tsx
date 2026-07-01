@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { FileSearch, History, User, LogOut, Menu, X, BookOpen } from 'lucide-react'
+import { FileSearch, History, User, LogOut, Menu, X, BookOpen, Briefcase } from 'lucide-react'
 
 const navLinks = [
   { href: '/dashboard', label: 'Screen JDs', icon: FileSearch },
   { href: '/dashboard/history', label: 'History', icon: History },
+  { href: '/dashboard/tracker', label: 'Tracker', icon: Briefcase },
   { href: '/dashboard/guide', label: 'How to use', icon: BookOpen },
   { href: '/profile', label: 'Profile', icon: User },
 ]

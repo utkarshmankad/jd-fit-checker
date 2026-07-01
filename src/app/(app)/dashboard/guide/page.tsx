@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Copy, Check, Terminal, MousePointer, ClipboardList, Zap } from 'lucide-react'
+import { Copy, Check, Terminal, MousePointer, ClipboardList, Zap, Globe } from 'lucide-react'
 
 const SCRAPER_SCRIPT = `(function () {
   var P = [
@@ -60,6 +60,37 @@ const SCRAPER_SCRIPT = `(function () {
   }
   navigator.clipboard.writeText(text).catch(function(){}).finally(showPanel);
 })();`.trim()
+
+const LINKEDIN_CONSOLE_SCRIPT = `(async () => {
+  const ids = new Set();
+  function collect() {
+    document.querySelectorAll('[data-job-id],[data-occludable-job-id]').forEach(el => {
+      const id = el.getAttribute('data-job-id') || el.getAttribute('data-occludable-job-id');
+      if (id && /^\\d{5,}$/.test(id)) ids.add(id);
+    });
+    document.querySelectorAll('[data-occludable-entity-urn*="jobPosting"],[data-entity-urn*="jobPosting"]').forEach(el => {
+      const urn = el.getAttribute('data-occludable-entity-urn') || el.getAttribute('data-entity-urn') || '';
+      const m = urn.match(/jobPosting:(\\d+)/);
+      if (m) ids.add(m[1]);
+    });
+    document.querySelectorAll('a[href]').forEach(el => {
+      const h = el.getAttribute('href') || '';
+      const m = h.match(/\\/jobs\\/view\\/(\\d+)/) || h.match(/[?&]currentJobId=(\\d+)/);
+      if (m) ids.add(m[1]);
+    });
+    const cj = new URL(location.href).searchParams.get('currentJobId');
+    if (cj && /^\\d+$/.test(cj)) ids.add(cj);
+  }
+  collect();
+  for (let i = 0; i < 10; i++) {
+    window.scrollBy(0, 800);
+    await new Promise(r => setTimeout(r, 800));
+    collect();
+  }
+  const urls = [...ids].slice(0, 20).map(id => 'https://www.linkedin.com/jobs/view/' + id + '/').join('\\n');
+  try { await navigator.clipboard.writeText(urls); } catch (e) { prompt('Copy URLs:', urls); }
+  alert('Copied ' + ids.size + ' job URLs! Paste into JD Fit Checker.');
+})();`
 
 const SITES = [
   'Greenhouse', 'Lever', 'Workday', 'iCIMS', 'SmartRecruiters',
@@ -163,6 +194,42 @@ export default function GuidePage() {
         </div>
       </div>
 
+      {/* LinkedIn bulk import */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-5 pt-5 pb-3">
+          <h2 className="font-semibold text-gray-900">LinkedIn bulk import</h2>
+        </div>
+        <div className="px-5 space-y-5">
+          <Step num={1} icon={Globe} title="Open any LinkedIn Jobs page">
+            <p>
+              <a href="https://www.linkedin.com/jobs/collections/recommended/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">Recommended</a>,
+              a search results page, or a saved job alert — while logged in.
+            </p>
+          </Step>
+
+          <Step num={2} icon={Terminal} title="Run the LinkedIn script in browser console">
+            <p>Open DevTools (<kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">F12</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">Cmd+Option+J</kbd>), paste the script below into the Console tab, and press Enter.</p>
+          </Step>
+        </div>
+
+        <div className="mx-5 mb-3 rounded-lg border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
+            <span className="text-xs font-mono text-gray-500">LinkedIn script — paste into browser console</span>
+            <CopyButton text={LINKEDIN_CONSOLE_SCRIPT} />
+          </div>
+          <pre className="px-4 py-3 text-xs font-mono bg-gray-950 text-green-400 leading-relaxed overflow-x-auto max-h-48 w-full box-border">
+            {LINKEDIN_CONSOLE_SCRIPT}
+          </pre>
+        </div>
+        <p className="text-xs text-gray-400 px-5 pb-3">It auto-scrolls, collects up to 20 jobs, and copies the URLs to your clipboard — wait ~10 seconds for it to finish.</p>
+
+        <div className="px-5 space-y-5 pb-5">
+          <Step num={3} icon={Zap} title="Paste and screen">
+            <p>Go to <a href="/dashboard" className="text-blue-600 hover:underline font-medium">Screen JDs</a>, select the <strong>Job URLs</strong> tab, paste the links, and click <strong>Screen all</strong>. If there are more than 20 jobs, scroll down on LinkedIn and run the script again to grab the rest.</p>
+          </Step>
+        </div>
+      </div>
+
       {/* Supported sites */}
       <div className="bg-white rounded-xl border border-gray-200 px-5 py-5">
         <h2 className="font-semibold text-gray-900 mb-3">Supported sites</h2>
@@ -182,7 +249,7 @@ export default function GuidePage() {
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
         <h2 className="font-semibold text-amber-900 text-sm mb-2">Tips</h2>
         <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
-          <li>On LinkedIn search results pages the job list scrolls independently — the script handles this automatically, but wait the full ~15 seconds</li>
+          <li>The LinkedIn script caps out at 20 jobs per run — scroll down and run it again to collect more</li>
           <li>Scroll to bottom before running on infinite-scroll pages (Indeed, Greenhouse listings)</li>
           <li>On Workday, navigate into a job category first — the root page may not list individual jobs</li>
           <li>If the panel shows 0 jobs, open the job listing page (not the company homepage)</li>

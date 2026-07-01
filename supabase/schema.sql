@@ -192,3 +192,49 @@ create policy "shared_reports_insert_own" on public.shared_reports
 -- Public can read by slug (route filters expiry in application code).
 create policy "shared_reports_select_all" on public.shared_reports
   for select using (true);
+
+-- ──────────────────────────────────────────────────────────
+-- 8. job_tracker
+--    Manual application-tracking table. One row per job the
+--    user chose to track from a screening result. Denormalizes
+--    job_title/company/job_url so tracker entries survive even
+--    if the linked screening_results row is ever deleted.
+-- ──────────────────────────────────────────────────────────
+create table if not exists public.job_tracker (
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null references public.profiles(id) on delete cascade,
+  screening_result_id uuid references public.screening_results(id) on delete set null,
+  job_title           text,
+  company             text,
+  job_url             text,
+  status              text not null check (status in ('Applied', 'Interviewing', 'Offer', 'Rejected', 'Withdrawn')) default 'Applied',
+  notes               text,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
+);
+
+create index if not exists job_tracker_user_id_idx on public.job_tracker(user_id);
+
+-- Prevent duplicate tracker entries for the same screening result — only
+-- applies when screening_result_id is set (manual/orphaned rows can repeat).
+create unique index if not exists job_tracker_user_screening_result_idx
+  on public.job_tracker(user_id, screening_result_id)
+  where screening_result_id is not null;
+
+alter table public.job_tracker enable row level security;
+
+drop policy if exists "job_tracker_select_own" on public.job_tracker;
+create policy "job_tracker_select_own" on public.job_tracker
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "job_tracker_insert_own" on public.job_tracker;
+create policy "job_tracker_insert_own" on public.job_tracker
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "job_tracker_update_own" on public.job_tracker;
+create policy "job_tracker_update_own" on public.job_tracker
+  for update using (auth.uid() = user_id);
+
+drop policy if exists "job_tracker_delete_own" on public.job_tracker;
+create policy "job_tracker_delete_own" on public.job_tracker
+  for delete using (auth.uid() = user_id);

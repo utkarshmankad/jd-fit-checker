@@ -4,14 +4,19 @@ import { useState, useEffect, useRef, Fragment } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   FileSearch, Eye, ExternalLink, Download, Share2, Plus, X,
-  ChevronDown, ChevronUp, Copy, Check, AlertTriangle, WifiOff, Pencil, Info,
+  ChevronDown, ChevronUp, AlertTriangle, WifiOff, Pencil,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import type { ScreeningResult, HardRejectFilters } from '@/types'
+import type { ScreeningResult, HardRejectFilters, TrackedJob } from '@/types'
 import type { FatalScreenError } from '@/app/api/screen/route'
 import PaymentModal from '@/components/payment/PaymentModal'
+import TrackButton from '@/components/tracker/TrackButton'
 import { SAMPLE_RESULTS } from '@/lib/sample-data'
 import { calculateTimeSaved } from '@/lib/utils/time-saved'
+import {
+  VERDICT_CONFIG, SCORE_TOOLTIPS, getReasonLine,
+  ScorePill, AnalysisDetailBody,
+} from '@/components/analysis/AnalysisDetail'
 
 type SortKey = 'composite_score' | 'ats_score' | 'role_level_score' | 'verdict'
 type InputTab = 'urls' | 'text'
@@ -40,25 +45,6 @@ const SORT_LABELS: Record<SortKey, string> = {
 
 const VERDICT_ORDER: Record<'STRONG' | 'DECENT' | 'WEAK' | 'REJECT', number> = {
   STRONG: 0, DECENT: 1, WEAK: 2, REJECT: 3,
-}
-
-const VERDICT_CONFIG: Record<string, { cls: string; label: string }> = {
-  STRONG: { cls: 'bg-green-100 text-green-800 border border-green-300', label: '✦ Strong match' },
-  DECENT: { cls: 'bg-amber-100 text-amber-800 border border-amber-300', label: '◉ Decent match' },
-  WEAK:   { cls: 'bg-gray-100 text-gray-600 border border-gray-300',   label: '○ Weak match' },
-  REJECT: { cls: 'bg-red-100 text-red-800 border border-red-300',      label: '✕ Rejected' },
-}
-
-const SCORE_TOOLTIPS = {
-  ats: "How many of the JD's required skills appear in your resume, weighted by importance.",
-  role: 'How well your seniority, scope, and team-size experience matches what this role needs.',
-  composite: 'Weighted blend: 45% ATS keyword match, 55% role-level fit.',
-}
-
-function scoreTextClass(n: number) {
-  if (n >= 70) return 'text-green-600'
-  if (n >= 50) return 'text-amber-500'
-  return 'text-red-500'
 }
 
 function timeAgo(iso: string) {
@@ -93,93 +79,7 @@ function getActiveRules(hrf: HardRejectFilters | null): string[] {
   return rules
 }
 
-function whyVerdict(r: ScreeningResult): string {
-  const { verdict, ats_score: ats, role_level_score: role } = r
-  const missing = r.analysis_json?.missing_skills ?? []
-  if (verdict === 'STRONG') return `STRONG because both ATS match (${ats}) and role-level fit (${role}) clear the threshold.`
-  if (verdict === 'DECENT') {
-    if (ats < role) return `DECENT because role-fit is solid (${role}) but ${missing.length > 0 ? `you're missing ${missing.length} required skill${missing.length !== 1 ? 's' : ''}, pulling ATS down to ${ats}` : `ATS match is moderate at ${ats}`}.`
-    return `DECENT because keyword match is reasonable (${ats}) but role-level fit (${role}) shows some mismatch.`
-  }
-  if (verdict === 'WEAK') {
-    if (ats < 50 && role < 50) return `WEAK because both ATS match (${ats}) and role-level fit (${role}) are below threshold.`
-    if (ats < role) return `WEAK because ATS match (${ats}) is significantly below threshold despite reasonable role-fit (${role}).`
-    return `WEAK because role-level fit (${role}) indicates significant mismatch.`
-  }
-  if (verdict === 'REJECT') {
-    const reasons = r.hard_reject_reasons ?? []
-    return `REJECT triggered before scoring — ${reasons.length > 0 ? `failed hard-reject rule: ${reasons[0]}` : 'failed your hard-reject filters'}.`
-  }
-  return ''
-}
-
-function getReasonLine(r: ScreeningResult): string {
-  if (r.verdict === 'REJECT') return r.hard_reject_reasons?.[0] ?? 'Hard-reject rule triggered'
-  if (r.analysis_json?.headline) {
-    const h = r.analysis_json.headline
-    return h.length > 90 ? h.slice(0, 90) + '…' : h
-  }
-  if (r.analysis_json?.recommendation) {
-    const rec = r.analysis_json.recommendation.replace(/^(APPLY IF|APPLY|SKIP)\s*/i, '')
-    return rec.length > 90 ? rec.slice(0, 90) + '…' : rec
-  }
-  return ''
-}
-
-const LINKEDIN_CONSOLE_SCRIPT = `(async () => {
-  const ids = new Set();
-  function collect() {
-    document.querySelectorAll('[data-job-id],[data-occludable-job-id]').forEach(el => {
-      const id = el.getAttribute('data-job-id') || el.getAttribute('data-occludable-job-id');
-      if (id && /^\\d{5,}$/.test(id)) ids.add(id);
-    });
-    document.querySelectorAll('[data-occludable-entity-urn*="jobPosting"],[data-entity-urn*="jobPosting"]').forEach(el => {
-      const urn = el.getAttribute('data-occludable-entity-urn') || el.getAttribute('data-entity-urn') || '';
-      const m = urn.match(/jobPosting:(\\d+)/);
-      if (m) ids.add(m[1]);
-    });
-    document.querySelectorAll('a[href]').forEach(el => {
-      const h = el.getAttribute('href') || '';
-      const m = h.match(/\\/jobs\\/view\\/(\\d+)/) || h.match(/[?&]currentJobId=(\\d+)/);
-      if (m) ids.add(m[1]);
-    });
-    const cj = new URL(location.href).searchParams.get('currentJobId');
-    if (cj && /^\\d+$/.test(cj)) ids.add(cj);
-  }
-  collect();
-  for (let i = 0; i < 10; i++) {
-    window.scrollBy(0, 800);
-    await new Promise(r => setTimeout(r, 800));
-    collect();
-  }
-  const urls = [...ids].slice(0, 20).map(id => 'https://www.linkedin.com/jobs/view/' + id + '/').join('\\n');
-  try { await navigator.clipboard.writeText(urls); } catch (e) { prompt('Copy URLs:', urls); }
-  alert('Copied ' + ids.size + ' job URLs! Paste into JD Fit Checker.');
-})();`
-
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-function ScoreTooltip({ tip, children }: { tip: string; children: React.ReactNode }) {
-  return (
-    <span className="relative group inline-flex items-center gap-1 cursor-default">
-      {children}
-      <Info size={10} className="text-gray-300 opacity-60 shrink-0" />
-      <span className="absolute bottom-full right-0 mb-2 w-52 bg-gray-900 text-white text-xs rounded-lg px-2.5 py-2 leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none whitespace-normal text-left shadow-lg">
-        {tip}
-        <span className="absolute top-full right-2 border-4 border-transparent border-t-gray-900" />
-      </span>
-    </span>
-  )
-}
-
-function ScorePill({ label, score, tip }: { label: string; score: number; tip: string }) {
-  return (
-    <ScoreTooltip tip={tip}>
-      <span className="text-xs text-gray-400">{label}</span>
-      <span className={`text-xs font-semibold ${scoreTextClass(score)}`}>{score}</span>
-    </ScoreTooltip>
-  )
-}
 
 function SkeletonRow() {
   return (
@@ -190,85 +90,6 @@ function SkeletonRow() {
       <td className="px-4 py-4 hidden md:table-cell"><div className="h-3 bg-gray-200 rounded animate-pulse w-16 ml-auto" /></td>
       <td className="px-4 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-6 ml-auto" /></td>
     </tr>
-  )
-}
-
-function RequirementsChecklist({ items }: { items: import('@/types').RequirementCheck[] }) {
-  if (!items?.length) return null
-  return (
-    <div>
-      <p className="text-xs font-semibold text-gray-500 mb-2">Requirements check</p>
-      <ul className="space-y-2">
-        {items.map((item, i) => {
-          const icon = item.status === 'met' ? '✓' : item.status === 'partial' ? '◐' : '✗'
-          const cls = item.status === 'met' ? 'text-green-600' : item.status === 'partial' ? 'text-amber-600' : 'text-red-600'
-          return (
-            <li key={i} className="flex items-start gap-2 text-sm">
-              <span className={`shrink-0 font-bold mt-0.5 ${cls}`}>{icon}</span>
-              <span>
-                <span className="text-gray-800">{item.requirement}</span>
-                {item.evidence && <span className="text-gray-400 text-xs ml-1">— {item.evidence}</span>}
-              </span>
-            </li>
-          )
-        })}
-      </ul>
-    </div>
-  )
-}
-
-function SoftConcernsCallout({ concerns }: { concerns?: string[] }) {
-  if (!concerns?.length) return null
-  return (
-    <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-3">
-      <p className="text-xs font-semibold text-amber-700 mb-1.5">Worth checking:</p>
-      <ul className="space-y-1">
-        {concerns.map((c, i) => (
-          <li key={i} className="text-sm text-amber-800 flex items-start gap-1.5">
-            <span className="text-amber-500 mt-0.5 shrink-0">•</span>{c}
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-function ColoredRecommendation({ text }: { text: string }) {
-  if (!text) return null
-  const match = text.match(/^(APPLY IF|APPLY|SKIP)([\s\S]*)/)
-  if (!match) return <p className="text-sm text-blue-900 leading-relaxed">{text}</p>
-  const keyword = match[1]
-  const rest = match[2]
-  const color = keyword === 'SKIP' ? 'text-red-600' : keyword === 'APPLY IF' ? 'text-amber-600' : 'text-green-600'
-  return (
-    <p className="text-sm text-blue-900 leading-relaxed">
-      <span className={`font-bold ${color}`}>{keyword}</span>{rest}
-    </p>
-  )
-}
-
-function SkillPills({ label, skills, variant }: { label: string; skills: string[]; variant: 'match' | 'miss' }) {
-  const pillCls = variant === 'match' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-  const prefix = variant === 'match' ? '✓ ' : '✗ '
-  return (
-    <div>
-      <p className="text-xs font-semibold text-gray-500 mb-2">{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {skills.length === 0 ? <span className="text-xs text-gray-400">None</span> : skills.map((s) => (
-          <span key={s} className={`px-2 py-0.5 rounded-full text-xs font-medium ${pillCls}`}>{prefix}{s}</span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function AnalysisBlock({ label, text }: { label: string; text: string }) {
-  if (!text) return null
-  return (
-    <div>
-      <p className="text-xs font-semibold text-gray-500 mb-1">{label}</p>
-      <p className="text-sm text-gray-700 leading-relaxed">{text}</p>
-    </div>
   )
 }
 
@@ -297,14 +118,13 @@ export default function DashboardPage() {
   const [hardRejectFilters, setHardRejectFilters] = useState<HardRejectFilters | null>(null)
 
   const [screenError, setScreenError] = useState<ScreenError | null>(null)
+  const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set())
   const [showTierModal, setShowTierModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [rateLimitCountdown, setRateLimitCountdown] = useState(0)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const [profileBannerDismissed, setProfileBannerDismissed] = useState(true)
-  const [showLinkedInHelper, setShowLinkedInHelper] = useState(false)
-  const [scriptCopied, setScriptCopied] = useState(false)
 
   useEffect(() => {
     setProfileBannerDismissed(localStorage.getItem(PROFILE_BANNER_KEY) === '1')
@@ -312,6 +132,15 @@ export default function DashboardPage() {
 
   useEffect(() => {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/tracker')
+      .then((r) => r.json())
+      .then((data: { items?: TrackedJob[] }) => {
+        setTrackedIds(new Set((data.items ?? []).filter((i) => i.screening_result_id).map((i) => i.screening_result_id as string)))
+      })
+      .catch(() => {})
   }, [])
 
   async function fetchLifetimeCount(userId: string) {
@@ -399,7 +228,7 @@ export default function DashboardPage() {
     type Item = { kind: 'url'; value: string } | { kind: 'jd'; entry: JdEntry }
     const items: Item[] =
       tab === 'urls'
-        ? urlInput.split('\n').map((u) => u.trim()).filter(Boolean).slice(0, 20).map((u) => ({ kind: 'url' as const, value: u }))
+        ? urlInput.split('\n').map((u) => u.trim()).filter(Boolean).map((u) => ({ kind: 'url' as const, value: u }))
         : jdEntries.filter((e) => e.jd_text.trim()).map((e) => ({ kind: 'jd' as const, entry: e }))
 
     if (items.length === 0) return
@@ -582,6 +411,16 @@ export default function DashboardPage() {
                   <ExternalLink size={15} />
                 </a>
               )}
+              {!isErrorRow && (
+                <TrackButton
+                  screeningResultId={result.id}
+                  jobTitle={result.job_title}
+                  company={result.company}
+                  jobUrl={result.job_url}
+                  tracked={trackedIds.has(result.id)}
+                  onTracked={(item) => setTrackedIds((prev) => new Set(prev).add(item.screening_result_id as string))}
+                />
+              )}
             </div>
           </td>
         </tr>
@@ -605,46 +444,7 @@ export default function DashboardPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-4 max-w-3xl">
-                    {/* a. Headline + why verdict */}
-                    {result.analysis_json?.headline && (
-                      <p className="text-sm font-medium text-gray-700">{result.analysis_json.headline}</p>
-                    )}
-                    <p className="text-xs text-gray-400 italic">{whyVerdict(result)}</p>
-
-                    {/* Hard reject */}
-                    {result.hard_reject_reasons?.length > 0 && result.verdict === 'REJECT' && (
-                      <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200">
-                        <p className="text-xs font-semibold text-red-600 mb-0.5">Hard reject</p>
-                        <p className="text-sm text-red-700">{result.hard_reject_reasons[0]}</p>
-                      </div>
-                    )}
-
-                    {/* b. Requirements + skills */}
-                    <RequirementsChecklist items={result.analysis_json?.requirements_met ?? []} />
-                    <SkillPills label="Matching skills" skills={result.analysis_json?.matching_skills ?? []} variant="match" />
-                    <SkillPills label="Missing skills" skills={result.analysis_json?.missing_skills ?? []} variant="miss" />
-                    <SoftConcernsCallout concerns={result.analysis_json?.soft_concerns} />
-                    <AnalysisBlock label="Role level assessment" text={result.analysis_json?.role_level_assessment ?? ''} />
-                    <AnalysisBlock label="Gap analysis" text={result.analysis_json?.gap_analysis ?? ''} />
-
-                    {/* c. Score breakdown (supplementary) */}
-                    {result.verdict !== 'REJECT' && (
-                      <p className="text-xs font-mono text-gray-400 bg-gray-100 rounded px-2 py-1 inline-block">
-                        Composite {result.composite_score} = (ATS {result.ats_score} × 0.45) + (Role {result.role_level_score} × 0.55) = {(result.ats_score * 0.45 + result.role_level_score * 0.55).toFixed(1)}
-                      </p>
-                    )}
-
-                    {/* d. Recommendation */}
-                    {result.analysis_json?.recommendation && (
-                      <div>
-                        <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1.5">Recommendation</p>
-                        <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-md">
-                          <ColoredRecommendation text={result.analysis_json.recommendation} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <AnalysisDetailBody result={result} />
                 )}
               </div>
             </div>
@@ -699,30 +499,9 @@ export default function DashboardPage() {
                 className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               {urlInput.trim() && <p className="text-xs text-gray-400">{urlCount} URL{urlCount !== 1 ? 's' : ''} detected</p>}
 
-              <div className="rounded-lg border border-gray-200 overflow-hidden">
-                <button type="button" onClick={() => setShowLinkedInHelper((v) => !v)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-                  <span className="font-medium">Bulk import from LinkedIn (recommended, search, or saved alerts) →</span>
-                  {showLinkedInHelper ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                </button>
-                {showLinkedInHelper && (
-                  <div className="border-t border-gray-100 px-4 py-4 space-y-4 bg-gray-50 text-sm text-gray-700">
-                    <p className="text-xs text-gray-500">Run this script in your browser console on any LinkedIn jobs page. It auto-scrolls, collects up to 20 jobs, and copies the URLs — then paste them into the URL input above.</p>
-                    <ol className="space-y-3 text-sm">
-                      <li className="flex gap-2"><span className="font-bold text-gray-400 shrink-0">1.</span><span>Open any LinkedIn Jobs page while logged in — <a href="https://www.linkedin.com/jobs/collections/recommended/" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Recommended</a>, a search results page, or a saved job alert.</span></li>
-                      <li className="flex gap-2"><span className="font-bold text-gray-400 shrink-0">2.</span><span>Open DevTools — press <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-xs">F12</kbd> on Windows/Linux or <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-xs">Cmd ⌥ J</kbd> on Mac — and go to the Console tab.</span></li>
-                      <li className="flex gap-2"><span className="font-bold text-gray-400 shrink-0">3.</span><span>Copy the script below, paste it into the console, and press Enter. Wait ~10 seconds.</span></li>
-                    </ol>
-                    <div className="relative">
-                      <pre className="bg-gray-900 text-green-300 rounded-lg px-4 py-3 text-xs overflow-x-auto leading-relaxed whitespace-pre-wrap break-all">{LINKEDIN_CONSOLE_SCRIPT}</pre>
-                      <button type="button" onClick={async () => { await navigator.clipboard.writeText(LINKEDIN_CONSOLE_SCRIPT); setScriptCopied(true); setTimeout(() => setScriptCopied(false), 2000) }}
-                        className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs text-gray-200 transition-colors">
-                        {scriptCopied ? <><Check size={11} /> Copied</> : <><Copy size={11} /> Copy</>}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <p className="text-xs text-gray-400">
+                Bulk import from LinkedIn? <a href="/dashboard/guide" className="text-blue-600 hover:underline font-medium">See the guide →</a>
+              </p>
             </>
           ) : (
             <div className="space-y-3">
