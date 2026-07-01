@@ -126,26 +126,27 @@ function getReasonLine(r: ScreeningResult): string {
   return ''
 }
 
-const LINKEDIN_CONSOLE_SCRIPT = `(() => {
+const LINKEDIN_CONSOLE_SCRIPT = `(async () => {
   const ids = new Set();
-  document.querySelectorAll('[data-occludable-job-id],[data-job-id],[data-occludable-entity-urn],[data-entity-urn]').forEach(el => {
-    const jid = el.getAttribute('data-occludable-job-id') || el.getAttribute('data-job-id');
-    if (jid && /^\\d{7,}$/.test(jid)) ids.add(jid);
-    const urn = el.getAttribute('data-occludable-entity-urn') || el.getAttribute('data-entity-urn') || '';
-    const m = urn.match(/jobPosting:(\\d{7,})/);
-    if (m) ids.add(m[1]);
-  });
-  document.querySelectorAll('a[href]').forEach(el => {
-    const h = el.getAttribute('href') || '';
-    const m = h.match(/\\/jobs\\/view\\/(\\d{7,})/) || h.match(/[?&]currentJobId=(\\d{7,})/);
-    if (m) ids.add(m[1]);
-  });
-  const cj = new URL(location.href).searchParams.get('currentJobId');
-  if (cj && /^\\d+$/.test(cj)) ids.add(cj);
-  const all = [...ids].slice(0, 20);
-  const urls = all.map(id => 'https://www.linkedin.com/jobs/view/' + id + '/').join('\\n');
-  try { navigator.clipboard.writeText(urls); } catch (e) { prompt('Copy ' + all.length + ' URLs:', urls); }
-  alert('Copied ' + all.length + ' job URLs.\\nPaste into JD Fit Checker.\\nScroll down and run again for more.');
+  function collect() {
+    document.querySelectorAll('[data-job-id],[data-occludable-job-id]').forEach(el => {
+      const id = el.getAttribute('data-job-id') || el.getAttribute('data-occludable-job-id');
+      if (id && /^\\d{5,}$/.test(id)) ids.add(id);
+    });
+    document.querySelectorAll('a[href*="/jobs/view/"]').forEach(el => {
+      const m = (el.getAttribute('href') || '').match(/\\/jobs\\/view\\/(\\d+)/);
+      if (m) ids.add(m[1]);
+    });
+  }
+  collect();
+  for (let i = 0; i < 10; i++) {
+    window.scrollBy(0, 800);
+    await new Promise(r => setTimeout(r, 800));
+    collect();
+  }
+  const urls = [...ids].slice(0, 20).map(id => 'https://www.linkedin.com/jobs/view/' + id + '/').join('\\n');
+  try { await navigator.clipboard.writeText(urls); } catch (e) { prompt('Copy URLs:', urls); }
+  alert('Copied ' + ids.size + ' job URLs! Paste into JD Fit Checker.');
 })();`
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -693,16 +694,16 @@ export default function DashboardPage() {
               <div className="rounded-lg border border-gray-200 overflow-hidden">
                 <button type="button" onClick={() => setShowLinkedInHelper((v) => !v)}
                   className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-                  <span className="font-medium">Bulk import from LinkedIn (recommended, search, or saved alerts) →</span>
+                  <span className="font-medium">Bulk import from LinkedIn Recommended →</span>
                   {showLinkedInHelper ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
                 {showLinkedInHelper && (
                   <div className="border-t border-gray-100 px-4 py-4 space-y-4 bg-gray-50 text-sm text-gray-700">
-                    <p className="text-xs text-gray-500">Run this in your browser console. Scrolls the job list automatically and stops when all results are loaded. Copies every URL found — paste 20 at a time into the URL box.</p>
+                    <p className="text-xs text-gray-500">Run this script in your browser console while on the LinkedIn recommended jobs page. It auto-scrolls, collects up to 20 jobs, and copies the URLs — then paste them into the URL input above.</p>
                     <ol className="space-y-3 text-sm">
-                      <li className="flex gap-2"><span className="font-bold text-gray-400 shrink-0">1.</span><span>Open any LinkedIn Jobs page while logged in — <a href="https://www.linkedin.com/jobs/collections/recommended/" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Recommended</a>, a search results page, or a saved job alert.</span></li>
-                      <li className="flex gap-2"><span className="font-bold text-gray-400 shrink-0">2.</span><span>Open DevTools — <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-xs">F12</kbd> or <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-xs">Cmd ⌥ J</kbd> — Console tab.</span></li>
-                      <li className="flex gap-2"><span className="font-bold text-gray-400 shrink-0">3.</span><span>Copy the script below, paste into the console, press Enter. It auto-scrolls until all jobs load — wait for the alert (30–90 sec for large lists).</span></li>
+                      <li className="flex gap-2"><span className="font-bold text-gray-400 shrink-0">1.</span><span>Go to <a href="https://www.linkedin.com/jobs/collections/recommended/" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">LinkedIn Recommended Jobs</a> while logged in.</span></li>
+                      <li className="flex gap-2"><span className="font-bold text-gray-400 shrink-0">2.</span><span>Open DevTools — press <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-xs">F12</kbd> on Windows/Linux or <kbd className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 font-mono text-xs">Cmd ⌥ J</kbd> on Mac — and go to the Console tab.</span></li>
+                      <li className="flex gap-2"><span className="font-bold text-gray-400 shrink-0">3.</span><span>Copy the script below, paste it into the console, and press Enter. Wait ~10 seconds.</span></li>
                     </ol>
                     <div className="relative">
                       <pre className="bg-gray-900 text-green-300 rounded-lg px-4 py-3 text-xs overflow-x-auto leading-relaxed whitespace-pre-wrap break-all">{LINKEDIN_CONSOLE_SCRIPT}</pre>
