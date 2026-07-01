@@ -2,6 +2,7 @@ import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto'
 
 const ALGO = 'aes-256-gcm'
 const IV_LENGTH = 12 // 96-bit nonce, recommended size for GCM
+const LEGACY_ALGO = 'aes-256-cbc'
 
 function getKey(): Buffer {
   const raw = process.env.ENCRYPTION_SECRET ?? process.env.ENCRYPTION_KEY
@@ -20,11 +21,23 @@ export function encrypt(text: string): string {
 }
 
 export function decrypt(encoded: string): string {
-  const [ivHex, tagHex, encHex] = encoded.split(':')
+  const parts = encoded.split(':')
+
+  if (parts.length === 3) {
+    const [ivHex, tagHex, encHex] = parts
+    const iv = Buffer.from(ivHex, 'hex')
+    const authTag = Buffer.from(tagHex, 'hex')
+    const encrypted = Buffer.from(encHex, 'hex')
+    const decipher = createDecipheriv(ALGO, getKey(), iv)
+    decipher.setAuthTag(authTag)
+    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8')
+  }
+
+  // Legacy format (iv:ciphertext, no auth tag) written before the AES-256-GCM
+  // migration — decrypt with the old CBC cipher so existing keys keep working.
+  const [ivHex, encHex] = parts
   const iv = Buffer.from(ivHex, 'hex')
-  const authTag = Buffer.from(tagHex, 'hex')
   const encrypted = Buffer.from(encHex, 'hex')
-  const decipher = createDecipheriv(ALGO, getKey(), iv)
-  decipher.setAuthTag(authTag)
+  const decipher = createDecipheriv(LEGACY_ALGO, getKey(), iv)
   return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8')
 }
