@@ -51,8 +51,8 @@ export async function PUT(request: NextRequest) {
     try {
       updates.api_key_encrypted = encrypt(body.api_key)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      return NextResponse.json({ error: `Failed to encrypt API key: ${msg}` }, { status: 500 })
+      console.error('API key encryption failed:', err)
+      return NextResponse.json({ error: 'Failed to save API key' }, { status: 500 })
     }
   }
 
@@ -60,7 +60,10 @@ export async function PUT(request: NextRequest) {
 
   const { error } = await supabase.from('profiles').update(updates).eq('id', user.id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('Profile update failed:', error)
+    return NextResponse.json({ error: 'Failed to save profile' }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true })
 }

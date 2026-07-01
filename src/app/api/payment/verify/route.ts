@@ -18,6 +18,16 @@ export async function POST(request: NextRequest) {
 
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = body
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('pending_order_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.pending_order_id || profile.pending_order_id !== razorpay_order_id) {
+    return NextResponse.json({ error: 'Order does not belong to this user' }, { status: 403 })
+  }
+
   const expectedSignature = crypto
     .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -28,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
 
   const service = createServiceClient()
-  await service.from('profiles').update({ tier: 'paid' }).eq('id', user.id)
+  await service.from('profiles').update({ tier: 'paid', pending_order_id: null }).eq('id', user.id)
 
   return NextResponse.json({ success: true })
 }

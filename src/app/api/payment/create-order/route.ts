@@ -25,6 +25,11 @@ export async function POST(_request: NextRequest) {
     },
   })
 
+  // Record which order belongs to this user so /payment/verify can confirm
+  // ownership later — signature validity alone doesn't prove the order_id
+  // being verified was actually issued to this session.
+  await supabase.from('profiles').update({ pending_order_id: order.id }).eq('id', user.id)
+
   return NextResponse.json({
     order_id: order.id,
     amount: order.amount,

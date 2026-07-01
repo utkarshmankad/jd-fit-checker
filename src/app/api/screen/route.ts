@@ -96,10 +96,12 @@ export async function POST(request: NextRequest) {
           hard_reject_filters: profile!.hard_reject_filters,
           api_key: apiKey,
           api_provider: profile!.api_provider,
+          user_id: user.id,
         }),
       })
     } catch (e) {
-      return { _error: `Screening service unreachable: ${e instanceof Error ? e.message : String(e)}`, _status: 503 }
+      console.error('Screening service fetch failed:', e)
+      return { _error: 'Screening service unreachable', _status: 503 }
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({})) as Record<string, unknown>

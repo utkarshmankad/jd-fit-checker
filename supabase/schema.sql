@@ -139,3 +139,56 @@ create policy "shared_results_select_all" on public.shared_results
 --      $$update public.profiles set screens_used_this_month = 0$$
 --    );
 -- ──────────────────────────────────────────────────────────
+
+-- ──────────────────────────────────────────────────────────
+-- 6. MIGRATION — run in Supabase SQL Editor even if the tables
+--    above already exist. Safe / idempotent.
+--
+--    a) profiles.tier check constraint only allowed
+--       ('free', 'pro') but every payment route in the app
+--       writes tier = 'paid' — that update has been violating
+--       this constraint and silently failing in production.
+--    b) Adds profiles.pending_order_id so /api/payment/verify
+--       can confirm the Razorpay order_id being verified was
+--       actually issued to the requesting user, not just that
+--       its signature is valid (signature alone doesn't prove
+--       order ownership if the order/payment/signature triple
+--       leaks via logs, referrers, etc.).
+-- ──────────────────────────────────────────────────────────
+alter table public.profiles drop constraint if exists profiles_tier_check;
+alter table public.profiles add constraint profiles_tier_check check (tier in ('free', 'paid'));
+
+alter table public.profiles add column if not exists pending_order_id text;
+
+-- ──────────────────────────────────────────────────────────
+-- 7. shared_reports — the table actually used by
+--    /api/share and /api/report/[slug] in the live app.
+--    This schema.sql previously only documented an older
+--    "shared_results" (token-based) design that the code no
+--    longer references; this section syncs the doc to reality.
+--    Columns/shape reconstructed from route usage — verify
+--    against the live table before relying on this section.
+-- ──────────────────────────────────────────────────────────
+create table if not exists public.shared_reports (
+  id               uuid primary key default gen_random_uuid(),
+  user_id          uuid not null references public.profiles(id) on delete cascade,
+  batch_id         uuid not null,
+  slug             text not null unique,
+  results_snapshot jsonb not null default '[]'::jsonb,
+  expires_at       timestamptz not null,
+  created_at       timestamptz not null default now()
+);
+
+create index if not exists shared_reports_slug_idx on public.shared_reports(slug);
+
+alter table public.shared_reports enable row level security;
+
+-- Owner can create their own share links (defense in depth — the
+-- route currently always writes via the service-role client, which
+-- bypasses RLS, but this keeps the table safe if that ever changes).
+create policy "shared_reports_insert_own" on public.shared_reports
+  for insert with check (auth.uid() = user_id);
+
+-- Public can read by slug (route filters expiry in application code).
+create policy "shared_reports_select_all" on public.shared_reports
+  for select using (true);
