@@ -20,6 +20,7 @@ import {
   ScorePill, AnalysisDetailBody, FakeEmBadge,
 } from '@/components/analysis/AnalysisDetail'
 import { getVerdictDisplay } from '@/lib/utils/verdicts'
+import { normalizeJobUrl } from '@/lib/utils/url'
 
 type SortKey = 'composite_score' | 'ats_score' | 'role_level_score' | 'verdict'
 type InputTab = 'urls' | 'text'
@@ -231,10 +232,34 @@ export default function DashboardPage() {
     if (hasApiKey === false) { setScreenError({ type: 'no_api_key' }); return }
 
     type Item = { kind: 'url'; value: string } | { kind: 'jd'; entry: JdEntry }
-    const items: Item[] =
+    let items: Item[] =
       tab === 'urls'
         ? urlInput.split('\n').map((u) => u.trim()).filter(Boolean).map((u) => ({ kind: 'url' as const, value: u }))
         : jdEntries.filter((e) => e.jd_text.trim()).map((e) => ({ kind: 'jd' as const, entry: e }))
+
+    // Dedupe before screening — the same job can appear twice in a paste (LinkedIn's
+    // recommended and search-results pages link the same posting with different URL
+    // forms; users sometimes paste the same JD text twice). Screening a duplicate
+    // burns an LLM call and produces a confusing duplicate row in the results table.
+    const seenUrls = new Set<string>()
+    const seenJdText = new Set<string>()
+    const dedupedItems = items.filter((item) => {
+      if (item.kind === 'url') {
+        const key = normalizeJobUrl(item.value)
+        if (seenUrls.has(key)) return false
+        seenUrls.add(key)
+        return true
+      }
+      const key = item.entry.jd_text.trim()
+      if (seenJdText.has(key)) return false
+      seenJdText.add(key)
+      return true
+    })
+    const duplicateCount = items.length - dedupedItems.length
+    items = dedupedItems
+    if (duplicateCount > 0) {
+      toast(`Removed ${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''} before screening`, { icon: '🧹' })
+    }
 
     if (items.length === 0) return
 
