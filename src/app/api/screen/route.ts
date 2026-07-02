@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/utils/crypto'
-import type { AnalysisResult, ScreeningResult } from '@/types'
+import type { AnalysisResult, ScreeningResult, BatchIntelligence } from '@/types'
 
 const FREE_TIER_LIMIT = 5
 const SCREEN_LIMIT_ENABLED = process.env.NEXT_PUBLIC_FEATURE_SCREEN_LIMIT === 'true'
+const MIN_BATCH_SIZE_FOR_INTELLIGENCE = 3
 
 type FastAPIResult = AnalysisResult & {
   job_title?: string
@@ -18,12 +19,81 @@ export type FatalScreenError = {
   provider: string
 }
 
+// Called once by the client after its per-item screening loop finishes for a
+// batch_id. Not a new screen — doesn't touch screens_used_this_month or the
+// free-tier limit. Reuses already-persisted screening_results rows rather than
+// requiring the client to accumulate jd_texts separately.
+async function finalizeBatch(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  batchId: string
+): Promise<NextResponse> {
+  const { data: batchRows, error: batchError } = await supabase
+    .from('screening_results')
+    .select('jd_text, job_title, verdict')
+    .eq('batch_id', batchId)
+    .eq('user_id', userId)
+
+  if (batchError || !batchRows || batchRows.length < MIN_BATCH_SIZE_FOR_INTELLIGENCE) {
+    return NextResponse.json({ batch_intelligence: null })
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('api_key_encrypted, api_provider')
+    .eq('id', userId)
+    .single()
+
+  if (!profile?.api_key_encrypted) {
+    return NextResponse.json({ batch_intelligence: null })
+  }
+
+  let apiKey: string
+  try {
+    apiKey = decrypt(profile.api_key_encrypted as string)
+  } catch {
+    return NextResponse.json({ batch_intelligence: null })
+  }
+
+  const apiUrl = process.env.NEXT_PUBLIC_SCREENING_API_URL!
+  try {
+    const res = await fetch(`${apiUrl}/analyze-batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jd_texts: batchRows.map((r) => r.jd_text ?? ''),
+        job_titles: batchRows.map((r) => r.job_title ?? ''),
+        verdicts: batchRows.map((r) => r.verdict),
+        api_key: apiKey,
+        api_provider: profile.api_provider ?? 'anthropic',
+      }),
+    })
+    if (!res.ok) {
+      console.error('analyze-batch failed:', res.status, await res.text().catch(() => ''))
+      return NextResponse.json({ batch_intelligence: null })
+    }
+    const batch_intelligence = (await res.json()) as BatchIntelligence
+    return NextResponse.json({ batch_intelligence })
+  } catch (e) {
+    console.error('analyze-batch fetch failed:', e)
+    return NextResponse.json({ batch_intelligence: null })
+  }
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await request.json()
+  const { finalize, batch_id: finalizeBatchId } = body as { finalize?: boolean; batch_id?: string }
+
+  if (finalize) {
+    if (!finalizeBatchId) return NextResponse.json({ error: 'batch_id is required' }, { status: 400 })
+    return finalizeBatch(supabase, user.id, finalizeBatchId)
+  }
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
@@ -58,7 +128,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to decrypt API key' }, { status: 500 })
   }
 
-  const body = await request.json()
   const { urls, jd_text, jd_entries, job_title, company, batch_id } = body as {
     urls?: string[]
     jd_text?: string

@@ -1,11 +1,46 @@
 import { Info } from 'lucide-react'
-import type { ScreeningResult, RequirementCheck } from '@/types'
+import type { ScreeningResult, RequirementCheck, FakeEmDetection } from '@/types'
 
-export const VERDICT_CONFIG: Record<string, { cls: string; label: string }> = {
-  STRONG: { cls: 'bg-green-100 text-green-800 border border-green-300', label: '✦ Strong match' },
-  DECENT: { cls: 'bg-amber-100 text-amber-800 border border-amber-300', label: '◉ Decent match' },
-  WEAK:   { cls: 'bg-gray-100 text-gray-600 border border-gray-300',   label: '○ Weak match' },
-  REJECT: { cls: 'bg-red-100 text-red-800 border border-red-300',      label: '✕ Rejected' },
+export { getVerdictDisplay, verdictPillClass } from '@/lib/utils/verdicts'
+
+// Only surface the fake-EM signal when the model is actually confident about
+// it — null means "not a management role" (nothing to flag), and low
+// confidence isn't trustworthy enough to put in front of the user as fact.
+export function isFakeEmFlagged(detection?: FakeEmDetection): boolean {
+  return !!detection && detection.is_fake_em === true && (detection.confidence === 'high' || detection.confidence === 'medium')
+}
+
+export function FakeEmBadge({ detection }: { detection?: FakeEmDetection }) {
+  if (!isFakeEmFlagged(detection)) return null
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white shrink-0"
+      title="This role reads like a fake/inflated Engineering Manager title"
+    >
+      🚩 Fake EM Detected
+    </span>
+  )
+}
+
+export function FakeEmCallout({ detection }: { detection?: FakeEmDetection }) {
+  if (!isFakeEmFlagged(detection)) return null
+  return (
+    <div className="bg-red-50 border border-red-300 rounded-lg px-3 py-3">
+      <p className="text-xs font-bold text-red-700 uppercase tracking-wide mb-1.5">Why we flagged this:</p>
+      {detection!.actual_level_assessment && (
+        <p className="text-sm font-bold text-red-800 mb-2">{detection!.actual_level_assessment}</p>
+      )}
+      {detection!.red_flags?.length > 0 && (
+        <ul className="space-y-1">
+          {detection!.red_flags.map((flag, i) => (
+            <li key={i} className="text-sm text-red-700 flex items-start gap-1.5">
+              <span className="shrink-0">🚩</span>{flag}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }
 
 export const SCORE_TOOLTIPS = {
@@ -162,6 +197,9 @@ export function AnalysisDetailBody({ result }: { result: ScreeningResult }) {
         <p className="text-sm font-medium text-gray-700">{result.analysis_json.headline}</p>
       )}
       <p className="text-xs text-gray-400 italic">{whyVerdict(result)}</p>
+
+      {/* Fake EM detection — most trustworthy signal we produce, shown first */}
+      <FakeEmCallout detection={result.analysis_json?.fake_em_detection} />
 
       {/* Hard reject */}
       {result.hard_reject_reasons?.length > 0 && result.verdict === 'REJECT' && (

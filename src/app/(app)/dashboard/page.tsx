@@ -7,16 +7,19 @@ import {
   ChevronDown, ChevronUp, AlertTriangle, WifiOff, Pencil,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import type { ScreeningResult, HardRejectFilters, TrackedJob } from '@/types'
+import type { ScreeningResult, HardRejectFilters, TrackedJob, BatchIntelligence } from '@/types'
 import type { FatalScreenError } from '@/app/api/screen/route'
+import BatchIntelligencePanel from '@/components/analysis/BatchIntelligencePanel'
+import WhyNotChatGptModal from '@/components/dashboard/WhyNotChatGptModal'
 import PaymentModal from '@/components/payment/PaymentModal'
 import TrackButton from '@/components/tracker/TrackButton'
 import { SAMPLE_RESULTS } from '@/lib/sample-data'
 import { calculateTimeSaved } from '@/lib/utils/time-saved'
 import {
-  VERDICT_CONFIG, SCORE_TOOLTIPS, getReasonLine,
-  ScorePill, AnalysisDetailBody,
+  SCORE_TOOLTIPS, getReasonLine,
+  ScorePill, AnalysisDetailBody, FakeEmBadge,
 } from '@/components/analysis/AnalysisDetail'
+import { getVerdictDisplay } from '@/lib/utils/verdicts'
 
 type SortKey = 'composite_score' | 'ats_score' | 'role_level_score' | 'verdict'
 type InputTab = 'urls' | 'text'
@@ -119,6 +122,8 @@ export default function DashboardPage() {
 
   const [screenError, setScreenError] = useState<ScreenError | null>(null)
   const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set())
+  const [batchIntelligence, setBatchIntelligence] = useState<BatchIntelligence | null>(null)
+  const [showChatGptModal, setShowChatGptModal] = useState(false)
   const [showTierModal, setShowTierModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [rateLimitCountdown, setRateLimitCountdown] = useState(0)
@@ -238,6 +243,7 @@ export default function DashboardPage() {
     setBatchTime(null)
     setSkeletonCount(items.length)
     setRejectedCollapsed(true)
+    setBatchIntelligence(null)
 
     const batch_id = crypto.randomUUID()
 
@@ -285,6 +291,19 @@ export default function DashboardPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (user) fetchLifetimeCount(user.id)
+
+      // Ask for market intelligence across the batch just screened — cheap no-op
+      // server-side if fewer than 3 results were actually saved.
+      fetch('/api/screen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ finalize: true, batch_id }),
+      })
+        .then((r) => r.json())
+        .then((data: { batch_intelligence?: BatchIntelligence | null }) => {
+          if (data.batch_intelligence) setBatchIntelligence(data.batch_intelligence)
+        })
+        .catch(() => {})
     }
   }
 
@@ -368,7 +387,10 @@ export default function DashboardPage() {
                 {(result.job_url ?? '').slice(0, 36)}{(result.job_url ?? '').length > 36 ? '…' : ''}
               </span>
             ) : (
-              <span className="text-xs line-clamp-2">{result.job_title ?? '—'}</span>
+              <span className="flex items-start gap-1.5">
+                <span className="text-xs line-clamp-2">{result.job_title ?? '—'}</span>
+                <FakeEmBadge detection={result.analysis_json?.fake_em_detection} />
+              </span>
             )}
           </td>
           {/* Verdict (PRIMARY) + reason line */}
@@ -377,8 +399,8 @@ export default function DashboardPage() {
               <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-amber-100 text-amber-800 border border-amber-300">⚠ Scrape failed</span>
             ) : (
               <div>
-                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold ${VERDICT_CONFIG[result.verdict]?.cls ?? 'bg-gray-100 text-gray-600 border border-gray-300'}`}>
-                  {VERDICT_CONFIG[result.verdict]?.label ?? result.verdict}
+                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold ${getVerdictDisplay(result.verdict).bg} ${getVerdictDisplay(result.verdict).color} border ${getVerdictDisplay(result.verdict).border}`}>
+                  {getVerdictDisplay(result.verdict).icon} {getVerdictDisplay(result.verdict).label}
                 </span>
                 {reasonLine && (
                   <p className={`text-xs mt-1.5 leading-snug ${isReject ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
@@ -481,13 +503,22 @@ export default function DashboardPage() {
       {/* Input card */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-6 pt-6 pb-0">
-          <div className="flex border-b border-gray-200">
-            {(['urls', 'text'] as InputTab[]).map((t) => (
-              <button key={t} onClick={() => { setTab(t); setResults([]); setBatchTime(null); setScreenError(null); setIsSampleData(false) }}
-                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                {t === 'urls' ? 'Job URLs' : 'Paste JD text'}
-              </button>
-            ))}
+          <div className="flex items-center justify-between border-b border-gray-200">
+            <div className="flex">
+              {(['urls', 'text'] as InputTab[]).map((t) => (
+                <button key={t} onClick={() => { setTab(t); setResults([]); setBatchTime(null); setScreenError(null); setIsSampleData(false) }}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  {t === 'urls' ? 'Job URLs' : 'Paste JD text'}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowChatGptModal(true)}
+              className="mb-2 text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors shrink-0"
+            >
+              How is this different from ChatGPT?
+            </button>
           </div>
         </div>
 
@@ -570,7 +601,7 @@ export default function DashboardPage() {
                 </svg>
                 Working on it…
               </span>
-            ) : 'Reject the bad ones →'}
+            ) : 'Tell me which ones are worth it →'}
           </button>
         </div>
       </div>
@@ -641,10 +672,10 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-500 mt-1">
                     <span className="font-medium text-gray-700">{goodResults.length} JD{goodResults.length !== 1 ? 's' : ''} screened</span>
                     {verdictCounts.REJECT > 0 && (
-                      <span className="ml-1">— <span className="text-red-600 font-medium">{verdictCounts.REJECT} rejected</span>, {worthALook} worth a look</span>
+                      <span className="ml-1">— <span className="text-green-600 font-medium">{worthALook} worth your time</span> · {verdictCounts.REJECT} you can skip</span>
                     )}
                     {verdictCounts.REJECT === 0 && worthALook > 0 && (
-                      <span className="ml-1">— <span className="text-green-600 font-medium">{worthALook} worth a look</span></span>
+                      <span className="ml-1">— <span className="text-green-600 font-medium">{worthALook} worth your time</span></span>
                     )}
                     {skeletonCount > 0 && <span className="text-gray-400 italic ml-1">{skeletonCount} in progress…</span>}
                   </p>
@@ -692,7 +723,7 @@ export default function DashboardPage() {
                   className="w-full flex items-center justify-between px-4 sm:px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
                   <span className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
-                    Rejected ({rejectResults.length}) — click to see why
+                    Skip These ({rejectResults.length}) — click to see why
                   </span>
                   {rejectedCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                 </button>
@@ -728,6 +759,13 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+
+          {batchIntelligence && (
+            <BatchIntelligencePanel
+              intelligence={batchIntelligence}
+              matchingSkills={Array.from(new Set(goodResults.flatMap((r) => r.analysis_json?.matching_skills ?? [])))}
+            />
+          )}
         </div>
       )}
 
@@ -751,6 +789,8 @@ export default function DashboardPage() {
 
       <PaymentModal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)}
         onSuccess={() => { setShowPaymentModal(false); toast.success('Upgraded! Unlimited rejections unlocked.') }} />
+
+      <WhyNotChatGptModal open={showChatGptModal} onClose={() => setShowChatGptModal(false)} />
     </div>
   )
 }

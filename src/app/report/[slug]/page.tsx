@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { createServiceClient } from '@/lib/supabase/service'
 import type { SharedReport, ScreeningResult } from '@/types'
 import { calculateTimeSaved } from '@/lib/utils/time-saved'
+import { getVerdictDisplay } from '@/lib/utils/verdicts'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://jdfit.in'
 
@@ -72,13 +73,6 @@ function scoreBarColor(n: number) {
   if (n >= 70) return 'bg-green-500'
   if (n >= 50) return 'bg-amber-500'
   return 'bg-red-500'
-}
-
-const VERDICT_CONFIG: Record<string, { cls: string; label: string }> = {
-  STRONG: { cls: 'bg-green-100 text-green-800 border border-green-300', label: '✦ Strong match' },
-  DECENT: { cls: 'bg-amber-100 text-amber-800 border border-amber-300', label: '◉ Decent match' },
-  WEAK:   { cls: 'bg-gray-100 text-gray-600 border border-gray-300',   label: '○ Weak match' },
-  REJECT: { cls: 'bg-red-100 text-red-800 border border-red-300',      label: '✕ Rejected' },
 }
 
 function ScoreBar({ score }: { score: number }) {
@@ -168,23 +162,23 @@ export default async function ReportPage({
         <div className="max-w-5xl mx-auto flex flex-wrap gap-2 items-center">
           <span className="text-xs font-medium text-gray-500 mr-1">Summary:</span>
           {counts.STRONG > 0 && (
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
-              ✦ {counts.STRONG} Strong
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getVerdictDisplay('STRONG').bg} ${getVerdictDisplay('STRONG').color} border ${getVerdictDisplay('STRONG').border}`}>
+              {getVerdictDisplay('STRONG').icon} {counts.STRONG} {getVerdictDisplay('STRONG').label}
             </span>
           )}
           {counts.DECENT > 0 && (
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-              ◉ {counts.DECENT} Decent
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getVerdictDisplay('DECENT').bg} ${getVerdictDisplay('DECENT').color} border ${getVerdictDisplay('DECENT').border}`}>
+              {getVerdictDisplay('DECENT').icon} {counts.DECENT} {getVerdictDisplay('DECENT').label}
             </span>
           )}
           {counts.WEAK > 0 && (
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
-              ○ {counts.WEAK} Weak
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getVerdictDisplay('WEAK').bg} ${getVerdictDisplay('WEAK').color} border ${getVerdictDisplay('WEAK').border}`}>
+              {getVerdictDisplay('WEAK').icon} {counts.WEAK} {getVerdictDisplay('WEAK').label}
             </span>
           )}
           {counts.REJECT > 0 && (
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
-              ✕ {counts.REJECT} Auto-rejected
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getVerdictDisplay('REJECT').bg} ${getVerdictDisplay('REJECT').color} border ${getVerdictDisplay('REJECT').border}`}>
+              {getVerdictDisplay('REJECT').icon} {counts.REJECT} {getVerdictDisplay('REJECT').label}
             </span>
           )}
           <span className="ml-auto text-xs text-gray-400">Expires {expiryDate}</span>
@@ -246,8 +240,8 @@ export default async function ReportPage({
                         <ScoreBar score={r.composite_score} />
                       </td>
                       <td className="px-4 py-4 text-center">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${VERDICT_CONFIG[r.verdict]?.cls ?? 'bg-gray-100 text-gray-600 border border-gray-300'}`}>
-                          {VERDICT_CONFIG[r.verdict]?.label ?? r.verdict}
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${getVerdictDisplay(r.verdict).bg} ${getVerdictDisplay(r.verdict).color} border ${getVerdictDisplay(r.verdict).border}`}>
+                          {getVerdictDisplay(r.verdict).icon} {getVerdictDisplay(r.verdict).label}
                         </span>
                       </td>
                     </tr>
@@ -280,7 +274,7 @@ export default async function ReportPage({
                           <td className="px-4 py-3 text-center hidden md:table-cell text-gray-300">—</td>
                           <td className="px-4 py-3 text-center text-gray-300">—</td>
                           <td className="px-4 py-3 text-center">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-300">✕ Rejected</span>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-300">✕ Skip This One</span>
                           </td>
                         </tr>
                       ))}

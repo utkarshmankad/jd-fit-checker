@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo, Fragment } from 'react'
 import { Download, History, Search, ChevronDown, ChevronUp, ExternalLink, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { ScreeningResult } from '@/types'
-import { VERDICT_CONFIG, SCORE_TOOLTIPS, getReasonLine, ScorePill, AnalysisDetailBody } from '@/components/analysis/AnalysisDetail'
+import { SCORE_TOOLTIPS, getReasonLine, ScorePill, AnalysisDetailBody, FakeEmBadge } from '@/components/analysis/AnalysisDetail'
+import { getVerdictDisplay } from '@/lib/utils/verdicts'
 import TrackButton from '@/components/tracker/TrackButton'
 
 type HistoryRow = Omit<ScreeningResult, 'jd_text'>
@@ -19,12 +20,16 @@ interface Batch {
 const VERDICTS = ['ALL', 'STRONG', 'DECENT', 'WEAK', 'REJECT'] as const
 type VerdictFilter = (typeof VERDICTS)[number]
 
+function verdictFilterLabel(v: VerdictFilter) {
+  return v === 'ALL' ? 'ALL' : getVerdictDisplay(v).label
+}
+
 function verdictFilterClass(v: VerdictFilter, active: boolean) {
   if (!active) return 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
   if (v === 'ALL') return 'bg-gray-900 text-white border border-gray-900'
   const map: Record<string, string> = {
     STRONG: 'bg-green-600 text-white border border-green-600',
-    DECENT: 'bg-amber-500 text-white border border-amber-500',
+    DECENT: 'bg-blue-600 text-white border border-blue-600',
     WEAK: 'bg-gray-500 text-white border border-gray-500',
     REJECT: 'bg-red-600 text-white border border-red-600',
   }
@@ -165,7 +170,7 @@ export default function HistoryPage() {
               onClick={() => setVerdictFilter(v)}
               className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${verdictFilterClass(v, verdictFilter === v)}`}
             >
-              {v}
+              {verdictFilterLabel(v)}
             </button>
           ))}
         </div>
@@ -227,7 +232,10 @@ export default function HistoryPage() {
                                   </a>
                                 )}
                               </div>
-                              <p className="text-xs text-gray-500 mt-0.5 truncate">{r.job_title ?? '—'}</p>
+                              <p className="text-xs text-gray-500 mt-0.5 truncate flex items-center gap-1.5">
+                                <span className="truncate">{r.job_title ?? '—'}</span>
+                                <FakeEmBadge detection={r.analysis_json?.fake_em_detection} />
+                              </p>
                               {reasonLine && (
                                 <p className="text-xs text-gray-400 mt-1 truncate">{reasonLine}</p>
                               )}
@@ -242,8 +250,8 @@ export default function HistoryPage() {
                               {r.composite_score}
                             </span>
 
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${VERDICT_CONFIG[r.verdict]?.cls ?? 'bg-gray-100 text-gray-600 border border-gray-300'}`}>
-                              {r.verdict}
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${getVerdictDisplay(r.verdict).bg} ${getVerdictDisplay(r.verdict).color} border ${getVerdictDisplay(r.verdict).border}`}>
+                              {getVerdictDisplay(r.verdict).label}
                             </span>
 
                             <div className="flex items-center gap-1 shrink-0">

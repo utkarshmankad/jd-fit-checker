@@ -64,6 +64,13 @@ export interface RequirementCheck {
   evidence?: string;
 }
 
+export interface FakeEmDetection {
+  is_fake_em: boolean | null;
+  confidence: 'high' | 'medium' | 'low' | null;
+  red_flags: string[];
+  actual_level_assessment: string | null;
+}
+
 export interface AnalysisResult {
   ats_score: number;
   role_level_score: number;
@@ -79,6 +86,31 @@ export interface AnalysisResult {
   role_level_assessment: string;
   gap_analysis: string;
   recommendation: string;
+  fake_em_detection?: FakeEmDetection;
+}
+
+export interface SkillFrequency {
+  skill: string;
+  count: number;
+  percentage: number;
+  trend: 'high_demand' | 'moderate' | 'rare';
+}
+
+export interface BatchIntelligence {
+  total_jds: number;
+  top_required_skills: SkillFrequency[];
+  top_missing_from_profile: string[];
+  search_strategy_insight: string;
+  market_observation: string;
+  title_patterns: string[];
+  red_flags_count: number;
+  recommendation: string;
+}
+
+export interface ScreenBatchResponse {
+  results: ScreeningResult[];
+  fatalError?: { type: 'invalid_key' | 'rate_limit'; message: string; provider: string };
+  batch_intelligence?: BatchIntelligence | null;
 }
 
 export interface SharedReport {
