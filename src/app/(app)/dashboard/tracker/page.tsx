@@ -1,3 +1,14 @@
+// Job Tracker — feature disabled (kept for later, not deleted).
+// Nav link removed in src/components/layout/DashboardShell.tsx. This stub
+// blocks direct navigation to /dashboard/tracker too. To re-enable: uncomment
+// everything below, restore the default export, and re-add the nav entry.
+import { redirect } from 'next/navigation'
+
+export default function TrackerPage() {
+  redirect('/dashboard')
+}
+
+/*
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -156,3 +167,4 @@ export default function TrackerPage() {
     </div>
   )
 }
+*/

@@ -1,3 +1,14 @@
+// Job Tracker — feature disabled (kept for later, not deleted). Uncomment the
+// block below to re-enable, and re-add the TrackButton usages + nav entry that
+// call this. Next.js requires a route.ts to export at least one handler to be
+// a valid route module, so this stub 404s until re-enabled.
+import { NextResponse } from 'next/server'
+
+export async function GET() {
+  return NextResponse.json({ error: 'Not found' }, { status: 404 })
+}
+
+/*
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { TrackedJobStatus } from '@/types'
@@ -70,3 +81,4 @@ export async function DELETE(
 
   return NextResponse.json({ success: true })
 }
+*/

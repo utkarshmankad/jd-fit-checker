@@ -7,12 +7,13 @@ import {
   ChevronDown, ChevronUp, AlertTriangle, WifiOff, Pencil,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import type { ScreeningResult, HardRejectFilters, TrackedJob, BatchIntelligence } from '@/types'
+import type { ScreeningResult, HardRejectFilters, BatchIntelligence } from '@/types'
 import type { FatalScreenError } from '@/app/api/screen/route'
 import BatchIntelligencePanel from '@/components/analysis/BatchIntelligencePanel'
 import WhyNotChatGptModal from '@/components/dashboard/WhyNotChatGptModal'
 import PaymentModal from '@/components/payment/PaymentModal'
-import TrackButton from '@/components/tracker/TrackButton'
+// Job Tracker — feature disabled, kept for later.
+// import TrackButton from '@/components/tracker/TrackButton'
 import { SAMPLE_RESULTS } from '@/lib/sample-data'
 import { calculateTimeSaved } from '@/lib/utils/time-saved'
 import {
@@ -122,13 +123,18 @@ export default function DashboardPage() {
   const [hardRejectFilters, setHardRejectFilters] = useState<HardRejectFilters | null>(null)
 
   const [screenError, setScreenError] = useState<ScreenError | null>(null)
-  const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set())
+  // const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set())
   const [batchIntelligence, setBatchIntelligence] = useState<BatchIntelligence | null>(null)
   const [showChatGptModal, setShowChatGptModal] = useState(false)
   const [showTierModal, setShowTierModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [rateLimitCountdown, setRateLimitCountdown] = useState(0)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Tracks an interrupted batch (rate limit, network drop, tab backgrounded) so
+  // retrying continues from where it stopped instead of re-screening everything —
+  // and re-burning API calls against the very rate limit that interrupted it.
+  const inProgressBatchRef = useRef<{ batchId: string; allKeys: string[]; screenedKeys: Set<string> } | null>(null)
+  const lastRequestAtRef = useRef(0)
 
   const [profileBannerDismissed, setProfileBannerDismissed] = useState(true)
 
@@ -140,14 +146,15 @@ export default function DashboardPage() {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
   }, [])
 
-  useEffect(() => {
-    fetch('/api/tracker')
-      .then((r) => r.json())
-      .then((data: { items?: TrackedJob[] }) => {
-        setTrackedIds(new Set((data.items ?? []).filter((i) => i.screening_result_id).map((i) => i.screening_result_id as string)))
-      })
-      .catch(() => {})
-  }, [])
+  // Job Tracker — feature disabled, kept for later.
+  // useEffect(() => {
+  //   fetch('/api/tracker')
+  //     .then((r) => r.json())
+  //     .then((data: { items?: TrackedJob[] }) => {
+  //       setTrackedIds(new Set((data.items ?? []).filter((i) => i.screening_result_id).map((i) => i.screening_result_id as string)))
+  //     })
+  //     .catch(() => {})
+  // }, [])
 
   async function fetchLifetimeCount(userId: string) {
     const supabase = createClient()
@@ -186,7 +193,16 @@ export default function DashboardPage() {
     setRateLimitCountdown(30)
     countdownRef.current = setInterval(() => {
       setRateLimitCountdown((v) => {
-        if (v <= 1) { clearInterval(countdownRef.current!); countdownRef.current = null; return 0 }
+        if (v <= 1) {
+          clearInterval(countdownRef.current!)
+          countdownRef.current = null
+          // Auto-resume once the cooldown clears — handleScreen picks up from
+          // where it stopped (inProgressBatchRef), so this doesn't re-screen
+          // anything already completed. No need to make the user click back in.
+          setScreenError(null)
+          handleScreen()
+          return 0
+        }
         return v - 1
       })
     }, 1000)
@@ -241,18 +257,12 @@ export default function DashboardPage() {
     // recommended and search-results pages link the same posting with different URL
     // forms; users sometimes paste the same JD text twice). Screening a duplicate
     // burns an LLM call and produces a confusing duplicate row in the results table.
-    const seenUrls = new Set<string>()
-    const seenJdText = new Set<string>()
+    const itemKey = (item: Item) => item.kind === 'url' ? `url:${normalizeJobUrl(item.value)}` : `jd:${item.entry.jd_text.trim()}`
+    const seenKeys = new Set<string>()
     const dedupedItems = items.filter((item) => {
-      if (item.kind === 'url') {
-        const key = normalizeJobUrl(item.value)
-        if (seenUrls.has(key)) return false
-        seenUrls.add(key)
-        return true
-      }
-      const key = item.entry.jd_text.trim()
-      if (seenJdText.has(key)) return false
-      seenJdText.add(key)
+      const key = itemKey(item)
+      if (seenKeys.has(key)) return false
+      seenKeys.add(key)
       return true
     })
     const duplicateCount = items.length - dedupedItems.length
@@ -263,17 +273,51 @@ export default function DashboardPage() {
 
     if (items.length === 0) return
 
-    setScreening(true)
-    setResults([])
-    setBatchTime(null)
-    setSkeletonCount(items.length)
-    setRejectedCollapsed(true)
-    setBatchIntelligence(null)
+    // Resume detection: same input as an interrupted batch → continue with the
+    // same batch_id, screening only what hasn't been screened yet. Any change to
+    // the input (different URLs/JD text) is treated as a fresh batch.
+    const currentKeys = items.map(itemKey)
+    const prevBatch = inProgressBatchRef.current
+    const isResume = !!prevBatch
+      && prevBatch.allKeys.length === currentKeys.length
+      && prevBatch.allKeys.every((k, i) => k === currentKeys[i])
 
-    const batch_id = crypto.randomUUID()
+    let batch_id: string
+    let itemsToScreen: Item[]
+
+    if (isResume) {
+      batch_id = prevBatch!.batchId
+      itemsToScreen = items.filter((item) => !prevBatch!.screenedKeys.has(itemKey(item)))
+      if (itemsToScreen.length === 0) { inProgressBatchRef.current = null; return }
+      toast(`Resuming — ${itemsToScreen.length} left to screen`, { icon: '↻' })
+    } else {
+      batch_id = crypto.randomUUID()
+      inProgressBatchRef.current = { batchId: batch_id, allKeys: currentKeys, screenedKeys: new Set() }
+      itemsToScreen = items
+      setResults([])
+      setBatchTime(null)
+      setBatchIntelligence(null)
+    }
+
+    setScreening(true)
+    setSkeletonCount(itemsToScreen.length)
+    setRejectedCollapsed(true)
+
+    // OpenAI's default tier caps at 20 requests/minute — space calls out to stay
+    // under that instead of firing as fast as possible and hitting 429s. Anthropic
+    // isn't subject to this specific cap, so only pace OpenAI keys.
+    const MIN_INTERVAL_MS = apiProvider === 'openai' ? 3100 : 0
+
+    let completedFully = true
 
     try {
-      for (const item of items) {
+      for (const item of itemsToScreen) {
+        if (MIN_INTERVAL_MS > 0) {
+          const elapsed = Date.now() - lastRequestAtRef.current
+          if (elapsed < MIN_INTERVAL_MS) await new Promise((r) => setTimeout(r, MIN_INTERVAL_MS - elapsed))
+        }
+        lastRequestAtRef.current = Date.now()
+
         const payload =
           item.kind === 'url'
             ? { urls: [item.value], batch_id }
@@ -284,27 +328,31 @@ export default function DashboardPage() {
           res = await fetch('/api/screen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         } catch {
           setScreenError({ type: 'network', message: 'Connection error — check your internet connection and try again.' })
+          completedFully = false
           break
         }
 
         if (res.status === 403) {
           const json = (await res.json().catch(() => ({}))) as { upgrade_required?: boolean }
-          if (json.upgrade_required) { setShowTierModal(true); break }
+          if (json.upgrade_required) { setShowTierModal(true); completedFully = false; break }
         }
 
         if (!res.ok) {
           const json = (await res.json().catch(() => ({}))) as { error?: string }
           setScreenError({ type: 'network', message: json.error ?? `Screening failed (${res.status})` })
+          completedFully = false
           break
         }
 
         const data = (await res.json()) as { results: ScreeningResult[]; fatalError?: FatalScreenError }
         setResults((prev) => [...prev, ...data.results])
         setSkeletonCount((prev) => Math.max(0, prev - 1))
+        inProgressBatchRef.current?.screenedKeys.add(itemKey(item))
 
         if (data.fatalError) {
           if (data.fatalError.type === 'invalid_key') setScreenError({ type: 'invalid_key', provider: data.fatalError.provider })
           else if (data.fatalError.type === 'rate_limit') { setScreenError({ type: 'rate_limit' }); startCountdown() }
+          completedFully = false
           break
         }
       }
@@ -317,18 +365,22 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) fetchLifetimeCount(user.id)
 
-      // Ask for market intelligence across the batch just screened — cheap no-op
-      // server-side if fewer than 3 results were actually saved.
-      fetch('/api/screen', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ finalize: true, batch_id }),
-      })
-        .then((r) => r.json())
-        .then((data: { batch_intelligence?: BatchIntelligence | null }) => {
-          if (data.batch_intelligence) setBatchIntelligence(data.batch_intelligence)
+      if (completedFully) {
+        inProgressBatchRef.current = null
+        // Ask for market intelligence across the batch just screened — cheap no-op
+        // server-side if fewer than 3 results were actually saved. Only do this once
+        // the batch is actually done, not on every interrupted partial attempt.
+        fetch('/api/screen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ finalize: true, batch_id }),
         })
-        .catch(() => {})
+          .then((r) => r.json())
+          .then((data: { batch_intelligence?: BatchIntelligence | null }) => {
+            if (data.batch_intelligence) setBatchIntelligence(data.batch_intelligence)
+          })
+          .catch(() => {})
+      }
     }
   }
 
@@ -458,6 +510,7 @@ export default function DashboardPage() {
                   <ExternalLink size={15} />
                 </a>
               )}
+              {/* Job Tracker — feature disabled, kept for later.
               {!isErrorRow && (
                 <TrackButton
                   screeningResultId={result.id}
@@ -468,6 +521,7 @@ export default function DashboardPage() {
                   onTracked={(item) => setTrackedIds((prev) => new Set(prev).add(item.screening_result_id as string))}
                 />
               )}
+              */}
             </div>
           </td>
         </tr>
@@ -595,10 +649,14 @@ export default function DashboardPage() {
                 {screenError.type === 'invalid_key' && (<><p>✕ API key rejected by {screenError.provider === 'openai' ? 'OpenAI' : 'Anthropic'}.</p><a href="/profile" className="inline-block font-semibold underline text-xs">→ Update your API key</a></>)}
                 {screenError.type === 'rate_limit' && (
                   <div className="flex items-center justify-between gap-4">
-                    <p>Your {providerLabel} key hit a rate limit.{rateLimitCountdown > 0 ? ` Retry in ${rateLimitCountdown}s.` : ' Ready to retry.'}</p>
+                    <p>
+                      Your {providerLabel} key hit a rate limit
+                      {apiProvider === 'openai' && ' (OpenAI’s default tier caps at 20 requests/minute)'}.{' '}
+                      {rateLimitCountdown > 0 ? `Continuing automatically in ${rateLimitCountdown}s — nothing already screened will be redone.` : 'Continuing where it left off.'}
+                    </p>
                     <button onClick={() => { setScreenError(null); handleScreen() }} disabled={rateLimitCountdown > 0}
                       className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors">
-                      {rateLimitCountdown > 0 ? `Retry in ${rateLimitCountdown}s` : 'Retry'}
+                      {rateLimitCountdown > 0 ? `Retry in ${rateLimitCountdown}s` : 'Retry now'}
                     </button>
                   </div>
                 )}

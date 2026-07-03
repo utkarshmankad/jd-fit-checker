@@ -603,6 +603,14 @@ export default function ProfilePage() {
             <option value="anthropic">Anthropic (Claude)</option>
             <option value="openai">OpenAI (GPT)</option>
           </select>
+          {apiProvider === 'openai' && (
+            <p className="text-xs text-amber-600 mt-1.5 leading-relaxed">
+              OpenAI&apos;s default (free/low-spend) tier caps at 20 requests/minute — large batches
+              will screen more slowly to stay under that, and pause-and-resume automatically if
+              you hit it. To go faster: spend $5+ on your OpenAI account to unlock a higher tier,
+              request a rate-limit increase, or switch to Anthropic above (no equivalent cap).
+            </p>
+          )}
         </Field>
         <Field label="API key">
           <input

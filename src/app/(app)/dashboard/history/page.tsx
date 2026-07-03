@@ -6,7 +6,8 @@ import toast from 'react-hot-toast'
 import type { ScreeningResult } from '@/types'
 import { SCORE_TOOLTIPS, getReasonLine, ScorePill, AnalysisDetailBody, FakeEmBadge } from '@/components/analysis/AnalysisDetail'
 import { getVerdictDisplay } from '@/lib/utils/verdicts'
-import TrackButton from '@/components/tracker/TrackButton'
+// Job Tracker — feature disabled, kept for later.
+// import TrackButton from '@/components/tracker/TrackButton'
 
 type HistoryRow = Omit<ScreeningResult, 'jd_text'>
 
@@ -58,7 +59,7 @@ export default function HistoryPage() {
   const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>('ALL')
   const [collapsedBatches, setCollapsedBatches] = useState<Set<string>>(new Set())
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
-  const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set())
+  // const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     async function load() {
@@ -75,12 +76,13 @@ export default function HistoryPage() {
     }
     load()
 
-    fetch('/api/tracker')
-      .then((r) => r.json())
-      .then((data: { items?: { screening_result_id: string | null }[] }) => {
-        setTrackedIds(new Set((data.items ?? []).filter((i) => i.screening_result_id).map((i) => i.screening_result_id as string)))
-      })
-      .catch(() => {})
+    // Job Tracker — feature disabled, kept for later.
+    // fetch('/api/tracker')
+    //   .then((r) => r.json())
+    //   .then((data: { items?: { screening_result_id: string | null }[] }) => {
+    //     setTrackedIds(new Set((data.items ?? []).filter((i) => i.screening_result_id).map((i) => i.screening_result_id as string)))
+    //   })
+    //   .catch(() => {})
   }, [])
 
   function handleExport(batch_id: string) {
@@ -262,6 +264,7 @@ export default function HistoryPage() {
                               >
                                 <Eye size={15} />
                               </button>
+                              {/* Job Tracker — feature disabled, kept for later.
                               <TrackButton
                                 screeningResultId={r.id}
                                 jobTitle={r.job_title}
@@ -270,6 +273,7 @@ export default function HistoryPage() {
                                 tracked={trackedIds.has(r.id)}
                                 onTracked={(item) => setTrackedIds((prev) => new Set(prev).add(item.screening_result_id as string))}
                               />
+                              */}
                             </div>
                           </div>
 
