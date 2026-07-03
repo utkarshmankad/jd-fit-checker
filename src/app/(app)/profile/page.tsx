@@ -13,6 +13,7 @@ interface ProfileData {
   has_api_key: boolean
   tier: 'free' | 'paid'
   screens_used_this_month: number
+  is_beta_user: boolean
   updated_at: string
 }
 
@@ -309,6 +310,10 @@ export default function ProfilePage() {
   // Tier / meta
   const [tier, setTier] = useState<'free' | 'paid'>('free')
   const [screensUsed, setScreensUsed] = useState(0)
+  const [isBetaUser, setIsBetaUser] = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
+  const [inviteStatus, setInviteStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [inviteMessage, setInviteMessage] = useState('')
   const [resumeDate, setResumeDate] = useState<string | null>(null)
 
   // Resume parse result feedback
@@ -349,6 +354,7 @@ export default function ProfilePage() {
       setHasExistingApiKey(profile.has_api_key)
       setTier(profile.tier)
       setScreensUsed(profile.screens_used_this_month)
+      setIsBetaUser(profile.is_beta_user)
 
       if (profile.resume_text) setResumeDate(profile.updated_at)
 
@@ -462,6 +468,29 @@ export default function ProfilePage() {
       setPrefsSave,
       setPrefsSaved,
     )
+  }
+
+  async function handleApplyInvite() {
+    if (!inviteCode.trim()) return
+    setInviteStatus('loading')
+    try {
+      const res = await fetch('/api/invite/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invite_code: inviteCode.trim() }),
+      })
+      const data = (await res.json()) as { success: boolean; message: string }
+      setInviteMessage(data.message)
+      if (data.success) {
+        setInviteStatus('success')
+        setIsBetaUser(true)
+      } else {
+        setInviteStatus('error')
+      }
+    } catch {
+      setInviteStatus('error')
+      setInviteMessage('Failed to apply invite code')
+    }
   }
 
   // Completion scoring
@@ -725,6 +754,38 @@ export default function ProfilePage() {
           </Field>
         </div>
       </Section>
+
+      {!isBetaUser && tier !== 'paid' && (
+        <Section title="Have a beta invite code?">
+          {inviteStatus === 'success' ? (
+            <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2.5">
+              ✓ {inviteMessage}
+            </p>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={inviteCode}
+                onChange={(e) => { setInviteCode(e.target.value); setInviteStatus('idle') }}
+                placeholder="Enter invite code"
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={handleApplyInvite}
+                disabled={inviteStatus === 'loading' || !inviteCode.trim()}
+                className="shrink-0 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                style={{ backgroundColor: '#1B3A5C' }}
+              >
+                {inviteStatus === 'loading' ? 'Applying…' : 'Apply'}
+              </button>
+            </div>
+          )}
+          {inviteStatus === 'error' && (
+            <p className="text-xs text-red-600 mt-1.5">{inviteMessage}</p>
+          )}
+        </Section>
+      )}
     </div>
   )
 }

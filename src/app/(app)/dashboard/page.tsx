@@ -11,6 +11,8 @@ import type { ScreeningResult, HardRejectFilters, BatchIntelligence } from '@/ty
 import type { FatalScreenError } from '@/app/api/screen/route'
 import BatchIntelligencePanel from '@/components/analysis/BatchIntelligencePanel'
 import WhyNotChatGptModal from '@/components/dashboard/WhyNotChatGptModal'
+import UsageWidget from '@/components/dashboard/UsageWidget'
+import ReferralCard from '@/components/dashboard/ReferralCard'
 import PaymentModal from '@/components/payment/PaymentModal'
 // Job Tracker — feature disabled, kept for later.
 // import TrackButton from '@/components/tracker/TrackButton'
@@ -120,6 +122,16 @@ export default function DashboardPage() {
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
   const [hasPreferences, setHasPreferences] = useState(false)
   const [apiProvider, setApiProvider] = useState<string>('anthropic')
+  const [usage, setUsage] = useState<{
+    tier: 'free' | 'paid'
+    effective_is_beta: boolean
+    screens_used_total: number
+    screens_used_this_week: number
+    week_reset_at: string
+    referral_bonus_screens: number
+    beta_limit: number
+    weekly_limit: number
+  } | null>(null)
   const [hardRejectFilters, setHardRejectFilters] = useState<HardRejectFilters | null>(null)
 
   const [screenError, setScreenError] = useState<ScreenError | null>(null)
@@ -184,6 +196,13 @@ export default function DashboardPage() {
       setHardRejectFilters(hrf)
       setHasPreferences(!!(prefs.preferred_tech_stack?.length || prefs.target_industries?.length || hrf.title_floor?.trim() || hrf.geography_allowed?.length))
       await fetchLifetimeCount(user.id)
+
+      fetch('/api/profile')
+        .then((r) => r.json())
+        .then((data: { profile?: typeof usage }) => {
+          if (data.profile) setUsage(data.profile)
+        })
+        .catch(() => {})
     }
     loadProfile()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -570,13 +589,26 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reject the bad ones</h1>
           {lifetimeSaved && (
             <p className="text-xs text-gray-400 mt-0.5">Lifetime: {lifetimeSaved} saved across your screening history</p>
           )}
         </div>
+        {usage && (
+          <UsageWidget
+            tier={usage.tier}
+            effective_is_beta={usage.effective_is_beta}
+            screens_used_total={usage.screens_used_total}
+            screens_used_this_week={usage.screens_used_this_week}
+            week_reset_at={usage.week_reset_at}
+            referral_bonus_screens={usage.referral_bonus_screens}
+            beta_limit={usage.beta_limit}
+            weekly_limit={usage.weekly_limit}
+            onUpgradeClick={() => setShowTierModal(true)}
+          />
+        )}
       </div>
 
       {/* Input card */}
@@ -849,6 +881,8 @@ export default function DashboardPage() {
               matchingSkills={Array.from(new Set(goodResults.flatMap((r) => r.analysis_json?.matching_skills ?? [])))}
             />
           )}
+
+          {usage && usage.tier !== 'paid' && <ReferralCard />}
         </div>
       )}
 

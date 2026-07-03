@@ -1,0 +1,51 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { Copy, Check } from 'lucide-react'
+
+interface ReferralInfo {
+  code: string
+  referral_link: string
+  referrals_count: number
+  bonus_screens_earned: number
+}
+
+export default function ReferralCard() {
+  const [info, setInfo] = useState<ReferralInfo | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/referral')
+      .then((r) => r.json())
+      .then((data: ReferralInfo) => setInfo(data))
+      .catch(() => {})
+  }, [])
+
+  if (!info) return null
+
+  function copyLink() {
+    if (!info) return
+    navigator.clipboard.writeText(info.referral_link).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div id="referral-card" className="bg-white rounded-xl border border-gray-200 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <p className="text-sm font-semibold text-gray-900">Give a friend 10 bonus screens. Get 10 yourself.</p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          You&apos;ve referred {info.referrals_count} people · earned {info.bonus_screens_earned} bonus screens
+        </p>
+      </div>
+      <button
+        onClick={copyLink}
+        className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+      >
+        {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+        {copied ? 'Copied!' : 'Copy referral link'}
+      </button>
+    </div>
+  )
+}

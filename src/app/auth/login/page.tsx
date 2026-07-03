@@ -61,12 +61,19 @@ function LoginForm() {
     if (err) setError(decodeURIComponent(err))
   }, [searchParams])
 
+  // Forward ?ref= through the auth redirect so /auth/callback can apply it —
+  // Supabase's redirect chain would otherwise drop the query param.
+  function buildCallbackUrl() {
+    const refCode = searchParams.get('ref')
+    return window.location.origin + '/auth/callback' + (refCode ? `?ref=${encodeURIComponent(refCode)}` : '')
+  }
+
   async function handleGoogleSignIn() {
     setOauthLoading(true)
     setError(null)
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin + '/auth/callback' },
+      options: { redirectTo: buildCallbackUrl() },
     })
     if (error) {
       const msg = formatAuthError(error.message)
@@ -100,7 +107,7 @@ function LoginForm() {
     const { error } = await supabase.auth.signInWithOtp({
       email: signupEmail,
       options: {
-        emailRedirectTo: window.location.origin + '/auth/callback',
+        emailRedirectTo: buildCallbackUrl(),
         shouldCreateUser: true,
       },
     })

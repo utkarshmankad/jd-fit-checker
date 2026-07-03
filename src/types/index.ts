@@ -10,6 +10,14 @@ export interface UserProfile {
   api_provider: 'openai' | 'anthropic' | null;
   tier: 'free' | 'paid';
   screens_used_this_month: number;
+  is_beta_user: boolean;
+  screens_used_total: number;
+  screens_used_this_week: number;
+  week_reset_at: string;
+  referral_code: string | null;
+  referred_by: string | null;
+  referral_bonus_screens: number;
+  invite_code_used: string | null;
   created_at: string;
   updated_at: string;
 }

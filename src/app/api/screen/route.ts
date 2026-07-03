@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { decrypt } from '@/lib/utils/crypto'
 import { normalizeJobUrl } from '@/lib/utils/url'
-import type { AnalysisResult, ScreeningResult, BatchIntelligence } from '@/types'
+import { checkScreenLimit } from '@/lib/utils/screen-limits'
+import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile } from '@/types'
 
-const FREE_TIER_LIMIT = 5
-const SCREEN_LIMIT_ENABLED = process.env.NEXT_PUBLIC_FEATURE_SCREEN_LIMIT === 'true'
 const MIN_BATCH_SIZE_FOR_INTELLIGENCE = 3
 
 type FastAPIResult = AnalysisResult & {
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select(
-      'resume_text, preferences, hard_reject_filters, api_key_encrypted, api_provider, tier, screens_used_this_month'
+      'resume_text, preferences, hard_reject_filters, api_key_encrypted, api_provider, tier, screens_used_this_month, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_bonus_screens'
     )
     .eq('id', user.id)
     .single()
@@ -115,20 +115,6 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (SCREEN_LIMIT_ENABLED && profile.tier === 'free' && (profile.screens_used_this_month as number) >= FREE_TIER_LIMIT) {
-    return NextResponse.json(
-      { error: 'Monthly screen limit reached. Upgrade to continue.', upgrade_required: true },
-      { status: 403 }
-    )
-  }
-
-  let apiKey: string
-  try {
-    apiKey = decrypt(profile.api_key_encrypted as string)
-  } catch {
-    return NextResponse.json({ error: 'Failed to decrypt API key' }, { status: 500 })
-  }
-
   const { urls, jd_text, jd_entries, job_title, company, batch_id } = body as {
     urls?: string[]
     jd_text?: string
@@ -140,6 +126,42 @@ export async function POST(request: NextRequest) {
 
   if (!batch_id) {
     return NextResponse.json({ error: 'batch_id is required' }, { status: 400 })
+  }
+
+  const requestedCount = urls?.length
+    ? [...new Set(urls.filter((u) => u.trim()).map(normalizeJobUrl))].length
+    : jd_entries?.length
+      ? jd_entries.filter((e) => e.jd_text?.trim()).length
+      : jd_text ? 1 : 0
+
+  const LAUNCH_MODE = process.env.LAUNCH_MODE === 'true'
+  if (!profile.is_beta_user && !LAUNCH_MODE) {
+    await supabase.rpc('reset_weekly_screens_if_needed', { user_id: user.id })
+    // Re-fetch after a possible reset so the limit check below sees fresh counts.
+    const { data: refreshed } = await supabase
+      .from('profiles')
+      .select('screens_used_this_week, week_reset_at')
+      .eq('id', user.id)
+      .single()
+    if (refreshed) {
+      profile.screens_used_this_week = refreshed.screens_used_this_week
+      profile.week_reset_at = refreshed.week_reset_at
+    }
+  }
+
+  const limitCheck = await checkScreenLimit(profile as unknown as UserProfile, requestedCount)
+  if (!limitCheck.allowed) {
+    return NextResponse.json(
+      { error: limitCheck.upgrade_prompt, limit_check: limitCheck },
+      { status: 403 }
+    )
+  }
+
+  let apiKey: string
+  try {
+    apiKey = decrypt(profile.api_key_encrypted as string)
+  } catch {
+    return NextResponse.json({ error: 'Failed to decrypt API key' }, { status: 500 })
   }
 
   // Use stored resume_text if available; otherwise synthesize from saved preferences so
@@ -315,10 +337,15 @@ export async function POST(request: NextRequest) {
   }
 
   if (count > 0) {
-    await supabase
-      .from('profiles')
-      .update({ screens_used_this_month: (profile.screens_used_this_month as number) + count })
-      .eq('id', user.id)
+    const service = createServiceClient()
+    const updates: Record<string, number> = {
+      screens_used_this_month: (profile.screens_used_this_month as number) + count,
+      screens_used_total: (profile.screens_used_total as number) + count,
+    }
+    if (!profile.is_beta_user && !LAUNCH_MODE) {
+      updates.screens_used_this_week = (profile.screens_used_this_week as number) + count
+    }
+    await service.from('profiles').update(updates).eq('id', user.id)
   }
 
   return NextResponse.json({ results, ...(fatalError ? { fatalError } : {}) })
