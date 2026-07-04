@@ -149,12 +149,49 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const limitCheck = await checkScreenLimit(profile as unknown as UserProfile, requestedCount)
-  if (!limitCheck.allowed) {
-    return NextResponse.json(
-      { error: limitCheck.upgrade_prompt, limit_check: limitCheck },
-      { status: 403 }
-    )
+  // Reserve capacity atomically instead of check-then-later-increment — under
+  // concurrent /api/screen requests, reading a snapshot and writing the
+  // increment afterward lets every racing request see the same stale count
+  // and all pass the check, exceeding the limit. reserve_screens does the
+  // check and the increment in one row-locked UPDATE, so concurrent callers
+  // serialize instead of racing; it's a no-op (returns false) if the amount
+  // would exceed the limit.
+  const useWeekly = !profile.is_beta_user && !LAUNCH_MODE
+  const BETA_LIMIT = parseInt(process.env.BETA_TOTAL_LIMIT || '25')
+  const WEEKLY_LIMIT = parseInt(process.env.FREE_WEEKLY_LIMIT || '3')
+  const bonus = (profile.referral_bonus_screens as number) || 0
+  const limitValue = useWeekly ? WEEKLY_LIMIT + bonus : BETA_LIMIT
+
+  let reserved = false
+  if (profile.tier !== 'paid' && requestedCount > 0) {
+    const { data: ok, error: reserveError } = await supabase.rpc('reserve_screens', {
+      p_user_id: user.id,
+      p_amount: requestedCount,
+      p_use_weekly: useWeekly,
+      p_limit: limitValue,
+    })
+
+    if (reserveError) {
+      console.error('reserve_screens failed:', reserveError)
+      return NextResponse.json({ error: 'Failed to check screen limit' }, { status: 500 })
+    }
+
+    reserved = !!ok
+    if (!reserved) {
+      // The atomic reservation is the source of truth for allow/deny — refetch
+      // fresh counts to build an accurate message rather than trusting the
+      // pre-reservation snapshot, which may be stale under a real race.
+      const { data: fresh } = await supabase
+        .from('profiles')
+        .select('tier, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_bonus_screens')
+        .eq('id', user.id)
+        .single()
+      const limitCheck = await checkScreenLimit((fresh ?? profile) as unknown as UserProfile, requestedCount)
+      return NextResponse.json(
+        { error: limitCheck.upgrade_prompt, limit_check: limitCheck },
+        { status: 403 }
+      )
+    }
   }
 
   let apiKey: string
@@ -337,15 +374,24 @@ export async function POST(request: NextRequest) {
   }
 
   if (count > 0) {
+    // Legacy display-only field (profile page "screens used"), not
+    // limit-enforcing — fine as a plain increment, no atomicity needed.
     const service = createServiceClient()
-    const updates: Record<string, number> = {
-      screens_used_this_month: (profile.screens_used_this_month as number) + count,
-      screens_used_total: (profile.screens_used_total as number) + count,
-    }
-    if (!profile.is_beta_user && !LAUNCH_MODE) {
-      updates.screens_used_this_week = (profile.screens_used_this_week as number) + count
-    }
-    await service.from('profiles').update(updates).eq('id', user.id)
+    await service
+      .from('profiles')
+      .update({ screens_used_this_month: (profile.screens_used_this_month as number) + count })
+      .eq('id', user.id)
+  }
+
+  // screens_used_total/this_week were already incremented atomically by the
+  // reservation above, sized to requestedCount. If fewer JDs actually saved
+  // (some failed to scrape/score), refund the unused portion of the reservation.
+  if (reserved && requestedCount > count) {
+    await supabase.rpc('refund_screens', {
+      p_user_id: user.id,
+      p_amount: requestedCount - count,
+      p_use_weekly: useWeekly,
+    })
   }
 
   return NextResponse.json({ results, ...(fatalError ? { fatalError } : {}) })

@@ -23,29 +23,41 @@ export async function applyReferralCode(
 
   const { data: referrer, error: referrerError } = await service
     .from('profiles')
-    .select('id, referral_bonus_screens')
+    .select('id')
     .eq('referral_code', code)
     .maybeSingle()
 
   if (referrerError || !referrer) return { success: false, message: 'Invalid referral code' }
 
-  const { error: bonusError } = await service
-    .from('profiles')
-    .update({ referral_bonus_screens: (referrer.referral_bonus_screens ?? 0) + REFERRAL_BONUS })
-    .eq('id', referrer.id)
-
-  if (bonusError) {
-    console.error('referral bonus update failed:', bonusError)
-    return { success: false, message: 'Failed to apply referral code' }
-  }
-
-  const { error: referredByError } = await supabase
+  // Atomic, conditional on referred_by still being null — if two requests for
+  // this same user race (e.g. a double-click or a retried request), only one
+  // can win this UPDATE, so the referrer is never credited twice for one signup.
+  const { data: claimed, error: claimError } = await supabase
     .from('profiles')
     .update({ referred_by: code })
     .eq('id', userId)
+    .is('referred_by', null)
+    .select('id')
+    .maybeSingle()
 
-  if (referredByError) {
-    console.error('referred_by update failed:', referredByError)
+  if (claimError) {
+    console.error('referred_by update failed:', claimError)
+    return { success: false, message: 'Failed to apply referral code' }
+  }
+  if (!claimed) {
+    // Someone else won the race (or applied it moments ago) — don't double-credit.
+    return { success: false, message: 'A referral code has already been applied to your account' }
+  }
+
+  // Atomic increment via RPC — avoids the read-then-write race where two
+  // referrals landing on the same referrer at once could lose an increment.
+  const { error: bonusError } = await service.rpc('increment_referral_bonus', {
+    target_user_id: referrer.id,
+    amount: REFERRAL_BONUS,
+  })
+
+  if (bonusError) {
+    console.error('referral bonus increment failed:', bonusError)
     return { success: false, message: 'Failed to apply referral code' }
   }
 
