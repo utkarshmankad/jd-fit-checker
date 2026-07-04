@@ -9,6 +9,11 @@ export default async function LandingPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (user) redirect('/dashboard')
 
+  const LAUNCH_MODE = process.env.LAUNCH_MODE === 'true'
+  const BETA_LIMIT = parseInt(process.env.BETA_TOTAL_LIMIT || '25')
+  const WEEKLY_LIMIT = parseInt(process.env.FREE_WEEKLY_LIMIT || '3')
+  const freeSubtitle = LAUNCH_MODE ? `${BETA_LIMIT} free screens to start` : `${WEEKLY_LIMIT} free screens every week`
+
   return (
     <div className="min-h-screen flex flex-col bg-white text-gray-900">
       {/* Handles Supabase invite implicit-flow hash tokens client-side */}
@@ -49,7 +54,7 @@ export default async function LandingPage() {
             >
               Reject my jobs →
             </Link>
-            <span className="text-sm text-blue-200">Free for your first 5 batches. No credit card.</span>
+            <span className="text-sm text-blue-200">{freeSubtitle}. No credit card.</span>
           </div>
           <div className="mt-12 flex flex-col sm:flex-row sm:flex-wrap justify-center gap-2 sm:gap-3 w-full sm:w-auto">
             {[
@@ -315,7 +320,7 @@ export default async function LandingPage() {
             <div className="bg-white rounded-xl p-8 border border-gray-200 flex flex-col">
               <div className="mb-2">
                 <p className="text-3xl font-bold text-gray-900">Free</p>
-                <p className="text-sm text-gray-400 mt-1">5 batches to start</p>
+                <p className="text-sm text-gray-400 mt-1">{freeSubtitle}</p>
               </div>
               <ul className="mt-6 space-y-3 flex-1 mb-8">
                 {[
@@ -324,6 +329,7 @@ export default async function LandingPage() {
                   'Hard-reject auto-filter',
                   'CSV export',
                   'Shareable report links',
+                  '+10 more screens per friend you refer',
                 ].map((f) => (
                   <li key={f} className="flex items-center gap-3 text-sm text-gray-600">
                     <CheckIcon />

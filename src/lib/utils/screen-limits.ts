@@ -50,7 +50,7 @@ export async function checkScreenLimit(
         is_beta: true,
         is_paid: false,
         reset_message: null,
-        upgrade_prompt: `You've used all ${BETA_LIMIT} beta screens. Upgrade to Active Search (₹599/month) for unlimited screening.`,
+        upgrade_prompt: `You've used all ${BETA_LIMIT} beta screens. Upgrade for ₹499 one-time — unlimited screens, forever.`,
       }
     }
 
@@ -89,8 +89,8 @@ export async function checkScreenLimit(
       is_paid: false,
       reset_message: `Your ${WEEKLY_LIMIT} free screens reset on ${reset_date.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}.`,
       upgrade_prompt: bonus > 0
-        ? `You've used your ${effective_limit} weekly screens (${WEEKLY_LIMIT} base + ${bonus} referral bonus). Upgrade to Active Search for unlimited screening.`
-        : `You've used your ${WEEKLY_LIMIT} free weekly screens. Refer a friend for +10 bonus screens, or upgrade to Active Search (₹599/month) for unlimited screening.`,
+        ? `You've used your ${effective_limit} weekly screens (${WEEKLY_LIMIT} base + ${bonus} referral bonus). Upgrade for ₹499 one-time — unlimited screens, forever.`
+        : `You've used your ${WEEKLY_LIMIT} free weekly screens. Refer a friend for +10 bonus screens, or upgrade for ₹499 one-time — unlimited screens, forever.`,
     }
   }
 

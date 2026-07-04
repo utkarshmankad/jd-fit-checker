@@ -125,7 +125,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
         <div className="text-center">
           <h2 className="text-xl font-bold text-gray-900">Keep rejecting unlimited jobs</h2>
           <p className="text-gray-500 text-sm mt-1">
-            You&apos;ve used your 5 free batches. Upgrade once for unlimited rejections — no monthly subscription.
+            Upgrade once for unlimited rejections — no monthly subscription.
           </p>
         </div>
 

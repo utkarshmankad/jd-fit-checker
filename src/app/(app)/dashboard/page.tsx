@@ -139,6 +139,7 @@ export default function DashboardPage() {
   const [batchIntelligence, setBatchIntelligence] = useState<BatchIntelligence | null>(null)
   const [showChatGptModal, setShowChatGptModal] = useState(false)
   const [showTierModal, setShowTierModal] = useState(false)
+  const [tierModalMessage, setTierModalMessage] = useState('')
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [rateLimitCountdown, setRateLimitCountdown] = useState(0)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -352,8 +353,17 @@ export default function DashboardPage() {
         }
 
         if (res.status === 403) {
-          const json = (await res.json().catch(() => ({}))) as { upgrade_required?: boolean }
-          if (json.upgrade_required) { setShowTierModal(true); completedFully = false; break }
+          const json = (await res.json().catch(() => ({}))) as {
+            error?: string
+            upgrade_required?: boolean
+            limit_check?: { upgrade_prompt: string | null }
+          }
+          if (json.upgrade_required || json.limit_check) {
+            setTierModalMessage(json.limit_check?.upgrade_prompt ?? json.error ?? "You've hit your screening limit.")
+            setShowTierModal(true)
+            completedFully = false
+            break
+          }
         }
 
         if (!res.ok) {
@@ -891,8 +901,8 @@ export default function DashboardPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowTierModal(false)} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h2 className="text-xl font-bold text-gray-900">Free batches used up</h2>
-            <p className="text-gray-500 text-sm">You&apos;ve used your 5 free batches. Upgrade once for unlimited rejections — no monthly subscription.</p>
+            <h2 className="text-xl font-bold text-gray-900">Screening limit reached</h2>
+            <p className="text-gray-500 text-sm">{tierModalMessage || "You've hit your screening limit. Upgrade once for unlimited rejections — no monthly subscription."}</p>
             <div className="flex flex-col gap-2 pt-1">
               <button onClick={() => { setShowTierModal(false); setShowPaymentModal(true) }}
                 className="w-full py-3 rounded-xl font-semibold text-sm text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: '#1B3A5C' }}>

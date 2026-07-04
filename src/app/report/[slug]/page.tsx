@@ -121,6 +121,11 @@ export default async function ReportPage({
     day: 'numeric',
   })
 
+  const LAUNCH_MODE = process.env.LAUNCH_MODE === 'true'
+  const BETA_LIMIT = parseInt(process.env.BETA_TOTAL_LIMIT || '25')
+  const WEEKLY_LIMIT = parseInt(process.env.FREE_WEEKLY_LIMIT || '3')
+  const freeSubtitle = LAUNCH_MODE ? `${BETA_LIMIT} free screens` : `${WEEKLY_LIMIT} free screens/week`
+
   const mainResults = results.filter((r) => r.verdict !== 'REJECT')
   const rejectResults = results.filter((r) => r.verdict === 'REJECT')
   const counts = {
@@ -308,7 +313,7 @@ export default async function ReportPage({
                 style={{ color: '#1B3A5C' }}>
                 Get started free — no credit card →
               </a>
-              <p className="text-blue-300 text-xs mt-3">5 free screens. Bring your own AI key.</p>
+              <p className="text-blue-300 text-xs mt-3">{freeSubtitle}. Bring your own AI key.</p>
             </div>
             <div className="bg-white px-6 py-4">
               <div className="grid grid-cols-3 gap-4 text-center">
