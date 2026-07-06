@@ -6,7 +6,18 @@ import { normalizeJobUrl } from '@/lib/utils/url'
 import { checkScreenLimit } from '@/lib/utils/screen-limits'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile } from '@/types'
 
+// Explicit rather than implicit-default — this route's crash/timeout safety
+// (see reserveOneScreen below) depends on knowing which serverless runtime
+// it's on rather than assuming.
+export const runtime = 'nodejs'
+
 const MIN_BATCH_SIZE_FOR_INTELLIGENCE = 3
+// Per-item cap on the FastAPI call (scrape + LLM scoring for one JD). Without
+// this, one hung item stalls the whole request until the platform's own
+// function timeout kills it — uncleanly, after any quota already reserved for
+// remaining un-attempted items with no chance to give it back. Bounding each
+// item keeps a bad item from taking down the rest of the batch with it.
+const FASTAPI_TIMEOUT_MS = 45_000
 
 type FastAPIResult = AnalysisResult & {
   job_title?: string
@@ -128,12 +139,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'batch_id is required' }, { status: 400 })
   }
 
-  const requestedCount = urls?.length
-    ? [...new Set(urls.filter((u) => u.trim()).map(normalizeJobUrl))].length
-    : jd_entries?.length
-      ? jd_entries.filter((e) => e.jd_text?.trim()).length
-      : jd_text ? 1 : 0
-
   const LAUNCH_MODE = process.env.LAUNCH_MODE === 'true'
   if (!profile.is_beta_user && !LAUNCH_MODE) {
     await supabase.rpc('reset_weekly_screens_if_needed', { user_id: user.id })
@@ -149,49 +154,48 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Reserve capacity atomically instead of check-then-later-increment — under
-  // concurrent /api/screen requests, reading a snapshot and writing the
-  // increment afterward lets every racing request see the same stale count
-  // and all pass the check, exceeding the limit. reserve_screens does the
-  // check and the increment in one row-locked UPDATE, so concurrent callers
-  // serialize instead of racing; it's a no-op (returns false) if the amount
-  // would exceed the limit.
+  // Cheap upfront fast-fail (no mutation) — if the user already has zero
+  // capacity, bail before decrypting the API key or doing any work at all.
+  if (profile.tier !== 'paid') {
+    const precheck = await checkScreenLimit(profile as unknown as UserProfile, 1)
+    if (!precheck.allowed) {
+      return NextResponse.json(
+        { error: precheck.upgrade_prompt, limit_check: precheck },
+        { status: 403 }
+      )
+    }
+  }
+
+  // Real enforcement happens per-item below via reserveOneScreen(), not as one
+  // upfront reservation for the whole batch. Reserving the whole batch's worth
+  // up front and refunding the unused portion afterward (the previous design)
+  // has a crash-safety hole: if this invocation is killed mid-batch — a slow
+  // FastAPI call blowing the platform's function timeout, most likely — the
+  // refund never runs and the user permanently loses quota they never got to
+  // use. Reserving exactly 1 unit right before each item is attempted means
+  // there is never an over-reservation to strand or refund: at any point of
+  // failure, exactly the number of items actually attempted have been charged,
+  // and an item that was genuinely attempted (a real LLM call went out against
+  // the user's own key) is fair to charge for even if something fails after.
   const useWeekly = !profile.is_beta_user && !LAUNCH_MODE
   const BETA_LIMIT = parseInt(process.env.BETA_TOTAL_LIMIT || '25')
   const WEEKLY_LIMIT = parseInt(process.env.FREE_WEEKLY_LIMIT || '3')
   const bonus = (profile.referral_bonus_screens as number) || 0
   const limitValue = useWeekly ? WEEKLY_LIMIT + bonus : BETA_LIMIT
 
-  let reserved = false
-  if (profile.tier !== 'paid' && requestedCount > 0) {
-    const { data: ok, error: reserveError } = await supabase.rpc('reserve_screens', {
-      p_user_id: user.id,
-      p_amount: requestedCount,
+  async function reserveOneScreen(): Promise<boolean> {
+    if (profile!.tier === 'paid') return true
+    const { data: ok, error } = await supabase.rpc('reserve_screens', {
+      p_user_id: user!.id,
+      p_amount: 1,
       p_use_weekly: useWeekly,
       p_limit: limitValue,
     })
-
-    if (reserveError) {
-      console.error('reserve_screens failed:', reserveError)
-      return NextResponse.json({ error: 'Failed to check screen limit' }, { status: 500 })
+    if (error) {
+      console.error('reserve_screens failed:', error)
+      return false
     }
-
-    reserved = !!ok
-    if (!reserved) {
-      // The atomic reservation is the source of truth for allow/deny — refetch
-      // fresh counts to build an accurate message rather than trusting the
-      // pre-reservation snapshot, which may be stale under a real race.
-      const { data: fresh } = await supabase
-        .from('profiles')
-        .select('tier, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_bonus_screens')
-        .eq('id', user.id)
-        .single()
-      const limitCheck = await checkScreenLimit((fresh ?? profile) as unknown as UserProfile, requestedCount)
-      return NextResponse.json(
-        { error: limitCheck.upgrade_prompt, limit_check: limitCheck },
-        { status: 403 }
-      )
-    }
+    return !!ok
   }
 
   let apiKey: string
@@ -214,6 +218,8 @@ export async function POST(request: NextRequest) {
 
   async function callFastAPI(body: Record<string, unknown>): Promise<FastAPIResult | { _error: string; _status: number }> {
     let res: Response
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), FASTAPI_TIMEOUT_MS)
     try {
       res = await fetch(`${apiUrl}/screen`, {
         method: 'POST',
@@ -227,10 +233,17 @@ export async function POST(request: NextRequest) {
           api_provider: profile!.api_provider,
           user_id: user!.id,
         }),
+        signal: controller.signal,
       })
     } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        console.error(`Screening service timed out after ${FASTAPI_TIMEOUT_MS}ms`)
+        return { _error: 'Screening service timed out. Try this one again.', _status: 504 }
+      }
       console.error('Screening service fetch failed:', e)
       return { _error: 'Screening service unreachable', _status: 503 }
+    } finally {
+      clearTimeout(timer)
     }
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({})) as Record<string, unknown>
@@ -273,9 +286,34 @@ export async function POST(request: NextRequest) {
     return saved as ScreeningResult
   }
 
+  function saveFailedPlaceholder(overrides: { job_url?: string | null; job_title?: string | null; company?: string | null }): ScreeningResult {
+    // The FastAPI/LLM call succeeded (a real attempt was made and charged
+    // against quota) but persisting the row failed — surface this as a visible
+    // error rather than a fabricated "success" the user can't find in history
+    // later.
+    return {
+      id: '',
+      user_id: user!.id,
+      batch_id,
+      job_url: overrides.job_url ?? null,
+      job_title: overrides.job_title ?? null,
+      company: overrides.company ?? null,
+      jd_text: '',
+      ats_score: 0,
+      role_level_score: 0,
+      composite_score: 0,
+      verdict: 'REJECT',
+      hard_reject_reasons: ['Failed to save this result — please retry'],
+      analysis_json: {} as AnalysisResult,
+      created_at: new Date().toISOString(),
+    }
+  }
+
   if (urls && Array.isArray(urls) && urls.length > 0) {
     const urlList = [...new Set(urls.filter((u) => u.trim()).map(normalizeJobUrl))]
     for (const url of urlList) {
+      if (!(await reserveOneScreen())) break
+
       const result = await callFastAPI({ job_url: url })
       if ('_error' in result) {
         if (result._status === 401) {
@@ -290,27 +328,18 @@ export async function POST(request: NextRequest) {
         continue
       }
       const saved = await saveResult(result, { job_url: url })
-      results.push(saved ?? {
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        batch_id,
-        job_url: url,
-        job_title: result.job_title ?? null,
-        company: result.company ?? null,
-        jd_text: result.jd_text ?? '',
-        ats_score: result.ats_score,
-        role_level_score: result.role_level_score,
-        composite_score: result.composite_score,
-        verdict: result.verdict,
-        hard_reject_reasons: result.hard_reject_reasons,
-        analysis_json: result as AnalysisResult,
-        created_at: new Date().toISOString(),
-      })
-      if (saved) count++
+      if (!saved) {
+        results.push(saveFailedPlaceholder({ job_url: url, job_title: result.job_title, company: result.company }))
+        continue
+      }
+      results.push(saved)
+      count++
     }
   } else if (jd_entries && Array.isArray(jd_entries) && jd_entries.length > 0) {
     const entries = jd_entries.filter((e) => e.jd_text?.trim())
     for (const entry of entries) {
+      if (!(await reserveOneScreen())) break
+
       const result = await callFastAPI({ jd_text: entry.jd_text })
       if ('_error' in result) {
         if (result._status === 401) {
@@ -325,25 +354,17 @@ export async function POST(request: NextRequest) {
         continue
       }
       const saved = await saveResult(result, { jd_text: entry.jd_text, job_title: entry.job_title, company: entry.company })
-      results.push(saved ?? {
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        batch_id,
-        job_url: null,
-        job_title: entry.job_title ?? result.job_title ?? null,
-        company: entry.company ?? result.company ?? null,
-        jd_text: entry.jd_text,
-        ats_score: result.ats_score,
-        role_level_score: result.role_level_score,
-        composite_score: result.composite_score,
-        verdict: result.verdict,
-        hard_reject_reasons: result.hard_reject_reasons,
-        analysis_json: result as AnalysisResult,
-        created_at: new Date().toISOString(),
-      })
-      if (saved) count++
+      if (!saved) {
+        results.push(saveFailedPlaceholder({ job_title: entry.job_title ?? result.job_title, company: entry.company ?? result.company }))
+        continue
+      }
+      results.push(saved)
+      count++
     }
   } else if (jd_text) {
+    if (!(await reserveOneScreen())) {
+      return NextResponse.json({ results: [] })
+    }
     const result = await callFastAPI({ jd_text })
     if ('_error' in result) {
       if (result._status === 401) fatalError = { type: 'invalid_key', message: result._error, provider }
@@ -351,23 +372,12 @@ export async function POST(request: NextRequest) {
       else return NextResponse.json({ error: result._error }, { status: result._status })
     } else {
       const saved = await saveResult(result, { jd_text, job_title, company })
-      results.push(saved ?? {
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        batch_id,
-        job_url: null,
-        job_title: job_title ?? result.job_title ?? null,
-        company: company ?? result.company ?? null,
-        jd_text: jd_text ?? result.jd_text ?? '',
-        ats_score: result.ats_score,
-        role_level_score: result.role_level_score,
-        composite_score: result.composite_score,
-        verdict: result.verdict,
-        hard_reject_reasons: result.hard_reject_reasons,
-        analysis_json: result as AnalysisResult,
-        created_at: new Date().toISOString(),
-      })
-      if (saved) count++
+      if (!saved) {
+        results.push(saveFailedPlaceholder({ job_title: job_title ?? result.job_title, company: company ?? result.company }))
+      } else {
+        results.push(saved)
+        count++
+      }
     }
   } else {
     return NextResponse.json({ error: 'Provide urls or jd_text' }, { status: 400 })
@@ -381,17 +391,6 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .update({ screens_used_this_month: (profile.screens_used_this_month as number) + count })
       .eq('id', user.id)
-  }
-
-  // screens_used_total/this_week were already incremented atomically by the
-  // reservation above, sized to requestedCount. If fewer JDs actually saved
-  // (some failed to scrape/score), refund the unused portion of the reservation.
-  if (reserved && requestedCount > count) {
-    await supabase.rpc('refund_screens', {
-      p_user_id: user.id,
-      p_amount: requestedCount - count,
-      p_use_weekly: useWeekly,
-    })
   }
 
   return NextResponse.json({ results, ...(fatalError ? { fatalError } : {}) })
