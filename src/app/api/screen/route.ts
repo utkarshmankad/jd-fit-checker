@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { decrypt } from '@/lib/utils/crypto'
-import { normalizeJobUrl } from '@/lib/utils/url'
+import { normalizeJobUrl, isSafeJobUrl } from '@/lib/utils/url'
 import { checkScreenLimit } from '@/lib/utils/screen-limits'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile } from '@/types'
 
@@ -139,6 +139,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'batch_id is required' }, { status: 400 })
   }
 
+  // Bound how much work one request can trigger regardless of tier — paid
+  // users have no screen-count limit, but an unbounded array length is a
+  // separate resource-exhaustion axis (this function's own execution time,
+  // and load against the shared screening backend) that a valid-but-hostile
+  // session could otherwise exploit for free.
+  const MAX_ITEMS_PER_REQUEST = 100
+  const itemCount = urls?.length ?? jd_entries?.length ?? (jd_text ? 1 : 0)
+  if (itemCount > MAX_ITEMS_PER_REQUEST) {
+    return NextResponse.json(
+      { error: `Too many items in one request (max ${MAX_ITEMS_PER_REQUEST}).` },
+      { status: 400 }
+    )
+  }
+
   const LAUNCH_MODE = process.env.LAUNCH_MODE === 'true'
   if (!profile.is_beta_user && !LAUNCH_MODE) {
     await supabase.rpc('reset_weekly_screens_if_needed', { user_id: user.id })
@@ -248,9 +262,22 @@ export async function POST(request: NextRequest) {
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({})) as Record<string, unknown>
       const detail = errBody.detail
-      const msg = Array.isArray(detail)
+      const rawMsg = Array.isArray(detail)
         ? (detail as Array<{ msg: string; loc: string[] }>).map((e) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(', ')
         : (detail as string | undefined) ?? (errBody.error as string | undefined) ?? res.statusText
+      console.error('FastAPI /screen returned error:', res.status, rawMsg)
+      // 401/429 are our own FastAPI service's fixed, controlled strings (see
+      // _raise_for_provider_error there) — safe to show as-is, and callers
+      // special-case these statuses. Anything else is this route forwarding
+      // a message it doesn't control (could be a validation error, but could
+      // also be a stack-trace fragment from an unhandled exception in the
+      // scraper) — collapse to a generic, bounded client-facing message and
+      // keep the raw text server-side only.
+      const msg = res.status === 401 || res.status === 429
+        ? rawMsg
+        : res.status === 400
+          ? 'Could not process this job — check the URL or text and try again.'
+          : 'Screening service error. Try this one again.'
       return { _error: msg, _status: res.status }
     }
     return res.json() as Promise<FastAPIResult>
@@ -312,6 +339,12 @@ export async function POST(request: NextRequest) {
   if (urls && Array.isArray(urls) && urls.length > 0) {
     const urlList = [...new Set(urls.filter((u) => u.trim()).map(normalizeJobUrl))]
     for (const url of urlList) {
+      if (!isSafeJobUrl(url)) {
+        // Defense-in-depth before this ever reaches the screening service's
+        // own server-side fetch — doesn't consume quota, just rejected outright.
+        results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: ['Unsupported or unsafe URL'], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
+        continue
+      }
       if (!(await reserveOneScreen())) break
 
       const result = await callFastAPI({ job_url: url })

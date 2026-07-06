@@ -19,3 +19,35 @@ export function normalizeJobUrl(url: string): string {
   }
   return url
 }
+
+// Cheap defense-in-depth before forwarding a user-supplied URL to the
+// screening service to be fetched server-side. Hostname-string based, not a
+// DNS-resolution check — a domain that *resolves* to a private/link-local IP
+// (DNS rebinding) will still pass this and must be caught by the fetching
+// service itself at connect time. This just rejects the obvious cases and
+// non-http(s) schemes before they ever leave this app.
+const PRIVATE_HOST_PATTERNS = [
+  /^localhost$/i,
+  /^127\./,
+  /^0\.0\.0\.0$/,
+  /^10\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^169\.254\./, // link-local, includes the 169.254.169.254 cloud metadata endpoint
+  /^::1$/,
+  /^fc00:/i,
+  /^fe80:/i,
+]
+
+export function isSafeJobUrl(url: string): boolean {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return false
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+  const hostname = parsed.hostname.toLowerCase()
+  if (PRIVATE_HOST_PATTERNS.some((p) => p.test(hostname))) return false
+  return true
+}
