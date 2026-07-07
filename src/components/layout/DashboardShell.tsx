@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { FileSearch, History, User, LogOut, Menu, X, BookOpen /*, Briefcase */ } from 'lucide-react'
+import { LogoMark } from '@/components/Logo'
 
 const navLinks = [
   { href: '/dashboard', label: 'Screen JDs', icon: FileSearch },
@@ -52,7 +53,10 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
       >
         {/* Logo */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-white/10">
-          <span className="text-white font-bold text-lg tracking-tight">JD Fit Checker</span>
+          <Link href="/dashboard" className="flex items-center gap-2" onClick={() => setSidebarOpen(false)}>
+            <LogoMark size={26} />
+            <span className="text-white font-bold text-lg tracking-tight">JD Fit Checker</span>
+          </Link>
           <button
             className="md:hidden text-white/70 hover:text-white"
             onClick={() => setSidebarOpen(false)}
@@ -109,7 +113,10 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
           >
             <Menu size={22} />
           </button>
-          <span className="font-semibold text-gray-900">JD Fit Checker</span>
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <LogoMark size={22} />
+            <span className="font-semibold text-gray-900">JD Fit Checker</span>
+          </Link>
         </header>
 
         <main className="flex-1 bg-surface p-4 md:p-6 lg:p-8">{children}</main>

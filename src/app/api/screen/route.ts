@@ -29,6 +29,7 @@ export type FatalScreenError = {
   type: 'invalid_key' | 'rate_limit'
   message: string
   provider: string
+  keySource: 'app' | 'own'
 }
 
 // Called once by the client after its per-item screening loop finishes for a
@@ -191,6 +192,10 @@ export async function POST(request: NextRequest) {
   const BETA_LIMIT = parseInt(process.env.BETA_TOTAL_LIMIT || '25')
   const WEEKLY_LIMIT = parseInt(process.env.FREE_WEEKLY_LIMIT || '3')
   const bonus = (profile.referral_bonus_screens as number) || 0
+  // Referral bonus applies to whichever limit is actually in force for this
+  // user — beta's flat allotment or the regular weekly cap — not just the
+  // weekly one, otherwise referring a friend does nothing during beta/launch.
+  const betaLimitValue = BETA_LIMIT + bonus
   const weeklyLimitValue = WEEKLY_LIMIT + bonus
 
   const APP_OPENAI_KEY = process.env.APP_OPENAI_API_KEY || null
@@ -222,13 +227,13 @@ export async function POST(request: NextRequest) {
   // the app-key allotment while using the app key, or the weekly limit for
   // regular free-tier users using their own key. A beta user on their own
   // key past the app-key allotment reserves nothing and is never blocked.
-  async function prepareItem(): Promise<{ apiKey: string; provider: string } | { error: string }> {
-    if (isBetaOrLaunch && usedSoFar < BETA_LIMIT && APP_OPENAI_KEY) {
+  async function prepareItem(): Promise<{ apiKey: string; provider: string; source: 'app' | 'own' } | { error: string }> {
+    if (isBetaOrLaunch && usedSoFar < betaLimitValue && APP_OPENAI_KEY) {
       const { data: ok, error } = await supabase.rpc('reserve_screens', {
         p_user_id: user!.id,
         p_amount: 1,
         p_use_weekly: false,
-        p_limit: BETA_LIMIT,
+        p_limit: betaLimitValue,
       })
       if (error) {
         console.error('reserve_screens (app-key allotment) failed:', error)
@@ -236,7 +241,7 @@ export async function POST(request: NextRequest) {
       }
       if (ok) {
         usedSoFar++
-        return { apiKey: APP_OPENAI_KEY, provider: 'openai' }
+        return { apiKey: APP_OPENAI_KEY, provider: 'openai', source: 'app' }
       }
       // Exhausted (e.g. a concurrent request used the last one) — fall through to own key.
     }
@@ -245,9 +250,9 @@ export async function POST(request: NextRequest) {
 
     if (isBetaOrLaunch) {
       if (!own) {
-        return { error: `You've used your ${BETA_LIMIT} free beta scans. Add your own OpenAI or Anthropic API key in Profile settings to keep screening.` }
+        return { error: `You've used your ${betaLimitValue} free beta scans. Add your own OpenAI or Anthropic API key in Profile settings to keep screening.` }
       }
-      return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic' }
+      return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic', source: 'own' }
     }
 
     // Regular free tier: always weekly-capped, own key required from the start.
@@ -268,7 +273,7 @@ export async function POST(request: NextRequest) {
       const limitCheck = await checkScreenLimit(profile as unknown as UserProfile, 1)
       return { error: limitCheck.upgrade_prompt ?? 'Weekly screen limit reached.' }
     }
-    return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic' }
+    return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic', source: 'own' }
   }
 
   // Use stored resume_text if available; otherwise synthesize from saved preferences so
@@ -407,11 +412,11 @@ export async function POST(request: NextRequest) {
       const result = await callFastAPI({ job_url: url }, keyChoice.apiKey, keyChoice.provider)
       if ('_error' in result) {
         if (result._status === 401) {
-          fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider }
+          fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
           break
         }
         if (result._status === 429) {
-          fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider }
+          fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
           break
         }
         results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
@@ -437,11 +442,11 @@ export async function POST(request: NextRequest) {
       const result = await callFastAPI({ jd_text: entry.jd_text }, keyChoice.apiKey, keyChoice.provider)
       if ('_error' in result) {
         if (result._status === 401) {
-          fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider }
+          fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
           break
         }
         if (result._status === 429) {
-          fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider }
+          fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
           break
         }
         results.push({ id: '', user_id: user.id, batch_id, job_url: null, job_title: entry.job_title ?? null, company: entry.company ?? null, jd_text: entry.jd_text, ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
@@ -462,8 +467,8 @@ export async function POST(request: NextRequest) {
     }
     const result = await callFastAPI({ jd_text }, keyChoice.apiKey, keyChoice.provider)
     if ('_error' in result) {
-      if (result._status === 401) fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider }
-      else if (result._status === 429) fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider }
+      if (result._status === 401) fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
+      else if (result._status === 429) fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
       else return NextResponse.json({ error: result._error }, { status: result._status })
     } else {
       const saved = await saveResult(result, { jd_text, job_title, company })

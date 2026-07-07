@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Trash2, ShieldX, ListChecks, Flag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import AuthHashRedirect from '@/components/auth-hash-redirect'
+import { LogoMark } from '@/components/Logo'
 
 export default async function LandingPage() {
   const supabase = await createClient()
@@ -23,7 +24,8 @@ export default async function LandingPage() {
       {/* ── Nav ── */}
       <header className="sticky top-0 z-30 bg-white border-b border-gray-100">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
-          <span className="font-bold text-lg" style={{ color: '#1B3A5C' }}>
+          <span className="flex items-center gap-2 font-bold text-lg" style={{ color: '#1B3A5C' }}>
+            <LogoMark size={26} />
             JD Fit Checker
           </span>
           <Link
@@ -412,7 +414,8 @@ export default async function LandingPage() {
       {/* ── Footer ── */}
       <footer className="bg-white border-t border-gray-200 px-6 py-5">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span className="font-bold text-sm" style={{ color: '#1B3A5C' }}>
+          <span className="flex items-center gap-1.5 font-bold text-sm" style={{ color: '#1B3A5C' }}>
+            <LogoMark size={18} />
             JD Fit Checker
           </span>
           <span className="text-sm text-gray-400 hidden sm:block">

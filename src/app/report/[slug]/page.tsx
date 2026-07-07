@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import type { SharedReport, ScreeningResult } from '@/types'
 import { calculateTimeSaved } from '@/lib/utils/time-saved'
 import { getVerdictDisplay } from '@/lib/utils/verdicts'
+import { LogoMark } from '@/components/Logo'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://jdfit.in'
 
@@ -296,7 +297,7 @@ export default async function ReportPage({
                 Scored by AI against resume + hard-reject rules · Not a guarantee of interview success
               </span>
               <a href={APP_URL} className="text-xs font-semibold" style={{ color: '#1B3A5C' }}>
-                Powered by JD Fit Checker
+                <span className="inline-flex items-center gap-1.5"><LogoMark size={14} />Powered by JD Fit Checker</span>
               </a>
             </div>
           </div>
@@ -338,7 +339,7 @@ export default async function ReportPage({
       {/* ── Footer ── */}
       <footer className="border-t border-gray-200 bg-white px-6 py-5">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span className="font-bold text-sm" style={{ color: '#1B3A5C' }}>JD Fit Checker</span>
+          <span className="flex items-center gap-1.5 font-bold text-sm" style={{ color: '#1B3A5C' }}><LogoMark size={16} />JD Fit Checker</span>
           <span className="text-sm text-gray-400 hidden sm:block">
             Resume-to-JD fit analysis for senior engineers and EMs
           </span>

@@ -38,7 +38,7 @@ interface JdEntry {
 type ScreenError =
   | { type: 'no_api_key' }
   | { type: 'invalid_key'; provider: string }
-  | { type: 'rate_limit' }
+  | { type: 'rate_limit'; keySource: 'app' | 'own' }
   | { type: 'network'; message?: string }
 
 const PROFILE_BANNER_KEY = 'jdfit-profile-banner-dismissed'
@@ -384,7 +384,7 @@ export default function DashboardPage() {
 
         if (data.fatalError) {
           if (data.fatalError.type === 'invalid_key') setScreenError({ type: 'invalid_key', provider: data.fatalError.provider })
-          else if (data.fatalError.type === 'rate_limit') { setScreenError({ type: 'rate_limit' }); startCountdown() }
+          else if (data.fatalError.type === 'rate_limit') { setScreenError({ type: 'rate_limit', keySource: data.fatalError.keySource }); startCountdown() }
           completedFully = false
           break
         }
@@ -626,6 +626,8 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {usage && usage.tier !== 'paid' && <ReferralCard />}
+
       {/* Input card */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-6 pt-6 pb-0">
@@ -697,8 +699,10 @@ export default function DashboardPage() {
                 {screenError.type === 'rate_limit' && (
                   <div className="flex items-center justify-between gap-4">
                     <p>
-                      Your {providerLabel} key hit a rate limit
-                      {apiProvider === 'openai' && ' (OpenAI’s default tier caps at 20 requests/minute)'}.{' '}
+                      {screenError.keySource === 'app'
+                        ? "We're hitting high demand on the free scanning key right now"
+                        : `Your ${providerLabel} key hit a rate limit${apiProvider === 'openai' ? " (OpenAI's default tier caps at 20 requests/minute)" : ''}`}
+                      .{' '}
                       {rateLimitCountdown > 0 ? `Continuing automatically in ${rateLimitCountdown}s — nothing already screened will be redone.` : 'Continuing where it left off.'}
                     </p>
                     <button onClick={() => { setScreenError(null); handleScreen() }} disabled={rateLimitCountdown > 0}
@@ -896,8 +900,6 @@ export default function DashboardPage() {
               matchingSkills={Array.from(new Set(goodResults.flatMap((r) => r.analysis_json?.matching_skills ?? [])))}
             />
           )}
-
-          {PRICING_ENABLED && usage && usage.tier !== 'paid' && <ReferralCard />}
         </div>
       )}
 

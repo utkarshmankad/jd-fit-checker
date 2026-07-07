@@ -1,10 +1,12 @@
 import Link from 'next/link'
+import { LogoMark } from '@/components/Logo'
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
-        <Link href="/" className="font-bold text-lg" style={{ color: '#1B3A5C' }}>
+        <Link href="/" className="flex items-center gap-2 font-bold text-lg" style={{ color: '#1B3A5C' }}>
+          <LogoMark size={24} />
           JD Fit Checker
         </Link>
         <Link
