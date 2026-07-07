@@ -15,6 +15,7 @@ interface ProfileData {
   screens_used_this_month: number
   is_beta_user: boolean
   updated_at: string
+  referred_by: string | null
 }
 
 const PRICING_ENABLED = process.env.NEXT_PUBLIC_PRICING_ENABLED === 'true'
@@ -318,6 +319,12 @@ export default function ProfilePage() {
   const [inviteMessage, setInviteMessage] = useState('')
   const [resumeDate, setResumeDate] = useState<string | null>(null)
 
+  // Referral code (applying one, not the user's own code to share)
+  const [referredBy, setReferredBy] = useState<string | null>(null)
+  const [referralCodeInput, setReferralCodeInput] = useState('')
+  const [referralApplyStatus, setReferralApplyStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [referralApplyMessage, setReferralApplyMessage] = useState('')
+
   // Account deletion
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -363,6 +370,7 @@ export default function ProfilePage() {
       setTier(profile.tier)
       setScreensUsed(profile.screens_used_this_month)
       setIsBetaUser(profile.is_beta_user)
+      setReferredBy(profile.referred_by)
 
       if (profile.resume_text) setResumeDate(profile.updated_at)
 
@@ -498,6 +506,29 @@ export default function ProfilePage() {
     } catch {
       setInviteStatus('error')
       setInviteMessage('Failed to apply invite code')
+    }
+  }
+
+  async function handleApplyReferral() {
+    if (!referralCodeInput.trim()) return
+    setReferralApplyStatus('loading')
+    try {
+      const res = await fetch('/api/referral/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referral_code: referralCodeInput.trim() }),
+      })
+      const data = (await res.json()) as { success: boolean; message: string }
+      setReferralApplyMessage(data.message)
+      if (data.success) {
+        setReferralApplyStatus('success')
+        setReferredBy(referralCodeInput.trim().toUpperCase())
+      } else {
+        setReferralApplyStatus('error')
+      }
+    } catch {
+      setReferralApplyStatus('error')
+      setReferralApplyMessage('Failed to apply referral code')
     }
   }
 
@@ -810,6 +841,38 @@ export default function ProfilePage() {
           )}
           {inviteStatus === 'error' && (
             <p className="text-xs text-red-600 mt-1.5">{inviteMessage}</p>
+          )}
+        </Section>
+      )}
+
+      {!referredBy && (
+        <Section title="Have a referral code?">
+          {referralApplyStatus === 'success' ? (
+            <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2.5">
+              ✓ {referralApplyMessage}
+            </p>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={referralCodeInput}
+                onChange={(e) => { setReferralCodeInput(e.target.value); setReferralApplyStatus('idle') }}
+                placeholder="Enter friend's referral code"
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={handleApplyReferral}
+                disabled={referralApplyStatus === 'loading' || !referralCodeInput.trim()}
+                className="shrink-0 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                style={{ backgroundColor: '#1B3A5C' }}
+              >
+                {referralApplyStatus === 'loading' ? 'Applying…' : 'Apply'}
+              </button>
+            </div>
+          )}
+          {referralApplyStatus === 'error' && (
+            <p className="text-xs text-red-600 mt-1.5">{referralApplyMessage}</p>
           )}
         </Section>
       )}

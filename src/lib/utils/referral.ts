@@ -49,17 +49,31 @@ export async function applyReferralCode(
     return { success: false, message: 'A referral code has already been applied to your account' }
   }
 
-  // Atomic increment via RPC — avoids the read-then-write race where two
-  // referrals landing on the same referrer at once could lose an increment.
-  const { error: bonusError } = await service.rpc('increment_referral_bonus', {
+  // Mutual bonus — both sides get credited (matches the "Give a friend 10
+  // bonus screens. Get 10 yourself." copy on ReferralCard). The referred_by
+  // UPDATE above already won the race for this user, so it's safe to credit
+  // both here; each RPC call is still its own atomic increment against the
+  // read-then-write race on a single row.
+  const { error: referrerBonusError } = await service.rpc('increment_referral_bonus', {
     target_user_id: referrer.id,
     amount: REFERRAL_BONUS,
   })
-
-  if (bonusError) {
-    console.error('referral bonus increment failed:', bonusError)
+  if (referrerBonusError) {
+    console.error('referrer bonus increment failed:', referrerBonusError)
     return { success: false, message: 'Failed to apply referral code' }
   }
 
-  return { success: true, message: 'Referral code applied!' }
+  const { error: referredBonusError } = await service.rpc('increment_referral_bonus', {
+    target_user_id: userId,
+    amount: REFERRAL_BONUS,
+  })
+  if (referredBonusError) {
+    console.error('referred-user bonus increment failed:', referredBonusError)
+    // Referrer is already credited at this point — don't fail the whole
+    // request over the second half; the referred_by link is permanent
+    // either way, so this isn't retryable without a support ticket.
+    return { success: true, message: `Referral code applied! Your friend got ${REFERRAL_BONUS} bonus screens — yours will follow shortly.` }
+  }
+
+  return { success: true, message: `Referral code applied! You both got ${REFERRAL_BONUS} bonus screens.` }
 }
