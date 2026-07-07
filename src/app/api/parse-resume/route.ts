@@ -126,25 +126,40 @@ export async function POST(request: NextRequest) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('api_key_encrypted, api_provider')
+    .select('api_key_encrypted, api_provider, tier, is_beta_user')
     .eq('id', user.id)
     .single()
 
-  if (!profile?.api_key_encrypted) {
+  const LAUNCH_MODE = process.env.LAUNCH_MODE === 'true'
+  const APP_OPENAI_KEY = process.env.APP_OPENAI_API_KEY || null
+  // Same beta-trial fallback as /api/screen — resume parsing is a one-time
+  // setup action, not a metered "screen", so it draws on the app key
+  // unconditionally for beta/launch users with no key of their own yet
+  // (no quota check here, unlike screening).
+  const eligibleForAppKey = !!profile
+    && profile.tier !== 'paid'
+    && (!!profile.is_beta_user || LAUNCH_MODE)
+    && !profile.api_key_encrypted
+    && !!APP_OPENAI_KEY
+
+  let apiKey: string
+  let provider: string
+  if (eligibleForAppKey) {
+    apiKey = APP_OPENAI_KEY!
+    provider = 'openai'
+  } else if (profile?.api_key_encrypted) {
+    try {
+      apiKey = decrypt(profile.api_key_encrypted as string)
+    } catch {
+      return NextResponse.json({ error: 'Failed to decrypt API key' }, { status: 500 })
+    }
+    provider = profile.api_provider ?? 'anthropic'
+  } else {
     return NextResponse.json(
       { error: 'No API key configured. Add your AI provider key in the AI provider section first.' },
       { status: 400 }
     )
   }
-
-  let apiKey: string
-  try {
-    apiKey = decrypt(profile.api_key_encrypted as string)
-  } catch {
-    return NextResponse.json({ error: 'Failed to decrypt API key' }, { status: 500 })
-  }
-
-  const provider = profile.api_provider ?? 'anthropic'
   let rawText: string
 
   function aiErrorMessage(status: number): string {
