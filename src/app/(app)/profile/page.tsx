@@ -17,6 +17,8 @@ interface ProfileData {
   updated_at: string
 }
 
+const PRICING_ENABLED = process.env.NEXT_PUBLIC_PRICING_ENABLED === 'true'
+
 const DEFAULT_HARD_REJECT: HardRejectFilters = {
   tech_stack_dealbreakers: [],
   title_floor: '',
@@ -316,6 +318,12 @@ export default function ProfilePage() {
   const [inviteMessage, setInviteMessage] = useState('')
   const [resumeDate, setResumeDate] = useState<string | null>(null)
 
+  // Account deletion
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleteStatus, setDeleteStatus] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [deleteError, setDeleteError] = useState('')
+
   // Resume parse result feedback
   const [detectedSkills, setDetectedSkills] = useState<string[]>([])
   const [resumeWordCount, setResumeWordCount] = useState<number | null>(null)
@@ -490,6 +498,25 @@ export default function ProfilePage() {
     } catch {
       setInviteStatus('error')
       setInviteMessage('Failed to apply invite code')
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (deleteConfirmText !== 'DELETE') return
+    setDeleteStatus('loading')
+    setDeleteError('')
+    try {
+      const res = await fetch('/api/account', { method: 'DELETE' })
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        setDeleteStatus('error')
+        setDeleteError(data.error ?? 'Failed to delete account')
+        return
+      }
+      window.location.href = '/'
+    } catch {
+      setDeleteStatus('error')
+      setDeleteError('Failed to delete account')
     }
   }
 
@@ -755,7 +782,7 @@ export default function ProfilePage() {
         </div>
       </Section>
 
-      {!isBetaUser && tier !== 'paid' && (
+      {PRICING_ENABLED && !isBetaUser && tier !== 'paid' && (
         <Section title="Have a beta invite code?">
           {inviteStatus === 'success' ? (
             <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2.5">
@@ -786,6 +813,52 @@ export default function ProfilePage() {
           )}
         </Section>
       )}
+
+      <Section title="Danger zone">
+        {!showDeleteConfirm ? (
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-red-600 border border-red-300 hover:bg-red-50 transition-colors"
+          >
+            Delete my account
+          </button>
+        ) : (
+          <div className="space-y-3 bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-800">
+              This permanently deletes your account, resume, preferences, and entire screening history. This cannot be undone.
+            </p>
+            <p className="text-xs text-red-700">
+              Type <span className="font-mono font-bold">DELETE</span> to confirm.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => { setDeleteConfirmText(e.target.value); setDeleteStatus('idle') }}
+                placeholder="DELETE"
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText !== 'DELETE' || deleteStatus === 'loading'}
+                className="shrink-0 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deleteStatus === 'loading' ? 'Deleting…' : 'Delete forever'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); setDeleteStatus('idle') }}
+                className="shrink-0 px-4 py-2 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+            {deleteStatus === 'error' && <p className="text-xs text-red-600">{deleteError}</p>}
+          </div>
+        )}
+      </Section>
     </div>
   )
 }

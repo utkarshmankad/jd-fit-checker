@@ -7,7 +7,7 @@ import { checkScreenLimit } from '@/lib/utils/screen-limits'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile } from '@/types'
 
 // Explicit rather than implicit-default — this route's crash/timeout safety
-// (see reserveOneScreen below) depends on knowing which serverless runtime
+// (see prepareItem below) depends on knowing which serverless runtime
 // it's on rather than assuming.
 export const runtime = 'nodejs'
 
@@ -119,13 +119,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
   }
 
-  if (!profile.api_key_encrypted) {
-    return NextResponse.json(
-      { error: 'No API key configured. Set up your profile first.' },
-      { status: 400 }
-    )
-  }
-
   const { urls, jd_text, jd_entries, job_title, company, batch_id } = body as {
     urls?: string[]
     jd_text?: string
@@ -168,19 +161,15 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Cheap upfront fast-fail (no mutation) — if the user already has zero
-  // capacity, bail before decrypting the API key or doing any work at all.
-  if (profile.tier !== 'paid') {
-    const precheck = await checkScreenLimit(profile as unknown as UserProfile, 1)
-    if (!precheck.allowed) {
-      return NextResponse.json(
-        { error: precheck.upgrade_prompt, limit_check: precheck },
-        { status: 403 }
-      )
-    }
-  }
+  // No upfront hard-block here (deliberately) — a beta/launch user who has
+  // exhausted the app-key allotment but has their own key configured is NOT
+  // supposed to be blocked, just switched to their own key. Whether that's
+  // possible depends on API-key availability, which prepareItem() below
+  // checks per-item; only regular (non-beta) free-tier users can be blocked
+  // purely by quota, and that's handled there too (weekly reserve_screens
+  // failing produces the same checkScreenLimit-derived message).
 
-  // Real enforcement happens per-item below via reserveOneScreen(), not as one
+  // Real enforcement happens per-item below via prepareItem(), not as one
   // upfront reservation for the whole batch. Reserving the whole batch's worth
   // up front and refunding the unused portion afterward (the previous design)
   // has a crash-safety hole: if this invocation is killed mid-batch — a slow
@@ -191,32 +180,95 @@ export async function POST(request: NextRequest) {
   // failure, exactly the number of items actually attempted have been charged,
   // and an item that was genuinely attempted (a real LLM call went out against
   // the user's own key) is fair to charge for even if something fails after.
-  const useWeekly = !profile.is_beta_user && !LAUNCH_MODE
+  // isBetaOrLaunch users get BETA_LIMIT screens funded by the app's own key
+  // (no key setup needed to start); once that's used up, they need their own
+  // key but are otherwise unlimited from then on — the 25-cap only ever
+  // gated the app-funded portion, not the user in general. Regular
+  // (non-beta, post-launch) free users are unaffected by any of this: no
+  // app-key freebie, always weekly-capped, own key required from screen 1,
+  // same as before this feature existed.
+  const isBetaOrLaunch = profile.tier !== 'paid' && (!!profile.is_beta_user || LAUNCH_MODE)
   const BETA_LIMIT = parseInt(process.env.BETA_TOTAL_LIMIT || '25')
   const WEEKLY_LIMIT = parseInt(process.env.FREE_WEEKLY_LIMIT || '3')
   const bonus = (profile.referral_bonus_screens as number) || 0
-  const limitValue = useWeekly ? WEEKLY_LIMIT + bonus : BETA_LIMIT
+  const weeklyLimitValue = WEEKLY_LIMIT + bonus
 
-  async function reserveOneScreen(): Promise<boolean> {
-    if (profile!.tier === 'paid') return true
+  const APP_OPENAI_KEY = process.env.APP_OPENAI_API_KEY || null
+  // Running local counter (seeded from the DB snapshot, incremented after
+  // each successful reservation) rather than re-querying per item — correct
+  // as long as this single request is the only writer in flight, which is
+  // the common case since the client only ever sends one item per call.
+  let usedSoFar = (profile.screens_used_total as number) || 0
+
+  let userApiKey: string | null | undefined // undefined = not yet resolved
+  function getUserApiKey(): string | null {
+    if (userApiKey !== undefined) return userApiKey
+    if (!profile!.api_key_encrypted) {
+      userApiKey = null
+      return null
+    }
+    try {
+      userApiKey = decrypt(profile!.api_key_encrypted as string)
+    } catch {
+      userApiKey = null
+    }
+    return userApiKey
+  }
+
+  // Resolves the key/provider for one item AND performs whatever quota
+  // reservation actually applies to that choice, atomically per item (see
+  // the crash-safety note above reserve_screens' original introduction) —
+  // reservation only happens against the counter that's actually relevant:
+  // the app-key allotment while using the app key, or the weekly limit for
+  // regular free-tier users using their own key. A beta user on their own
+  // key past the app-key allotment reserves nothing and is never blocked.
+  async function prepareItem(): Promise<{ apiKey: string; provider: string } | { error: string }> {
+    if (isBetaOrLaunch && usedSoFar < BETA_LIMIT && APP_OPENAI_KEY) {
+      const { data: ok, error } = await supabase.rpc('reserve_screens', {
+        p_user_id: user!.id,
+        p_amount: 1,
+        p_use_weekly: false,
+        p_limit: BETA_LIMIT,
+      })
+      if (error) {
+        console.error('reserve_screens (app-key allotment) failed:', error)
+        return { error: 'Failed to check screen limit' }
+      }
+      if (ok) {
+        usedSoFar++
+        return { apiKey: APP_OPENAI_KEY, provider: 'openai' }
+      }
+      // Exhausted (e.g. a concurrent request used the last one) — fall through to own key.
+    }
+
+    const own = getUserApiKey()
+
+    if (isBetaOrLaunch) {
+      if (!own) {
+        return { error: `You've used your ${BETA_LIMIT} free beta scans. Add your own OpenAI or Anthropic API key in Profile settings to keep screening.` }
+      }
+      return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic' }
+    }
+
+    // Regular free tier: always weekly-capped, own key required from the start.
+    if (!own) {
+      return { error: 'No API key configured. Set up your profile first.' }
+    }
     const { data: ok, error } = await supabase.rpc('reserve_screens', {
       p_user_id: user!.id,
       p_amount: 1,
-      p_use_weekly: useWeekly,
-      p_limit: limitValue,
+      p_use_weekly: true,
+      p_limit: weeklyLimitValue,
     })
     if (error) {
-      console.error('reserve_screens failed:', error)
-      return false
+      console.error('reserve_screens (weekly) failed:', error)
+      return { error: 'Failed to check screen limit' }
     }
-    return !!ok
-  }
-
-  let apiKey: string
-  try {
-    apiKey = decrypt(profile.api_key_encrypted as string)
-  } catch {
-    return NextResponse.json({ error: 'Failed to decrypt API key' }, { status: 500 })
+    if (!ok) {
+      const limitCheck = await checkScreenLimit(profile as unknown as UserProfile, 1)
+      return { error: limitCheck.upgrade_prompt ?? 'Weekly screen limit reached.' }
+    }
+    return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic' }
   }
 
   // Use stored resume_text if available; otherwise synthesize from saved preferences so
@@ -228,9 +280,8 @@ export async function POST(request: NextRequest) {
   const results: ScreeningResult[] = []
   let count = 0
   let fatalError: FatalScreenError | null = null
-  const provider = (profile.api_provider as string) ?? 'anthropic'
 
-  async function callFastAPI(body: Record<string, unknown>): Promise<FastAPIResult | { _error: string; _status: number }> {
+  async function callFastAPI(body: Record<string, unknown>, apiKey: string, apiProvider: string): Promise<FastAPIResult | { _error: string; _status: number }> {
     let res: Response
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), FASTAPI_TIMEOUT_MS)
@@ -244,7 +295,7 @@ export async function POST(request: NextRequest) {
           resume_text: effectiveResumeText,
           hard_reject_filters: profile!.hard_reject_filters,
           api_key: apiKey,
-          api_provider: profile!.api_provider,
+          api_provider: apiProvider,
           user_id: user!.id,
         }),
         signal: controller.signal,
@@ -345,16 +396,22 @@ export async function POST(request: NextRequest) {
         results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: ['Unsupported or unsafe URL'], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
         continue
       }
-      if (!(await reserveOneScreen())) break
+      const keyChoice = await prepareItem()
+      if ('error' in keyChoice) {
+        // No usable key/quota for this or any further item — surface it as a
+        // visible result row rather than silently truncating, then stop.
+        results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [keyChoice.error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
+        break
+      }
 
-      const result = await callFastAPI({ job_url: url })
+      const result = await callFastAPI({ job_url: url }, keyChoice.apiKey, keyChoice.provider)
       if ('_error' in result) {
         if (result._status === 401) {
-          fatalError = { type: 'invalid_key', message: result._error, provider }
+          fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider }
           break
         }
         if (result._status === 429) {
-          fatalError = { type: 'rate_limit', message: result._error, provider }
+          fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider }
           break
         }
         results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
@@ -371,16 +428,20 @@ export async function POST(request: NextRequest) {
   } else if (jd_entries && Array.isArray(jd_entries) && jd_entries.length > 0) {
     const entries = jd_entries.filter((e) => e.jd_text?.trim())
     for (const entry of entries) {
-      if (!(await reserveOneScreen())) break
+      const keyChoice = await prepareItem()
+      if ('error' in keyChoice) {
+        results.push({ id: '', user_id: user.id, batch_id, job_url: null, job_title: entry.job_title ?? null, company: entry.company ?? null, jd_text: entry.jd_text, ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [keyChoice.error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
+        break
+      }
 
-      const result = await callFastAPI({ jd_text: entry.jd_text })
+      const result = await callFastAPI({ jd_text: entry.jd_text }, keyChoice.apiKey, keyChoice.provider)
       if ('_error' in result) {
         if (result._status === 401) {
-          fatalError = { type: 'invalid_key', message: result._error, provider }
+          fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider }
           break
         }
         if (result._status === 429) {
-          fatalError = { type: 'rate_limit', message: result._error, provider }
+          fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider }
           break
         }
         results.push({ id: '', user_id: user.id, batch_id, job_url: null, job_title: entry.job_title ?? null, company: entry.company ?? null, jd_text: entry.jd_text, ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
@@ -395,13 +456,14 @@ export async function POST(request: NextRequest) {
       count++
     }
   } else if (jd_text) {
-    if (!(await reserveOneScreen())) {
-      return NextResponse.json({ results: [] })
+    const keyChoice = await prepareItem()
+    if ('error' in keyChoice) {
+      return NextResponse.json({ error: keyChoice.error }, { status: 400 })
     }
-    const result = await callFastAPI({ jd_text })
+    const result = await callFastAPI({ jd_text }, keyChoice.apiKey, keyChoice.provider)
     if ('_error' in result) {
-      if (result._status === 401) fatalError = { type: 'invalid_key', message: result._error, provider }
-      else if (result._status === 429) fatalError = { type: 'rate_limit', message: result._error, provider }
+      if (result._status === 401) fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider }
+      else if (result._status === 429) fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider }
       else return NextResponse.json({ error: result._error }, { status: result._status })
     } else {
       const saved = await saveResult(result, { jd_text, job_title, company })

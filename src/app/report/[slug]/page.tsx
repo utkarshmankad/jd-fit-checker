@@ -125,6 +125,7 @@ export default async function ReportPage({
   const BETA_LIMIT = parseInt(process.env.BETA_TOTAL_LIMIT || '25')
   const WEEKLY_LIMIT = parseInt(process.env.FREE_WEEKLY_LIMIT || '3')
   const freeSubtitle = LAUNCH_MODE ? `${BETA_LIMIT} free screens` : `${WEEKLY_LIMIT} free screens/week`
+  const PRICING_ENABLED = process.env.NEXT_PUBLIC_PRICING_ENABLED === 'true'
 
   const mainResults = results.filter((r) => r.verdict !== 'REJECT')
   const rejectResults = results.filter((r) => r.verdict === 'REJECT')
@@ -313,14 +314,14 @@ export default async function ReportPage({
                 style={{ color: '#1B3A5C' }}>
                 Get started free — no credit card →
               </a>
-              <p className="text-blue-300 text-xs mt-3">{freeSubtitle}. Bring your own AI key.</p>
+              <p className="text-blue-300 text-xs mt-3">{freeSubtitle}, no key setup needed to start.</p>
             </div>
             <div className="bg-white px-6 py-4">
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className={`grid ${PRICING_ENABLED ? 'grid-cols-3' : 'grid-cols-2'} gap-4 text-center`}>
                 {[
                   { stat: '20 JDs', label: 'at once' },
                   { stat: '<60 sec', label: 'per batch' },
-                  { stat: '₹499', label: 'one-time unlock' },
+                  ...(PRICING_ENABLED ? [{ stat: '₹499', label: 'one-time unlock' }] : []),
                 ].map(({ stat, label }) => (
                   <div key={stat}>
                     <p className="font-bold text-gray-900" style={{ color: '#1B3A5C' }}>{stat}</p>

@@ -9,6 +9,7 @@ interface UsageWidgetProps {
   referral_bonus_screens: number
   beta_limit: number
   weekly_limit: number
+  pricingEnabled: boolean
   onUpgradeClick: () => void
 }
 
@@ -27,6 +28,7 @@ export default function UsageWidget({
   referral_bonus_screens,
   beta_limit,
   weekly_limit,
+  pricingEnabled,
   onUpgradeClick,
 }: UsageWidgetProps) {
   if (tier === 'paid') {
@@ -51,15 +53,21 @@ export default function UsageWidget({
     return (
       <div className="flex flex-col items-end gap-1.5">
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${colorCls}`}>
-          🧪 Beta access · {remaining} of {beta_limit} screens left
+          🧪 Beta access · {remaining} of {beta_limit} free scans left
         </span>
         <div className="w-40 h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div className={`h-1.5 rounded-full ${barCls} transition-all`} style={{ width: `${pct}%` }} />
         </div>
         {remaining === 0 && (
-          <button onClick={onUpgradeClick} className="text-xs font-semibold text-red-600 underline">
-            Upgrade to Active Search →
-          </button>
+          pricingEnabled ? (
+            <button onClick={onUpgradeClick} className="text-xs font-semibold text-red-600 underline">
+              Upgrade to Active Search →
+            </button>
+          ) : (
+            <a href="/profile" className="text-xs font-semibold text-red-600 underline">
+              Add your own API key to keep going →
+            </a>
+          )
         )}
       </div>
     )
@@ -77,12 +85,14 @@ export default function UsageWidget({
       {referral_bonus_screens > 0 && (
         <p className="text-xs text-green-600 font-medium">+ {referral_bonus_screens} referral bonus</p>
       )}
-      <button
-        onClick={() => document.getElementById('referral-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-        className="text-xs font-semibold text-blue-600 underline"
-      >
-        Refer a friend for +10 screens
-      </button>
+      {pricingEnabled && (
+        <button
+          onClick={() => document.getElementById('referral-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          className="text-xs font-semibold text-blue-600 underline"
+        >
+          Refer a friend for +10 screens
+        </button>
+      )}
     </div>
   )
 }

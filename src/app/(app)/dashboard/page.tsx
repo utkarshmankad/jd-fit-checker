@@ -42,6 +42,7 @@ type ScreenError =
   | { type: 'network'; message?: string }
 
 const PROFILE_BANNER_KEY = 'jdfit-profile-banner-dismissed'
+const PRICING_ENABLED = process.env.NEXT_PUBLIC_PRICING_ENABLED === 'true'
 
 const SORT_LABELS: Record<SortKey, string> = {
   composite_score: 'Composite',
@@ -265,7 +266,10 @@ export default function DashboardPage() {
   async function handleScreen() {
     setScreenError(null)
     setIsSampleData(false)
-    if (hasApiKey === false) { setScreenError({ type: 'no_api_key' }); return }
+    // No client-side "must have a key" gate — beta users get BETA_LIMIT
+    // screens on the app's own key with no key setup needed, and the server
+    // is the single source of truth for whether that's still true. It
+    // returns a clear error itself once a key actually is required.
 
     type Item = { kind: 'url'; value: string } | { kind: 'jd'; entry: JdEntry }
     let items: Item[] =
@@ -616,6 +620,7 @@ export default function DashboardPage() {
             referral_bonus_screens={usage.referral_bonus_screens}
             beta_limit={usage.beta_limit}
             weekly_limit={usage.weekly_limit}
+            pricingEnabled={PRICING_ENABLED}
             onUpgradeClick={() => setShowTierModal(true)}
           />
         )}
@@ -892,12 +897,12 @@ export default function DashboardPage() {
             />
           )}
 
-          {usage && usage.tier !== 'paid' && <ReferralCard />}
+          {PRICING_ENABLED && usage && usage.tier !== 'paid' && <ReferralCard />}
         </div>
       )}
 
       {/* Tier limit modal */}
-      {showTierModal && (
+      {PRICING_ENABLED && showTierModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowTierModal(false)} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
@@ -914,8 +919,10 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <PaymentModal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)}
-        onSuccess={() => { setShowPaymentModal(false); toast.success('Upgraded! Unlimited rejections unlocked.') }} />
+      {PRICING_ENABLED && (
+        <PaymentModal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)}
+          onSuccess={() => { setShowPaymentModal(false); toast.success('Upgraded! Unlimited rejections unlocked.') }} />
+      )}
 
       <WhyNotChatGptModal open={showChatGptModal} onClose={() => setShowChatGptModal(false)} />
     </div>

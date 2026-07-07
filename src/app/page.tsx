@@ -13,6 +13,7 @@ export default async function LandingPage() {
   const BETA_LIMIT = parseInt(process.env.BETA_TOTAL_LIMIT || '25')
   const WEEKLY_LIMIT = parseInt(process.env.FREE_WEEKLY_LIMIT || '3')
   const freeSubtitle = LAUNCH_MODE ? `${BETA_LIMIT} free screens to start` : `${WEEKLY_LIMIT} free screens every week`
+  const PRICING_ENABLED = process.env.NEXT_PUBLIC_PRICING_ENABLED === 'true'
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-gray-900">
@@ -305,89 +306,91 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Pricing ── */}
-      <section className="bg-white px-6 py-24">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-3" style={{ color: '#1B3A5C' }}>
-            Simple pricing.
-          </h2>
-          <p className="text-center text-gray-500 text-sm mb-14">
-            No $50/month subscription. No editing-then-rescanning treadmill. Reject the noise,
-            then move on with your day.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl mx-auto">
+      {PRICING_ENABLED && (
+        <section className="bg-white px-6 py-24">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-3" style={{ color: '#1B3A5C' }}>
+              Simple pricing.
+            </h2>
+            <p className="text-center text-gray-500 text-sm mb-14">
+              No $50/month subscription. No editing-then-rescanning treadmill. Reject the noise,
+              then move on with your day.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl mx-auto">
 
-            {/* Free */}
-            <div className="bg-white rounded-xl p-8 border border-gray-200 flex flex-col">
-              <div className="mb-2">
-                <p className="text-3xl font-bold text-gray-900">Free</p>
-                <p className="text-sm text-gray-400 mt-1">{freeSubtitle}</p>
+              {/* Free */}
+              <div className="bg-white rounded-xl p-8 border border-gray-200 flex flex-col">
+                <div className="mb-2">
+                  <p className="text-3xl font-bold text-gray-900">Free</p>
+                  <p className="text-sm text-gray-400 mt-1">{freeSubtitle}</p>
+                </div>
+                <ul className="mt-6 space-y-3 flex-1 mb-8">
+                  {[
+                    'URL + JD text screening',
+                    'ATS + role-level scores',
+                    'Hard-reject auto-filter',
+                    'CSV export',
+                    'Shareable report links',
+                    '+10 more screens per friend you refer',
+                  ].map((f) => (
+                    <li key={f} className="flex items-center gap-3 text-sm text-gray-600">
+                      <CheckIcon />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/auth/login"
+                  className="block text-center py-3 rounded-lg border-2 font-semibold text-sm hover:bg-gray-50 transition-colors"
+                  style={{ borderColor: '#1B3A5C', color: '#1B3A5C' }}
+                >
+                  Reject my jobs free →
+                </Link>
               </div>
-              <ul className="mt-6 space-y-3 flex-1 mb-8">
-                {[
-                  'URL + JD text screening',
-                  'ATS + role-level scores',
-                  'Hard-reject auto-filter',
-                  'CSV export',
-                  'Shareable report links',
-                  '+10 more screens per friend you refer',
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-3 text-sm text-gray-600">
-                    <CheckIcon />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/auth/login"
-                className="block text-center py-3 rounded-lg border-2 font-semibold text-sm hover:bg-gray-50 transition-colors"
-                style={{ borderColor: '#1B3A5C', color: '#1B3A5C' }}
-              >
-                Reject my jobs free →
-              </Link>
-            </div>
 
-            {/* Paid */}
-            <div
-              className="bg-white rounded-xl p-8 flex flex-col border-2 shadow-md"
-              style={{ borderColor: '#1B3A5C' }}
-            >
-              <div className="mb-2">
-                <span
-                  className="text-xs font-bold px-2.5 py-1 rounded-full text-white inline-block mb-3"
+              {/* Paid */}
+              <div
+                className="bg-white rounded-xl p-8 flex flex-col border-2 shadow-md"
+                style={{ borderColor: '#1B3A5C' }}
+              >
+                <div className="mb-2">
+                  <span
+                    className="text-xs font-bold px-2.5 py-1 rounded-full text-white inline-block mb-3"
+                    style={{ backgroundColor: '#1B3A5C' }}
+                  >
+                    ONE-TIME
+                  </span>
+                  <p className="text-3xl font-bold text-gray-900">₹499</p>
+                  <p className="text-sm text-gray-400 mt-1">one-time payment</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Unlimited screens, forever</p>
+                </div>
+                <ul className="mt-6 space-y-3 flex-1 mb-8">
+                  {[
+                    'Everything in Free',
+                    'Unlimited screens',
+                    'LinkedIn bulk import (up to 20 URLs)',
+                    'Full screening history',
+                    'Priority support',
+                  ].map((f) => (
+                    <li key={f} className="flex items-center gap-3 text-sm text-gray-600">
+                      <CheckIcon />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/auth/login"
+                  className="block text-center py-3 rounded-lg font-semibold text-sm text-white hover:opacity-90 transition-colors"
                   style={{ backgroundColor: '#1B3A5C' }}
                 >
-                  ONE-TIME
-                </span>
-                <p className="text-3xl font-bold text-gray-900">₹499</p>
-                <p className="text-sm text-gray-400 mt-1">one-time payment</p>
-                <p className="text-xs text-gray-400 mt-0.5">Unlimited screens, forever</p>
+                  Upgrade to paid →
+                </Link>
               </div>
-              <ul className="mt-6 space-y-3 flex-1 mb-8">
-                {[
-                  'Everything in Free',
-                  'Unlimited screens',
-                  'LinkedIn bulk import (up to 20 URLs)',
-                  'Full screening history',
-                  'Priority support',
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-3 text-sm text-gray-600">
-                    <CheckIcon />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/auth/login"
-                className="block text-center py-3 rounded-lg font-semibold text-sm text-white hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: '#1B3A5C' }}
-              >
-                Upgrade to paid →
-              </Link>
-            </div>
 
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── Final CTA ── */}
       <section className="px-6 py-16 md:py-24" style={{ backgroundColor: '#1B3A5C' }}>
