@@ -227,7 +227,9 @@ export async function POST(request: NextRequest) {
   // the app-key allotment while using the app key, or the weekly limit for
   // regular free-tier users using their own key. A beta user on their own
   // key past the app-key allotment reserves nothing and is never blocked.
-  async function prepareItem(): Promise<{ apiKey: string; provider: string; source: 'app' | 'own' } | { error: string }> {
+  type PreparedItem = { apiKey: string; provider: string; source: 'app' | 'own'; reserved: boolean; useWeekly: boolean }
+
+  async function prepareItem(): Promise<PreparedItem | { error: string }> {
     if (isBetaOrLaunch && usedSoFar < betaLimitValue && APP_OPENAI_KEY) {
       const { data: ok, error } = await supabase.rpc('reserve_screens', {
         p_user_id: user!.id,
@@ -241,7 +243,7 @@ export async function POST(request: NextRequest) {
       }
       if (ok) {
         usedSoFar++
-        return { apiKey: APP_OPENAI_KEY, provider: 'openai', source: 'app' }
+        return { apiKey: APP_OPENAI_KEY, provider: 'openai', source: 'app', reserved: true, useWeekly: false }
       }
       // Exhausted (e.g. a concurrent request used the last one) — fall through to own key.
     }
@@ -252,7 +254,8 @@ export async function POST(request: NextRequest) {
       if (!own) {
         return { error: `You've used your ${betaLimitValue} free beta scans. Add your own OpenAI or Anthropic API key in Profile settings to keep screening.` }
       }
-      return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic', source: 'own' }
+      // Own key past the app-key allotment reserves nothing — nothing to refund either.
+      return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic', source: 'own', reserved: false, useWeekly: false }
     }
 
     // Regular free tier: always weekly-capped, own key required from the start.
@@ -273,7 +276,21 @@ export async function POST(request: NextRequest) {
       const limitCheck = await checkScreenLimit(profile as unknown as UserProfile, 1)
       return { error: limitCheck.upgrade_prompt ?? 'Weekly screen limit reached.' }
     }
-    return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic', source: 'own' }
+    return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic', source: 'own', reserved: true, useWeekly: true }
+  }
+
+  // A scan that never produced a real result (scrape/LLM/service failure)
+  // shouldn't count against the user's allotment — only reserved upfront so
+  // a hung call can't strand quota (see prepareItem's crash-safety note);
+  // once we know it failed, give it back immediately, same request.
+  async function refundIfReserved(item: PreparedItem) {
+    if (!item.reserved) return
+    const { error } = await supabase.rpc('refund_screens', { p_user_id: user!.id, p_amount: 1, p_use_weekly: item.useWeekly })
+    if (error) {
+      console.error('refund_screens failed:', error)
+      return
+    }
+    usedSoFar--
   }
 
   // Use stored resume_text if available; otherwise synthesize from saved preferences so
@@ -411,6 +428,7 @@ export async function POST(request: NextRequest) {
 
       const result = await callFastAPI({ job_url: url }, keyChoice.apiKey, keyChoice.provider)
       if ('_error' in result) {
+        await refundIfReserved(keyChoice)
         if (result._status === 401) {
           fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
           break
@@ -441,6 +459,7 @@ export async function POST(request: NextRequest) {
 
       const result = await callFastAPI({ jd_text: entry.jd_text }, keyChoice.apiKey, keyChoice.provider)
       if ('_error' in result) {
+        await refundIfReserved(keyChoice)
         if (result._status === 401) {
           fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
           break
@@ -467,6 +486,7 @@ export async function POST(request: NextRequest) {
     }
     const result = await callFastAPI({ jd_text }, keyChoice.apiKey, keyChoice.provider)
     if ('_error' in result) {
+      await refundIfReserved(keyChoice)
       if (result._status === 401) fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
       else if (result._status === 429) fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
       else return NextResponse.json({ error: result._error }, { status: result._status })
