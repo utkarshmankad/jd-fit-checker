@@ -40,6 +40,7 @@ type ScreenError =
   | { type: 'invalid_key'; provider: string }
   | { type: 'rate_limit'; keySource: 'app' | 'own' }
   | { type: 'network'; message?: string }
+  | { type: 'service_error'; message?: string }
 
 const PROFILE_BANNER_KEY = 'jdfit-profile-banner-dismissed'
 const PRICING_ENABLED = process.env.NEXT_PUBLIC_PRICING_ENABLED === 'true'
@@ -94,7 +95,13 @@ function SkeletonRow() {
     <tr className="border-b border-gray-100">
       <td className="px-4 sm:px-6 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-24" /></td>
       <td className="px-4 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-32" /></td>
-      <td className="px-4 py-4"><div className="h-6 bg-gray-200 rounded-full animate-pulse w-28" /></td>
+      <td className="px-4 py-4">
+        <div className="h-6 bg-gray-200 rounded-full animate-pulse w-28" />
+        {/* Approximates the reason-line height real rows can show below the
+            badge — without this, a batch skewed toward REJECT verdicts grows
+            in row height right as the skeleton flips to a real result. */}
+        <div className="h-3 bg-gray-100 rounded animate-pulse w-40 mt-1.5" />
+      </td>
       <td className="px-4 py-4 hidden md:table-cell"><div className="h-3 bg-gray-200 rounded animate-pulse w-16 ml-auto" /></td>
       <td className="px-4 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-6 ml-auto" /></td>
     </tr>
@@ -210,13 +217,35 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Mirrors the key-building in handleScreen's resume detection, minus the
+  // duplicate-toast — used to check staleness before an unattended auto-retry.
+  function computeCurrentKeys(): string[] {
+    const raw = tab === 'urls'
+      ? urlInput.split('\n').map((u) => u.trim()).filter(Boolean).map((u) => `url:${normalizeJobUrl(u)}`)
+      : jdEntries.filter((e) => e.jd_text.trim()).map((e) => `jd:${e.jd_text.trim()}`)
+    return Array.from(new Set(raw))
+  }
+
   function startCountdown() {
+    const snapshotKeys = inProgressBatchRef.current?.allKeys ?? []
     setRateLimitCountdown(30)
     countdownRef.current = setInterval(() => {
       setRateLimitCountdown((v) => {
         if (v <= 1) {
           clearInterval(countdownRef.current!)
           countdownRef.current = null
+          // If the user edited the input while waiting, auto-resuming would
+          // silently start an unrelated batch with no confirmation — bail
+          // instead and let them resubmit deliberately.
+          const currentKeys = computeCurrentKeys()
+          const stillMatches = snapshotKeys.length === currentKeys.length
+            && snapshotKeys.every((k, i) => k === currentKeys[i])
+          if (!stillMatches) {
+            inProgressBatchRef.current = null
+            setScreenError(null)
+            toast('Input changed while waiting — auto-retry cancelled. Press Screen all to continue.', { icon: '✋' })
+            return 0
+          }
           // Auto-resume once the cooldown clears — handleScreen picks up from
           // where it stopped (inProgressBatchRef), so this doesn't re-screen
           // anything already completed. No need to make the user click back in.
@@ -371,8 +400,15 @@ export default function DashboardPage() {
         }
 
         if (!res.ok) {
-          const json = (await res.json().catch(() => ({}))) as { error?: string }
-          setScreenError({ type: 'network', message: json.error ?? `Screening failed (${res.status})` })
+          const json = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
+          if (json.code === 'no_api_key') {
+            setScreenError({ type: 'no_api_key' })
+          } else {
+            // Server responded (this isn't a connectivity problem on the
+            // user's end) but with an error — distinct from the fetch-throw
+            // 'network' case above, which really is the user's own connection.
+            setScreenError({ type: 'service_error', message: json.error ?? `Screening failed (${res.status})` })
+          }
           completedFully = false
           break
         }
@@ -703,7 +739,11 @@ export default function DashboardPage() {
                         ? "We're hitting high demand on the free scanning key right now"
                         : `Your ${providerLabel} key hit a rate limit${apiProvider === 'openai' ? " (OpenAI's default tier caps at 20 requests/minute)" : ''}`}
                       .{' '}
-                      {rateLimitCountdown > 0 ? `Continuing automatically in ${rateLimitCountdown}s — nothing already screened will be redone.` : 'Continuing where it left off.'}
+                      {rateLimitCountdown > 0
+                        ? results.length > 0
+                          ? `Continuing automatically in ${rateLimitCountdown}s — nothing already screened will be redone.`
+                          : `Retrying automatically in ${rateLimitCountdown}s.`
+                        : results.length > 0 ? 'Continuing where it left off.' : 'Retrying now.'}
                     </p>
                     <button onClick={() => { setScreenError(null); handleScreen() }} disabled={rateLimitCountdown > 0}
                       className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors">
@@ -713,12 +753,18 @@ export default function DashboardPage() {
                 )}
                 {screenError.type === 'network' && (
                   <div className="flex items-center justify-between gap-4">
-                    <p>{screenError.message ?? 'Connection error.'}</p>
+                    <p>{screenError.message ?? 'Connection error — check your internet connection.'}</p>
+                    <button onClick={() => { setScreenError(null); handleScreen() }} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-700 text-white hover:bg-gray-800 transition-colors">Retry</button>
+                  </div>
+                )}
+                {screenError.type === 'service_error' && (
+                  <div className="flex items-center justify-between gap-4">
+                    <p>{screenError.message ?? 'Screening service error.'} This isn&apos;t a problem with your connection.</p>
                     <button onClick={() => { setScreenError(null); handleScreen() }} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-700 text-white hover:bg-gray-800 transition-colors">Retry</button>
                   </div>
                 )}
               </div>
-              {screenError.type !== 'rate_limit' && screenError.type !== 'network' && (
+              {screenError.type !== 'rate_limit' && screenError.type !== 'network' && screenError.type !== 'service_error' && (
                 <button onClick={() => setScreenError(null)} className="shrink-0 opacity-60 hover:opacity-100 transition-opacity"><X size={14} /></button>
               )}
             </div>

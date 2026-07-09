@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
   // key past the app-key allotment reserves nothing and is never blocked.
   type PreparedItem = { apiKey: string; provider: string; source: 'app' | 'own'; reserved: boolean; useWeekly: boolean }
 
-  async function prepareItem(): Promise<PreparedItem | { error: string }> {
+  async function prepareItem(): Promise<PreparedItem | { error: string; code?: 'no_api_key' }> {
     if (isBetaOrLaunch && usedSoFar < betaLimitValue && APP_OPENAI_KEY) {
       const { data: ok, error } = await supabase.rpc('reserve_screens', {
         p_user_id: user!.id,
@@ -252,7 +252,7 @@ export async function POST(request: NextRequest) {
 
     if (isBetaOrLaunch) {
       if (!own) {
-        return { error: `You've used your ${betaLimitValue} free beta scans. Add your own OpenAI or Anthropic API key in Profile settings to keep screening.` }
+        return { error: `You've used your ${betaLimitValue} free beta scans. Add your own OpenAI or Anthropic API key in Profile settings to keep screening.`, code: 'no_api_key' }
       }
       // Own key past the app-key allotment reserves nothing — nothing to refund either.
       return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic', source: 'own', reserved: false, useWeekly: false }
@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
 
     // Regular free tier: always weekly-capped, own key required from the start.
     if (!own) {
-      return { error: 'No API key configured. Set up your profile first.' }
+      return { error: 'No API key configured. Set up your profile first.', code: 'no_api_key' }
     }
     const { data: ok, error } = await supabase.rpc('reserve_screens', {
       p_user_id: user!.id,
@@ -482,7 +482,7 @@ export async function POST(request: NextRequest) {
   } else if (jd_text) {
     const keyChoice = await prepareItem()
     if ('error' in keyChoice) {
-      return NextResponse.json({ error: keyChoice.error }, { status: 400 })
+      return NextResponse.json({ error: keyChoice.error, code: keyChoice.code }, { status: 400 })
     }
     const result = await callFastAPI({ jd_text }, keyChoice.apiKey, keyChoice.provider)
     if ('_error' in result) {
