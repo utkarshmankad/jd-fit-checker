@@ -1,0 +1,83 @@
+'use client'
+
+import { useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { MessageSquarePlus, X } from 'lucide-react'
+import toast from 'react-hot-toast'
+
+const MAX_MESSAGE_CHARS = 5000
+
+export default function FeedbackWidget() {
+  const [open, setOpen] = useState(false)
+  const [message, setMessage] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const pathname = usePathname()
+
+  async function handleSubmit() {
+    const trimmed = message.trim()
+    if (!trimmed) return
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: trimmed, page: pathname }),
+      })
+      if (!res.ok) throw new Error('failed')
+      toast.success("Thanks — feedback sent, it'll reach a real person.")
+      setMessage('')
+      setOpen(false)
+    } catch {
+      toast.error('Could not send feedback. Try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full text-white text-sm font-semibold shadow-lg hover:opacity-90 transition-opacity"
+        style={{ backgroundColor: '#1B3A5C' }}
+      >
+        <MessageSquarePlus size={16} />
+        Feedback
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">Send feedback</h2>
+              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-sm text-gray-500">
+              Bug, idea, or a complaint — goes straight to the person building this.
+            </p>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={5}
+              maxLength={MAX_MESSAGE_CHARS}
+              placeholder="What's on your mind?"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+            />
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || !message.trim()}
+              className="w-full py-2.5 rounded-lg font-semibold text-white text-sm disabled:opacity-50 transition-opacity hover:opacity-90"
+              style={{ backgroundColor: '#1B3A5C' }}
+            >
+              {submitting ? 'Sending…' : 'Send feedback'}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}

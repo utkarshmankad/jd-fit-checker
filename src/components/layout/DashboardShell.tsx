@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { FileSearch, History, User, LogOut, Menu, X, BookOpen /*, Briefcase */ } from 'lucide-react'
 import { LogoMark } from '@/components/Logo'
+import FeedbackWidget from '@/components/feedback/FeedbackWidget'
 
 const navLinks = [
   { href: '/dashboard', label: 'Screen JDs', icon: FileSearch },
@@ -121,6 +122,8 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
 
         <main className="flex-1 bg-surface p-4 md:p-6 lg:p-8">{children}</main>
       </div>
+
+      <FeedbackWidget />
     </div>
   )
 }

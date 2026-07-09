@@ -1,5 +1,15 @@
 export type ApiProvider = 'openai' | 'anthropic' | 'groq' | 'deepseek';
 
+export interface Feedback {
+  id: string;
+  user_id: string;
+  email: string | null;
+  message: string;
+  page: string | null;
+  created_at: string;
+  sent_at: string | null;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
