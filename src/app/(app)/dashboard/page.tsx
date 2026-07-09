@@ -463,7 +463,7 @@ export default function DashboardPage() {
   }
 
   const worthALook = goodResults.length - verdictCounts.REJECT
-  const providerLabel = apiProvider === 'openai' ? 'OpenAI' : 'Anthropic'
+  const providerLabel = { openai: 'OpenAI', anthropic: 'Anthropic', groq: 'Groq', deepseek: 'DeepSeek' }[apiProvider] ?? apiProvider
   const hasAnyResults = results.length > 0 || skeletonCount > 0
   const batchDone = !screening && skeletonCount === 0 && goodResults.length > 0
   const activeRules = getActiveRules(hardRejectFilters)
@@ -695,7 +695,7 @@ export default function DashboardPage() {
               {screenError.type === 'network' ? <WifiOff size={15} className="shrink-0 mt-0.5" /> : <AlertTriangle size={15} className="shrink-0 mt-0.5" />}
               <div className="flex-1 space-y-2">
                 {screenError.type === 'no_api_key' && (<><p>⚠️ No API key saved. Add your Anthropic or OpenAI key in Profile settings.</p><a href="/profile" className="inline-block font-semibold underline text-xs">→ Go to Profile</a></>)}
-                {screenError.type === 'invalid_key' && (<><p>✕ API key rejected by {screenError.provider === 'openai' ? 'OpenAI' : 'Anthropic'}.</p><a href="/profile" className="inline-block font-semibold underline text-xs">→ Update your API key</a></>)}
+                {screenError.type === 'invalid_key' && (<><p>✕ API key rejected by {({ openai: 'OpenAI', anthropic: 'Anthropic', groq: 'Groq', deepseek: 'DeepSeek' } as Record<string, string>)[screenError.provider] ?? screenError.provider}.</p><a href="/profile" className="inline-block font-semibold underline text-xs">→ Update your API key</a></>)}
                 {screenError.type === 'rate_limit' && (
                   <div className="flex items-center justify-between gap-4">
                     <p>

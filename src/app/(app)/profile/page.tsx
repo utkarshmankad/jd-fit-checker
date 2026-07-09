@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Upload, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react'
-import type { HardRejectFilters, UserPreferences } from '@/types'
+import type { HardRejectFilters, UserPreferences, ApiProvider } from '@/types'
 
 interface ProfileData {
   full_name: string | null
   resume_text: string | null
   hard_reject_filters: HardRejectFilters
   preferences: UserPreferences
-  api_provider: 'openai' | 'anthropic' | null
+  api_provider: ApiProvider | null
   has_api_key: boolean
   tier: 'free' | 'paid'
   screens_used_this_month: number
@@ -291,7 +291,7 @@ export default function ProfilePage() {
 
   // API key
   const [apiKey, setApiKey] = useState('')
-  const [apiProvider, setApiProvider] = useState<'openai' | 'anthropic'>('anthropic')
+  const [apiProvider, setApiProvider] = useState<ApiProvider>('anthropic')
   const [hasExistingApiKey, setHasExistingApiKey] = useState(false)
   const [apiSave, setApiSave] = useState<SaveState>('idle')
 
@@ -684,11 +684,13 @@ export default function ProfilePage() {
         <Field label="Provider">
           <select
             value={apiProvider}
-            onChange={(e) => { setApiProvider(e.target.value as 'openai' | 'anthropic'); markDirty() }}
+            onChange={(e) => { setApiProvider(e.target.value as ApiProvider); markDirty() }}
             className={inputCls}
           >
             <option value="anthropic">Anthropic (Claude)</option>
             <option value="openai">OpenAI (GPT)</option>
+            <option value="groq">Groq (Llama — fast, free tier)</option>
+            <option value="deepseek">DeepSeek</option>
           </select>
           {apiProvider === 'openai' && (
             <p className="text-xs text-amber-600 mt-1.5 leading-relaxed">
@@ -696,6 +698,16 @@ export default function ProfilePage() {
               will screen more slowly to stay under that, and pause-and-resume automatically if
               you hit it. To go faster: spend $5+ on your OpenAI account to unlock a higher tier,
               request a rate-limit increase, or switch to Anthropic above (no equivalent cap).
+            </p>
+          )}
+          {apiProvider === 'groq' && (
+            <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+              Free key at <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="underline">console.groq.com/keys</a>. Fast and free for moderate use, but quality on this kind of structured extraction is a step below Claude/GPT.
+            </p>
+          )}
+          {apiProvider === 'deepseek' && (
+            <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">
+              Key at <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer" className="underline">platform.deepseek.com/api_keys</a>. Cheap, strong reasoning — good budget option.
             </p>
           )}
         </Field>

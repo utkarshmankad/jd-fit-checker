@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { encrypt } from '@/lib/utils/crypto'
-import type { HardRejectFilters, UserPreferences } from '@/types'
+import type { HardRejectFilters, UserPreferences, ApiProvider } from '@/types'
 
 export async function GET() {
   const supabase = await createClient()
@@ -52,7 +52,7 @@ export async function PUT(request: NextRequest) {
     hard_reject_filters?: HardRejectFilters
     preferences?: UserPreferences
     api_key?: string
-    api_provider?: 'openai' | 'anthropic'
+    api_provider?: ApiProvider
   }
 
   const updates: Record<string, unknown> = {}
@@ -61,7 +61,13 @@ export async function PUT(request: NextRequest) {
   if (body.resume_text !== undefined) updates.resume_text = body.resume_text
   if (body.hard_reject_filters !== undefined) updates.hard_reject_filters = body.hard_reject_filters
   if (body.preferences !== undefined) updates.preferences = body.preferences
-  if (body.api_provider !== undefined) updates.api_provider = body.api_provider
+  if (body.api_provider !== undefined) {
+    const VALID_PROVIDERS: ApiProvider[] = ['openai', 'anthropic', 'groq', 'deepseek']
+    if (!VALID_PROVIDERS.includes(body.api_provider)) {
+      return NextResponse.json({ error: 'Invalid API provider' }, { status: 400 })
+    }
+    updates.api_provider = body.api_provider
+  }
   if (body.api_key) {
     try {
       updates.api_key_encrypted = encrypt(body.api_key)

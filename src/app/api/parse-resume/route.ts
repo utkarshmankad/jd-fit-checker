@@ -195,16 +195,25 @@ export async function POST(request: NextRequest) {
     const data = (await res.json()) as { content: Array<{ type: string; text: string }> }
     rawText = data.content.find((b) => b.type === 'text')?.text ?? ''
   } else {
+    // OpenAI and OpenAI-compatible providers (Groq, DeepSeek) all speak the
+    // same chat-completions shape — just a different base URL and model.
+    const OPENAI_COMPAT: Record<string, { baseUrl: string; model: string }> = {
+      openai: { baseUrl: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o' },
+      groq: { baseUrl: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile' },
+      deepseek: { baseUrl: 'https://api.deepseek.com/chat/completions', model: 'deepseek-chat' },
+    }
+    const { baseUrl, model } = OPENAI_COMPAT[provider] ?? OPENAI_COMPAT.openai
+
     let res: Response
     try {
-      res = await fetch('https://api.openai.com/v1/chat/completions', {
+      res = await fetch(baseUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'gpt-4o',
+          model,
           max_tokens: 1024,
           response_format: { type: 'json_object' },
           messages: [

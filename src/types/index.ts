@@ -1,3 +1,5 @@
+export type ApiProvider = 'openai' | 'anthropic' | 'groq' | 'deepseek';
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -7,7 +9,7 @@ export interface UserProfile {
   hard_reject_filters: HardRejectFilters;
   preferences: UserPreferences;
   api_key_encrypted: string | null;
-  api_provider: 'openai' | 'anthropic' | null;
+  api_provider: ApiProvider | null;
   tier: 'free' | 'paid';
   screens_used_this_month: number;
   is_beta_user: boolean;
