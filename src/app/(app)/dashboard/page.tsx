@@ -24,6 +24,8 @@ import {
 } from '@/components/analysis/AnalysisDetail'
 import { getVerdictDisplay } from '@/lib/utils/verdicts'
 import { normalizeJobUrl } from '@/lib/utils/url'
+import { sanitizeCsvField } from '@/lib/utils/csv'
+import Papa from 'papaparse'
 
 type SortKey = 'composite_score' | 'ats_score' | 'role_level_score' | 'verdict'
 type InputTab = 'urls' | 'text'
@@ -454,11 +456,17 @@ export default function DashboardPage() {
   }
 
   function exportCSV() {
-    const header = 'Company,Job Title,ATS %,Role Fit %,Composite %,Verdict'
-    const rows = results.map((r) => `"${r.company ?? ''}","${r.job_title ?? ''}",${r.ats_score},${r.role_level_score},${r.composite_score},${r.verdict}`)
+    const rows = results.map((r) => ({
+      Company: sanitizeCsvField(r.company ?? ''),
+      'Job Title': sanitizeCsvField(r.job_title ?? ''),
+      'ATS %': r.ats_score,
+      'Role Fit %': r.role_level_score,
+      'Composite %': r.composite_score,
+      Verdict: r.verdict,
+    }))
     const rejectCount = results.filter((r) => r.verdict === 'REJECT').length
     const timeSavedComment = rejectCount > 0 ? `# ${calculateTimeSaved(rejectCount)} saved across this batch\n` : ''
-    const csv = timeSavedComment + [header, ...rows].join('\n')
+    const csv = timeSavedComment + Papa.unparse(rows)
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

@@ -39,6 +39,50 @@ const PRIVATE_HOST_PATTERNS = [
   /^fe80:/i,
 ]
 
+// Parses a hostname as an IPv4 literal in ANY of the forms browsers/fetch
+// clients accept (decimal, hex, octal, and 1-4 dotted parts per the classic
+// inet_aton rules) — "2130706433", "0x7f000001", "017700000001", and
+// "0x7f.0.0.1" all mean 127.0.0.1, but none of those match a plain
+// "^127\." string check. Returns the 32-bit value, or null if hostname
+// isn't a numeric IPv4 literal in any recognized form.
+function parseIPv4Literal(hostname: string): number | null {
+  const parts = hostname.split('.')
+  if (parts.length > 4 || parts.length === 0) return null
+  const nums: number[] = []
+  for (const part of parts) {
+    if (!/^(0x[0-9a-f]+|0[0-7]*|[1-9]\d*|0)$/i.test(part)) return null
+    const n = /^0x/i.test(part) ? parseInt(part, 16) : /^0[0-7]+$/.test(part) ? parseInt(part, 8) : parseInt(part, 10)
+    if (!Number.isFinite(n) || n < 0 || n > 0xffffffff) return null
+    nums.push(n)
+  }
+  let ip: number
+  if (nums.length === 4) {
+    if (nums.some((n) => n > 255)) return null
+    ip = ((nums[0] << 24) | (nums[1] << 16) | (nums[2] << 8) | nums[3]) >>> 0
+  } else if (nums.length === 3) {
+    if (nums[0] > 255 || nums[1] > 255 || nums[2] > 0xffff) return null
+    ip = ((nums[0] << 24) | (nums[1] << 16) | nums[2]) >>> 0
+  } else if (nums.length === 2) {
+    if (nums[0] > 255 || nums[1] > 0xffffff) return null
+    ip = ((nums[0] << 24) | nums[1]) >>> 0
+  } else {
+    ip = nums[0] >>> 0
+  }
+  return ip
+}
+
+function isPrivateIPv4(ip: number): boolean {
+  const a = (ip >>> 24) & 0xff
+  const b = (ip >>> 16) & 0xff
+  if (a === 127) return true // loopback
+  if (a === 10) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  if (a === 192 && b === 168) return true
+  if (a === 169 && b === 254) return true // link-local, incl. 169.254.169.254 cloud metadata
+  if (ip === 0) return true // 0.0.0.0
+  return false
+}
+
 export function isSafeJobUrl(url: string): boolean {
   let parsed: URL
   try {
@@ -47,7 +91,33 @@ export function isSafeJobUrl(url: string): boolean {
     return false
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
-  const hostname = parsed.hostname.toLowerCase()
+  // Node's URL keeps the [brackets] in .hostname for IPv6 literals — without
+  // stripping them, none of the IPv6 patterns below (::1, fc00:, fe80:) ever
+  // match, since they all anchor on ^ with no bracket in the pattern.
+  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '')
   if (PRIVATE_HOST_PATTERNS.some((p) => p.test(hostname))) return false
+
+  // IPv4 literal in a non-dotted-decimal encoding (decimal/hex/octal) —
+  // the regexes above only match the canonical "127.0.0.1" form.
+  const ipv4 = parseIPv4Literal(hostname)
+  if (ipv4 !== null && isPrivateIPv4(ipv4)) return false
+
+  // IPv6-mapped IPv4, e.g. "::ffff:127.0.0.1" or its normalized hex-group
+  // form "::ffff:7f00:1" (the URL parser rewrites the dotted form to this) —
+  // extract the embedded IPv4 and re-check it.
+  const mappedDotted = hostname.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i)
+  const mappedHex = hostname.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i)
+  let embedded: number | null = null
+  if (mappedDotted) {
+    embedded = parseIPv4Literal(mappedDotted[1])
+  } else if (mappedHex) {
+    const hi = parseInt(mappedHex[1], 16)
+    const lo = parseInt(mappedHex[2], 16)
+    if (Number.isFinite(hi) && Number.isFinite(lo)) {
+      embedded = (((hi >>> 0) << 16) | (lo >>> 0)) >>> 0
+    }
+  }
+  if (embedded !== null && isPrivateIPv4(embedded)) return false
+
   return true
 }

@@ -100,7 +100,12 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await request.json()
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
   const { finalize, batch_id: finalizeBatchId } = body as { finalize?: boolean; batch_id?: string }
 
   if (finalize) {
@@ -143,6 +148,32 @@ export async function POST(request: NextRequest) {
   if (itemCount > MAX_ITEMS_PER_REQUEST) {
     return NextResponse.json(
       { error: `Too many items in one request (max ${MAX_ITEMS_PER_REQUEST}).` },
+      { status: 400 }
+    )
+  }
+
+  // Bound pasted-text field sizes — no legitimate JD or title/company name
+  // approaches these lengths. Without a cap, a single item can pad jd_text
+  // arbitrarily large, inflating cost against whichever key screens it
+  // (including the app's own shared key during the beta free allotment,
+  // where cost isn't reflected in quota at all — quota only counts scans,
+  // not tokens) and increasing payload size to the screening backend.
+  const MAX_JD_TEXT_CHARS = 20_000
+  const MAX_NAME_CHARS = 300
+  const oversizedField = (() => {
+    if (jd_text && jd_text.length > MAX_JD_TEXT_CHARS) return 'jd_text'
+    if (job_title && job_title.length > MAX_NAME_CHARS) return 'job_title'
+    if (company && company.length > MAX_NAME_CHARS) return 'company'
+    for (const entry of jd_entries ?? []) {
+      if (entry.jd_text && entry.jd_text.length > MAX_JD_TEXT_CHARS) return 'jd_text'
+      if (entry.job_title && entry.job_title.length > MAX_NAME_CHARS) return 'job_title'
+      if (entry.company && entry.company.length > MAX_NAME_CHARS) return 'company'
+    }
+    return null
+  })()
+  if (oversizedField) {
+    return NextResponse.json(
+      { error: `${oversizedField === 'jd_text' ? 'JD text' : oversizedField === 'job_title' ? 'Job title' : 'Company name'} is too long.` },
       { status: 400 }
     )
   }
@@ -409,21 +440,42 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Items within one request are independent (each does its own atomic
+  // reserve -> call -> save/refund), so they can run concurrently instead of
+  // strictly serially — serial execution meant a 100-item request could take
+  // up to 100 x FASTAPI_TIMEOUT_MS (~75 minutes) worst case, well past any
+  // serverless function time limit. A bounded chunk size keeps this from
+  // hammering the screening backend all at once while still cutting
+  // worst-case wall-clock by roughly the concurrency factor. `usedSoFar`
+  // and `fatalError` are safe to share across concurrently-running items:
+  // usedSoFar is only ever a heuristic for which key to try first (the DB's
+  // atomic reserve_screens call is the real gate — see prepareItem), and
+  // fatalError only needs "some item in this chunk hit one" semantics, not
+  // a specific ordering.
+  const CONCURRENCY = 5
+  async function processInChunks<T>(items: T[], worker: (item: T) => Promise<boolean>): Promise<void> {
+    for (let i = 0; i < items.length; i += CONCURRENCY) {
+      const chunk = items.slice(i, i + CONCURRENCY)
+      const shouldContinue = await Promise.all(chunk.map(worker))
+      if (shouldContinue.some((cont) => !cont)) break
+    }
+  }
+
   if (urls && Array.isArray(urls) && urls.length > 0) {
     const urlList = [...new Set(urls.filter((u) => u.trim()).map(normalizeJobUrl))]
-    for (const url of urlList) {
+    await processInChunks(urlList, async (url): Promise<boolean> => {
       if (!isSafeJobUrl(url)) {
         // Defense-in-depth before this ever reaches the screening service's
         // own server-side fetch — doesn't consume quota, just rejected outright.
         results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: ['Unsupported or unsafe URL'], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
-        continue
+        return true
       }
       const keyChoice = await prepareItem()
       if ('error' in keyChoice) {
         // No usable key/quota for this or any further item — surface it as a
         // visible result row rather than silently truncating, then stop.
         results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [keyChoice.error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
-        break
+        return false
       }
 
       const result = await callFastAPI({ job_url: url }, keyChoice.apiKey, keyChoice.provider)
@@ -431,30 +483,31 @@ export async function POST(request: NextRequest) {
         await refundIfReserved(keyChoice)
         if (result._status === 401) {
           fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
-          break
+          return false
         }
         if (result._status === 429) {
           fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
-          break
+          return false
         }
         results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
-        continue
+        return true
       }
       const saved = await saveResult(result, { job_url: url })
       if (!saved) {
         results.push(saveFailedPlaceholder({ job_url: url, job_title: result.job_title, company: result.company }))
-        continue
+        return true
       }
       results.push(saved)
       count++
-    }
+      return true
+    })
   } else if (jd_entries && Array.isArray(jd_entries) && jd_entries.length > 0) {
     const entries = jd_entries.filter((e) => e.jd_text?.trim())
-    for (const entry of entries) {
+    await processInChunks(entries, async (entry): Promise<boolean> => {
       const keyChoice = await prepareItem()
       if ('error' in keyChoice) {
         results.push({ id: '', user_id: user.id, batch_id, job_url: null, job_title: entry.job_title ?? null, company: entry.company ?? null, jd_text: entry.jd_text, ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [keyChoice.error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
-        break
+        return false
       }
 
       const result = await callFastAPI({ jd_text: entry.jd_text }, keyChoice.apiKey, keyChoice.provider)
@@ -462,23 +515,24 @@ export async function POST(request: NextRequest) {
         await refundIfReserved(keyChoice)
         if (result._status === 401) {
           fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
-          break
+          return false
         }
         if (result._status === 429) {
           fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
-          break
+          return false
         }
         results.push({ id: '', user_id: user.id, batch_id, job_url: null, job_title: entry.job_title ?? null, company: entry.company ?? null, jd_text: entry.jd_text, ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
-        continue
+        return true
       }
       const saved = await saveResult(result, { jd_text: entry.jd_text, job_title: entry.job_title, company: entry.company })
       if (!saved) {
         results.push(saveFailedPlaceholder({ job_title: entry.job_title ?? result.job_title, company: entry.company ?? result.company }))
-        continue
+        return true
       }
       results.push(saved)
       count++
-    }
+      return true
+    })
   } else if (jd_text) {
     const keyChoice = await prepareItem()
     if ('error' in keyChoice) {

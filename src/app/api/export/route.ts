@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Papa from 'papaparse'
+import { sanitizeCsvField } from '@/lib/utils/csv'
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -19,17 +20,20 @@ export async function GET(request: NextRequest) {
     .eq('user_id', user.id)
     .order('composite_score', { ascending: false })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('export query failed:', error.message)
+    return NextResponse.json({ error: 'Failed to load results for export' }, { status: 500 })
+  }
 
   const rows = (data ?? []).map((r) => ({
-    'Job Title': r.job_title ?? '',
-    Company: r.company ?? '',
-    URL: r.job_url ?? '',
+    'Job Title': sanitizeCsvField(r.job_title ?? ''),
+    Company: sanitizeCsvField(r.company ?? ''),
+    URL: sanitizeCsvField(r.job_url ?? ''),
     'ATS Score': r.ats_score,
     'Role Level Score': r.role_level_score,
     'Composite Score': r.composite_score,
     Verdict: r.verdict,
-    'Hard Reject Reasons': ((r.hard_reject_reasons as string[]) ?? []).join('; '),
+    'Hard Reject Reasons': sanitizeCsvField(((r.hard_reject_reasons as string[]) ?? []).join('; ')),
     'Screened At': r.created_at,
   }))
 
