@@ -4,11 +4,17 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') ?? 'JobSnob <noreply@jobsnob.fyi>'
 const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://jobsnob.fyi'
 // The secret shown in Supabase Dashboard -> Authentication -> Hooks when
-// creating the "Send Email" hook (starts with "v1,whsec_..."). This function
-// is deployed with --no-verify-jwt, since Auth Hook calls carry a signed
-// webhook payload, not a user JWT — this signature check is what actually
-// gates the endpoint instead, so it isn't open to anyone who finds the URL.
-const HOOK_SECRET = Deno.env.get('SEND_EMAIL_HOOK_SECRET')!
+// creating the "Send Email" hook comes formatted as "v1,whsec_XXXX" — the
+// "v1," is Supabase's own versioning prefix, not part of the secret the
+// standardwebhooks library expects. Passing the full string through made
+// its base64 decoder throw on every request (500 on every signup/magic-
+// link/recovery email). Strip down to just the whsec_ part.
+// This function is deployed with --no-verify-jwt, since Auth Hook calls
+// carry a signed webhook payload, not a user JWT — this signature check is
+// what actually gates the endpoint instead, so it isn't open to anyone who
+// finds the URL.
+const RAW_HOOK_SECRET = Deno.env.get('SEND_EMAIL_HOOK_SECRET')!
+const HOOK_SECRET = RAW_HOOK_SECRET.startsWith('v1,') ? RAW_HOOK_SECRET.slice(3) : RAW_HOOK_SECRET
 const wh = new Webhook(HOOK_SECRET)
 
 interface AuthHookPayload {
