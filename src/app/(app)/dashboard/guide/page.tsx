@@ -152,7 +152,7 @@ export default function GuidePage() {
     <div className="max-w-2xl space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">How to use</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Scrape job links from any career page and screen them in bulk.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Pull job links from any career page and judge them in bulk.</p>
       </div>
 
       {/* Quick workflow */}
@@ -188,7 +188,7 @@ export default function GuidePage() {
             <p>Click <strong>Copy all URLs</strong> in the panel that appears. The URLs are newline-separated — one job per line.</p>
           </Step>
 
-          <Step num={4} icon={Zap} title="Paste and screen">
+          <Step num={4} icon={Zap} title="Paste and judge">
             <p>Go to <a href="/dashboard" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Screen JDs</a>, select the <strong>Paste URLs</strong> tab, paste the links, and click <strong>Screen all</strong>.</p>
           </Step>
         </div>
@@ -224,7 +224,7 @@ export default function GuidePage() {
         <p className="text-xs text-gray-400 dark:text-gray-500 px-5 pb-3">It auto-scrolls, collects up to 20 jobs, and copies the URLs to your clipboard — wait ~10 seconds for it to finish.</p>
 
         <div className="px-5 space-y-5 pb-5">
-          <Step num={3} icon={Zap} title="Paste and screen">
+          <Step num={3} icon={Zap} title="Paste and judge">
             <p>Go to <a href="/dashboard" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Screen JDs</a>, select the <strong>Job URLs</strong> tab, paste the links, and click <strong>Screen all</strong>. If there are more than 20 jobs, scroll down on LinkedIn and run the script again to grab the rest.</p>
           </Step>
         </div>

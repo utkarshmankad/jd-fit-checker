@@ -33,7 +33,7 @@ export default function ReferralCard() {
   return (
     <div id="referral-card" className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Give a friend 10 bonus screens. Get 10 yourself.</p>
+        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Give a friend 10 bonus judgments. Get 10 yourself.</p>
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
           You&apos;ve referred {info.referrals_count} people · earned {info.bonus_screens_earned} bonus screens
         </p>

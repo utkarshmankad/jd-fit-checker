@@ -288,7 +288,7 @@ export async function POST(request: NextRequest) {
 
     if (isBetaOrLaunch) {
       if (!own) {
-        return { error: `You've used your ${betaLimitValue} free beta scans. Add your own OpenAI or Anthropic API key in Profile settings to keep screening.`, code: 'no_api_key' }
+        return { error: `You've used your ${betaLimitValue} free judgments. Add your own OpenAI or Anthropic API key in Profile settings to keep going.`, code: 'no_api_key' }
       }
       // Own key past the app-key allotment reserves nothing — nothing to refund either.
       return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic', source: 'own', reserved: false, useWeekly: false }
@@ -310,7 +310,7 @@ export async function POST(request: NextRequest) {
     }
     if (!ok) {
       const limitCheck = await checkScreenLimit(profile as unknown as UserProfile, 1)
-      return { error: limitCheck.upgrade_prompt ?? 'Weekly screen limit reached.' }
+      return { error: limitCheck.upgrade_prompt ?? "You've used this week's free judgments." }
     }
     return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic', source: 'own', reserved: true, useWeekly: true }
   }

@@ -132,12 +132,12 @@ export default function HistoryPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <History size={48} className="text-gray-300 dark:text-gray-600 mb-4" />
-        <p className="text-gray-500 dark:text-gray-400 font-medium">No screening history yet</p>
+        <p className="text-gray-500 dark:text-gray-400 font-medium">No judgments yet.</p>
         <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
-          Your past sessions will appear here after your first screen.
+          Your past batches will show up here once you've judged something.
         </p>
         <a href="/dashboard" className="mt-4 text-sm text-blue-600 dark:text-blue-400 underline">
-          Screen your first JD →
+          Judge your first job →
         </a>
       </div>
     )

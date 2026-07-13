@@ -9,12 +9,12 @@ import FeedbackWidget from '@/components/feedback/FeedbackWidget'
 import ThemeToggle from '@/components/theme/ThemeToggle'
 
 const navLinks = [
-  { href: '/dashboard', label: 'Screen JDs', icon: FileSearch },
-  { href: '/dashboard/history', label: 'History', icon: History },
+  { href: '/dashboard', label: 'Judge jobs', icon: FileSearch },
+  { href: '/dashboard/history', label: 'Past judgments', icon: History },
   // Job Tracker — feature disabled, kept for later. See src/app/(app)/dashboard/tracker/page.tsx.
   // { href: '/dashboard/tracker', label: 'Tracker', icon: Briefcase },
   { href: '/dashboard/guide', label: 'How to use', icon: BookOpen },
-  { href: '/profile', label: 'Profile', icon: User },
+  { href: '/profile', label: 'My standards', icon: User },
 ]
 
 interface DashboardShellProps {
@@ -57,7 +57,10 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
         <div className="flex items-center justify-between px-5 py-5 border-b border-white/10">
           <Link href="/dashboard" className="flex items-center gap-2" onClick={() => setSidebarOpen(false)}>
             <LogoMark size={26} />
-            <span className="text-white font-bold text-lg tracking-tight">JobSnob</span>
+            <span>
+              <span className="block text-white font-bold text-lg tracking-tight leading-none">JobSnob</span>
+              <span className="block text-white/40 text-[10px] italic leading-none mt-1">For job seekers with standards.</span>
+            </span>
           </Link>
           <button
             className="md:hidden text-white/70 hover:text-white"

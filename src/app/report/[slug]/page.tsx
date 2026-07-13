@@ -38,11 +38,11 @@ export async function generateMetadata({
   const result = await getReport(slug)
 
   const title = result
-    ? `JD Screening Report — ${result.report.results_snapshot.length} roles ranked`
-    : 'JD Screening Report'
+    ? `${result.userName ? `${result.userName}'s` : 'A'} job list, judged.`
+    : 'A job list, judged.'
   const description = result
-    ? `${result.userName ? `${result.userName} screened` : 'Screened'} ${result.report.results_snapshot.length} job descriptions with AI. See fit scores, gap analysis, and auto-rejected roles.`
-    : 'View this shared job screening report from JobSnob.'
+    ? `Jobsnob applied ${result.userName ? 'their' : 'the'} standards to ${result.report.results_snapshot.length} jobs. Here's the verdict.`
+    : 'View this shared job list from JobSnob.'
 
   return {
     title,
@@ -102,12 +102,12 @@ export default async function ReportPage({
           <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mx-auto mb-2">
             <span className="text-2xl">🔍</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">Report not found</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">This report has expired or the link is invalid.</p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">This one&apos;s gone.</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">The link expired, or it never existed.</p>
           <a href={APP_URL}
             className="inline-block mt-2 px-5 py-2 rounded-lg text-white font-medium text-sm"
             style={{ backgroundColor: '#1B3A5C' }}>
-            Screen your own JDs →
+            Want Jobsnob to judge your list? →
           </a>
         </div>
       </div>
@@ -145,21 +145,21 @@ export default async function ReportPage({
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <p className="text-blue-200 dark:text-blue-300 text-xs font-medium uppercase tracking-wide mb-1">
-              {userName ? `${userName}'s screening report` : 'Job screening report'}
+              {userName ? `${userName}'s job list, judged.` : 'A job list, judged.'}
             </p>
             <h1 className="text-white font-bold text-xl leading-tight">
-              {results.length} role{results.length !== 1 ? 's' : ''} ranked by AI fit analysis
+              Jobsnob applied {userName ? 'their' : 'the'} standards to {results.length} job{results.length !== 1 ? 's' : ''}. Here&apos;s the verdict.
             </h1>
             {counts.REJECT > 0 && (
               <p className="text-blue-300 dark:text-blue-400 text-sm mt-1">
-                {counts.REJECT} role{counts.REJECT !== 1 ? 's' : ''} auto-rejected before scoring
+                {counts.REJECT} dismissed before you&apos;d have finished reading them
               </p>
             )}
           </div>
           <a href={`${APP_URL}/auth/login`}
             className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             style={{ color: '#1B3A5C' }}>
-            Screen your own job list free →
+            Want Jobsnob to judge your list? →
           </a>
         </div>
       </header>
@@ -305,15 +305,14 @@ export default async function ReportPage({
           {/* CTA acquisition block */}
           <div className="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
             <div style={{ backgroundColor: '#1B3A5C' }} className="px-6 py-6 text-center">
-              <p className="text-white font-bold text-xl mb-2">Screen your own job list free</p>
+              <p className="text-white font-bold text-xl mb-2">Want Jobsnob to judge your list?</p>
               <p className="text-blue-200 dark:text-blue-300 text-sm mb-5 max-w-md mx-auto leading-relaxed">
-                Paste up to 20 job URLs. Get AI-ranked fit scores, auto-rejection for dealbreakers,
-                and gap analysis — in under 60 seconds.
+                It&apos;s free to start. No promises it&apos;ll be kind.
               </p>
               <a href={`${APP_URL}/auth/login`}
                 className="inline-block px-8 py-3 rounded-xl font-semibold text-sm bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 style={{ color: '#1B3A5C' }}>
-                Get started free — no credit card →
+                Judge my jobs free — no credit card →
               </a>
               <p className="text-blue-300 dark:text-blue-400 text-xs mt-3">{freeSubtitle}, no key setup needed to start.</p>
             </div>
@@ -341,10 +340,10 @@ export default async function ReportPage({
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="flex items-center gap-1.5 font-bold text-sm" style={{ color: '#1B3A5C' }}><LogoMark size={16} />JobSnob</span>
           <span className="text-sm text-gray-400 dark:text-gray-500 hidden sm:block">
-            Resume-to-JD fit analysis for senior engineers and EMs
+            For senior engineers and EMs with standards
           </span>
           <a href={`${APP_URL}/auth/login`} className="text-sm font-medium hover:underline" style={{ color: '#1B3A5C' }}>
-            Start screening free →
+            Judge my jobs free →
           </a>
         </div>
       </footer>

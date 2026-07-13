@@ -47,6 +47,14 @@ type ScreenError =
 const PROFILE_BANNER_KEY = 'jobsnob-profile-banner-dismissed'
 const PRICING_ENABLED = process.env.NEXT_PUBLIC_PRICING_ENABLED === 'true'
 
+const LOADING_MESSAGES = [
+  "Reading the fine print you'd skip…",
+  'Checking if this is actually EM or just tech lead…',
+  'Seeing if .NET is buried in requirements…',
+  'Applying your standards…',
+  'Almost done judging…',
+]
+
 const SORT_LABELS: Record<SortKey, string> = {
   composite_score: 'Composite',
   ats_score: 'ATS',
@@ -119,6 +127,7 @@ export default function DashboardPage() {
     { id: crypto.randomUUID(), jd_text: '', job_title: '', company: '' },
   ])
   const [screening, setScreening] = useState(false)
+  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0)
   const [skeletonCount, setSkeletonCount] = useState(0)
   const [results, setResults] = useState<ScreeningResult[]>([])
   const [batchTime, setBatchTime] = useState<string | null>(null)
@@ -168,6 +177,14 @@ export default function DashboardPage() {
   useEffect(() => {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
   }, [])
+
+  useEffect(() => {
+    if (!screening) { setLoadingMsgIndex(0); return }
+    const interval = setInterval(() => {
+      setLoadingMsgIndex((i) => (i + 1) % LOADING_MESSAGES.length)
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [screening])
 
   // Job Tracker — feature disabled, kept for later.
   // useEffect(() => {
@@ -245,7 +262,7 @@ export default function DashboardPage() {
           if (!stillMatches) {
             inProgressBatchRef.current = null
             setScreenError(null)
-            toast('Input changed while waiting — auto-retry cancelled. Press Screen all to continue.', { icon: '✋' })
+            toast('Input changed while waiting — auto-retry cancelled. Press Judge these jobs to continue.', { icon: '✋' })
             return 0
           }
           // Auto-resume once the cooldown clears — handleScreen picks up from
@@ -323,7 +340,7 @@ export default function DashboardPage() {
     const duplicateCount = items.length - dedupedItems.length
     items = dedupedItems
     if (duplicateCount > 0) {
-      toast(`Removed ${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''} before screening`, { icon: '🧹' })
+      toast(`Removed ${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''} before judging`, { icon: '🧹' })
     }
 
     if (items.length === 0) return
@@ -394,7 +411,7 @@ export default function DashboardPage() {
             limit_check?: { upgrade_prompt: string | null }
           }
           if (json.upgrade_required || json.limit_check) {
-            setTierModalMessage(json.limit_check?.upgrade_prompt ?? json.error ?? "You've hit your screening limit.")
+            setTierModalMessage(json.limit_check?.upgrade_prompt ?? json.error ?? "You've used your free judgments.")
             setShowTierModal(true)
             completedFully = false
             break
@@ -481,7 +498,7 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error('Share failed')
       const { url } = (await res.json()) as { url: string }
       await navigator.clipboard.writeText(url)
-      toast.success('Link copied — go brag about how much time you saved.')
+      toast.success("Link copied. Go show someone how many jobs you didn't apply to.")
     } catch {
       toast.error('Could not create share link')
     } finally {
@@ -638,8 +655,8 @@ export default function DashboardPage() {
         <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm">
           <AlertTriangle size={16} className="shrink-0 mt-0.5" />
           <span className="flex-1">
-            No dealbreakers set — any job could slip through.{' '}
-            <a href="/profile" className="font-semibold underline">Tell us what to reject →</a>
+            Jobsnob doesn&apos;t know your standards yet. Add your resume or set your dealbreakers.{' '}
+            <a href="/profile" className="font-semibold underline">→</a> Otherwise we&apos;re judging blind.
           </span>
           <button onClick={dismissProfileBanner} className="shrink-0 text-amber-500 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-400 transition-colors" title="Dismiss">
             <X size={15} />
@@ -651,7 +668,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Reject the bad ones</h1>
           {lifetimeSaved && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Lifetime: {lifetimeSaved} saved across your screening history</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Lifetime: {lifetimeSaved} back in your life, across every batch</p>
           )}
         </div>
         {usage && (
@@ -698,7 +715,7 @@ export default function DashboardPage() {
           {tab === 'urls' ? (
             <>
               <textarea value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setScreenError(null) }} rows={5}
-                placeholder="Paste job URLs here, one per line. We'll tell you which ones aren't worth your time."
+                placeholder="Paste job URLs here. One per line. LinkedIn, Naukri, Greenhouse — anywhere. We'll read them so you don't have to."
                 className="w-full resize-none rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               {urlInput.trim() && <p className="text-xs text-gray-400 dark:text-gray-500">{urlCount} URL{urlCount !== 1 ? 's' : ''} detected</p>}
 
@@ -787,9 +804,9 @@ export default function DashboardPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                 </svg>
-                Working on it…
+                {LOADING_MESSAGES[loadingMsgIndex]}
               </span>
-            ) : 'Tell me which ones are worth it →'}
+            ) : 'Judge these jobs'}
           </button>
         </div>
       </div>
@@ -809,8 +826,8 @@ export default function DashboardPage() {
       {!hasAnyResults ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <FileSearch size={48} className="text-gray-300 dark:text-gray-600 mb-4" />
-          <p className="text-gray-700 dark:text-gray-300 font-semibold text-lg">Nothing rejected yet.</p>
-          <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Paste your job list below — we&apos;ll tell you which ones to skip.</p>
+          <p className="text-gray-700 dark:text-gray-300 font-semibold text-lg">Nothing judged yet.</p>
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Paste your job list below. We&apos;ll tell you which ones aren&apos;t worth your morning.</p>
           <div className="mt-6 flex flex-col items-center gap-2">
             <button onClick={loadSampleData}
               className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors hover:opacity-90"
@@ -837,14 +854,14 @@ export default function DashboardPage() {
             <div style={{ backgroundColor: '#1B3A5C' }} className="rounded-xl px-6 py-6 text-white">
               <p className="text-5xl font-bold tracking-tight leading-none">{calculateTimeSaved(verdictCounts.REJECT)}</p>
               <p className="text-blue-200 dark:text-blue-300 mt-3 text-base">
-                saved — by skipping {verdictCounts.REJECT} job{verdictCounts.REJECT !== 1 ? 's' : ''} that weren&apos;t worth your time
+                back in your life. {verdictCounts.REJECT} job{verdictCounts.REJECT !== 1 ? 's' : ''} judged not worth it.
               </p>
             </div>
           )}
           {batchDone && !isSampleData && verdictCounts.REJECT === 0 && goodResults.length > 0 && (
             <div style={{ backgroundColor: '#1B3A5C' }} className="rounded-xl px-6 py-4 text-white flex items-center gap-3">
               <span className="text-green-400 dark:text-green-500 text-xl font-bold">✓</span>
-              <p>All {goodResults.length} jobs cleared your dealbreakers — no time-wasters in this batch.</p>
+              <p>All {goodResults.length} cleared your standards. Rare. Pick the best one.</p>
             </div>
           )}
 
@@ -858,9 +875,9 @@ export default function DashboardPage() {
                 </h2>
                 {goodResults.length > 0 && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">{goodResults.length} JD{goodResults.length !== 1 ? 's' : ''} screened</span>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Judged {goodResults.length}</span>
                     {verdictCounts.REJECT > 0 && (
-                      <span className="ml-1">— <span className="text-green-600 dark:text-green-400 font-medium">{worthALook} worth your time</span> · {verdictCounts.REJECT} you can skip</span>
+                      <span className="ml-1">— <span className="text-green-600 dark:text-green-400 font-medium">{worthALook} worth your time</span> · dismissed {verdictCounts.REJECT} you&apos;ll never have to read</span>
                     )}
                     {verdictCounts.REJECT === 0 && worthALook > 0 && (
                       <span className="ml-1">— <span className="text-green-600 dark:text-green-400 font-medium">{worthALook} worth your time</span></span>
@@ -869,7 +886,7 @@ export default function DashboardPage() {
                   </p>
                 )}
                 {batchTime && skeletonCount === 0 && goodResults.length > 0 && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Screened {timeAgo(batchTime)}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Judged {timeAgo(batchTime)}</p>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
@@ -962,12 +979,12 @@ export default function DashboardPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowTierModal(false)} />
           <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Screening limit reached</h2>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">{tierModalMessage || "You've hit your screening limit. Upgrade once for unlimited rejections — no monthly subscription."}</p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">You&apos;ve used your free judgments.</h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">{tierModalMessage || 'Upgrade once. Judge unlimited jobs. No monthly subscription — your search will end.'}</p>
             <div className="flex flex-col gap-2 pt-1">
               <button onClick={() => { setShowTierModal(false); setShowPaymentModal(true) }}
                 className="w-full py-3 rounded-xl font-semibold text-sm text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: '#1B3A5C' }}>
-                Unlock unlimited rejections — ₹499 one-time
+                Unlock unlimited judgments — ₹499 one-time
               </button>
               <button onClick={() => setShowTierModal(false)} className="w-full text-center text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors py-2">Maybe later</button>
             </div>
@@ -977,7 +994,7 @@ export default function DashboardPage() {
 
       {PRICING_ENABLED && (
         <PaymentModal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)}
-          onSuccess={() => { setShowPaymentModal(false); toast.success('Upgraded! Unlimited rejections unlocked.') }} />
+          onSuccess={() => { setShowPaymentModal(false); toast.success('Unlocked. Judge unlimited jobs, forever.') }} />
       )}
 
       <WhyNotChatGptModal open={showChatGptModal} onClose={() => setShowChatGptModal(false)} />

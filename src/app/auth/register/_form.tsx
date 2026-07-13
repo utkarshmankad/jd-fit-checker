@@ -112,9 +112,9 @@ export default function RegisterPage() {
           </p>
           <ul className="space-y-3">
             {[
-              'Screen 20 JDs in 60 seconds',
-              'ATS score before you apply',
-              'Auto-reject roles that don\'t fit',
+              'Judge 20 jobs in 60 seconds',
+              'Know your fit before you apply',
+              'Dismisses roles that don\'t fit — automatically',
             ].map((t) => (
               <li key={t} className="flex items-center gap-3 text-white/80 text-sm">
                 <svg className="w-4 h-4 text-green-400 dark:text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -48,5 +48,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: 'Failed to apply invite code' }, { status: 500 })
   }
 
-  return NextResponse.json({ success: true, message: 'Beta access unlocked! You have 25 free screens.' })
+  return NextResponse.json({ success: true, message: 'Beta access unlocked. You have 25 free judgments.' })
 }

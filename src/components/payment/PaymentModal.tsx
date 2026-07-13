@@ -74,7 +74,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
         amount: order.amount,
         currency: order.currency,
         name: 'JobSnob',
-        description: 'Monthly subscription — unlimited screens',
+        description: 'One-time payment — unlimited judgments, forever',
         prefill: {
           email: userInfo?.email ?? '',
           name: userInfo?.name ?? '',
@@ -91,7 +91,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
             if (verify.ok) {
               onSuccess()
               onClose()
-              toast.success('Upgraded! Unlimited rejections unlocked.')
+              toast.success('Unlocked. Judge unlimited jobs, forever.')
             } else {
               toast.error('Payment verification failed. Contact support.')
             }
@@ -123,26 +123,14 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
       {/* Modal */}
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-5">
         <div className="text-center">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Keep rejecting unlimited jobs</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Keep judging.</h2>
           <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-            Upgrade once for unlimited rejections — no monthly subscription.
+            You&apos;ve used your free judgments.
+            One payment. Unlimited jobs judged. Forever.
+            No monthly. No renewal.
+            Because your job search won&apos;t last forever — and neither should your subscription.
           </p>
         </div>
-
-        {/* Feature list */}
-        <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-          {[
-            'Unlimited batch screenings, forever',
-            'Full gap analysis + requirements check',
-            'CSV export & shareable report links',
-            'Priority support',
-          ].map((f) => (
-            <li key={f} className="flex items-center gap-2">
-              <span className="text-green-500 dark:text-green-400 font-bold">✓</span>
-              {f}
-            </li>
-          ))}
-        </ul>
 
         {/* Price */}
         <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 p-4 text-center">
@@ -156,14 +144,14 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
           className="w-full py-3 rounded-xl font-semibold text-white text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           style={{ backgroundColor: '#1B3A5C' }}
         >
-          {loading ? 'Opening payment...' : 'Unlock unlimited rejections →'}
+          {loading ? 'Opening payment...' : 'Unlock unlimited judgments — ₹499'}
         </button>
 
         <button
           onClick={onClose}
           className="w-full text-center text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
         >
-          Cancel
+          I&apos;ll apply to all of them manually
         </button>
       </div>
     </div>

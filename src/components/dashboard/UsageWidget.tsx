@@ -34,7 +34,7 @@ export default function UsageWidget({
   if (tier === 'paid') {
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-300 dark:border-green-700">
-        ✓ Active Search · Unlimited
+        ✓ Unlimited judgments
       </span>
     )
   }
@@ -54,7 +54,7 @@ export default function UsageWidget({
     return (
       <div className="flex flex-col items-end gap-1.5">
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${colorCls}`}>
-          🧪 Beta access · {remaining} of {effectiveBetaLimit} free scans left
+          🧪 Beta access · {remaining} of {effectiveBetaLimit} free judgments left
         </span>
         <div className="w-40 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div className={`h-1.5 rounded-full ${barCls} transition-all`} style={{ width: `${pct}%` }} />
@@ -67,13 +67,13 @@ export default function UsageWidget({
             onClick={() => document.getElementById('referral-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
             className="text-xs font-semibold text-blue-600 dark:text-blue-400 underline"
           >
-            Refer a friend for +10 more scans
+            Refer a friend for +10 more judgments
           </button>
         )}
         {remaining === 0 && (
           pricingEnabled ? (
             <button onClick={onUpgradeClick} className="text-xs font-semibold text-red-600 dark:text-red-400 underline">
-              Upgrade to Active Search →
+              Keep judging →
             </button>
           ) : (
             <a href="/profile" className="text-xs font-semibold text-red-600 dark:text-red-400 underline">
@@ -91,7 +91,7 @@ export default function UsageWidget({
   return (
     <div className="flex flex-col items-end gap-1">
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">
-        Free · {remaining} screens this week
+        Free · {remaining} judgments this week
       </span>
       <p className="text-xs text-gray-400 dark:text-gray-500">Resets {formatResetDate(week_reset_at)}</p>
       {referral_bonus_screens > 0 && (
@@ -101,7 +101,7 @@ export default function UsageWidget({
         onClick={() => document.getElementById('referral-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
         className="text-xs font-semibold text-blue-600 dark:text-blue-400 underline"
       >
-        Refer a friend for +10 screens
+        Refer a friend for +10 judgments
       </button>
     </div>
   )

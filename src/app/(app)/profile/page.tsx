@@ -139,14 +139,14 @@ function TagInput({
         <p className="text-xs text-gray-400 dark:text-gray-500">{tags.length} technolog{tags.length === 1 ? 'y' : 'ies'} added</p>
       )}
       {tags.length === 0 && (
-        <p className="text-xs text-amber-500 dark:text-amber-400">No dealbreakers set — all tech stacks will be considered</p>
+        <p className="text-xs text-amber-500 dark:text-amber-400">No hard nos set. Anything gets through.</p>
       )}
     </div>
   )
 }
 
 // ── SectionSaveButton ─────────────────────────────────────────────────────────
-function SectionSaveButton({ state, onClick }: { state: SaveState; onClick: () => void }) {
+function SectionSaveButton({ state, onClick, idleLabel = 'Save changes', savedLabel = 'Saved ✓' }: { state: SaveState; onClick: () => void; idleLabel?: string; savedLabel?: string }) {
   const isIdle = state === 'idle'
   const bgStyle = isIdle ? { backgroundColor: '#1B3A5C', color: '#fff' } : {}
   const bgClass =
@@ -163,8 +163,8 @@ function SectionSaveButton({ state, onClick }: { state: SaveState; onClick: () =
     >
       {state === 'saving' ? (
         <span className="flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> Saving…</span>
-      ) : state === 'saved' ? 'Saved ✓' :
-         state === 'error' ? 'Save failed — try again' : 'Save changes'}
+      ) : state === 'saved' ? savedLabel :
+         state === 'error' ? 'Save failed — try again' : idleLabel}
     </button>
   )
 }
@@ -560,9 +560,9 @@ export default function ProfilePage() {
   const completionTextColor = completionScore >= 80 ? 'text-green-700 dark:text-green-400' : completionScore >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
   const nextAction =
     completionScore === 100 ? null :
-    !prefFilled ? 'Set your preferences or upload a resume to improve scoring' :
-    !filtersFilled ? 'Set your hard-reject rules to filter bad fits' :
-    !apiKeyFilled ? 'Add your API key to unlock AI screening' : null
+    !prefFilled ? 'Show us what you\'re looking for, or upload a resume' :
+    !filtersFilled ? 'Tell us your hard nos' :
+    !apiKeyFilled ? 'Plug in your AI key to start judging' : null
 
   // Onboarding checklist
   const step1Done = prefFilled
@@ -583,8 +583,8 @@ export default function ProfilePage() {
       {/* Tier badge row */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Profile</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Tell us your dealbreakers once. We&apos;ll reject anything that crosses them — automatically, every time.</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Your standards.</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Set these once. Jobsnob applies them to everything, forever.</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="px-3 py-1 rounded-full text-xs font-bold tracking-wide text-white" style={{ backgroundColor: '#1B3A5C' }}>
@@ -612,7 +612,7 @@ export default function ProfilePage() {
         </div>
         {completionScore === 100 ? (
           <p className="text-xs text-green-700 dark:text-green-400 flex items-center gap-1.5">
-            <CheckCircle2 size={13} /> Profile complete — ready to screen JDs
+            <CheckCircle2 size={13} /> Standards set. Ready to judge.
           </p>
         ) : nextAction ? (
           <p className="text-xs text-gray-500 dark:text-gray-400">→ {nextAction}</p>
@@ -623,14 +623,14 @@ export default function ProfilePage() {
       {isOnboarding && !onboardingCompleted && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl px-4 sm:px-6 py-5 space-y-4">
           <div>
-            <h2 className="font-semibold text-blue-900 dark:text-blue-200">Tell us what you won&apos;t accept.</h2>
-            <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">We&apos;ll do the rejecting for you from here.</p>
+            <h2 className="font-semibold text-blue-900 dark:text-blue-200">Welcome to Jobsnob.</h2>
+            <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">Tell us your standards. We&apos;ll apply them to every job. Ruthlessly.</p>
           </div>
           <ol className="space-y-2.5">
             {([
-              { done: step1Done, label: 'Set preferences — tech stack, industries, company size' },
-              { done: step2Done, label: 'Set hard-reject filters — auto-rejects bad fits' },
-              { done: step3Done, label: 'Add your API key — powers AI screening' },
+              { done: step1Done, label: 'Show us what you\'re looking for — tech stack, industries, company size' },
+              { done: step2Done, label: 'Tell us your hard nos' },
+              { done: step3Done, label: 'Plug in your AI key' },
             ] as { done: boolean; label: string }[]).map((step, i) => (
               <li key={i} className="flex items-start gap-2.5 text-sm">
                 <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold mt-0.5 ${step.done ? 'bg-green-500 dark:bg-green-600 text-white' : 'bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-400'}`}>
@@ -648,8 +648,8 @@ export default function ProfilePage() {
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 sm:px-6 py-4 flex items-center gap-3">
           <CheckCircle2 size={20} className="text-green-600 dark:text-green-400 shrink-0" />
           <div>
-            <p className="font-medium text-green-900 dark:text-green-200 text-sm">Profile complete!</p>
-            <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">Save your profile to start screening jobs.</p>
+            <p className="font-medium text-green-900 dark:text-green-200 text-sm">Standards set. Ready to judge. →</p>
+            <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">Save your profile to start.</p>
           </div>
         </div>
       )}
@@ -668,7 +668,7 @@ export default function ProfilePage() {
       </Section>
 
       {/* Resume */}
-      <Section title="Resume">
+      <Section title="Your background." subtitle="Upload it once. We extract what matters and forget the file.">
         <ResumeUploader onParsed={applyParsed} existingResumeDate={resumeDate} />
         {detectedSkills.length > 0 && (
           <div className="flex items-center gap-2 text-xs text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2 mt-2">
@@ -680,7 +680,7 @@ export default function ProfilePage() {
       </Section>
 
       {/* AI provider */}
-      <Section title="AI provider" action={<SectionSaveButton state={apiSave} onClick={handleSaveApi} />}>
+      <Section title="The brain." subtitle="Your key. Your AI. We use it to judge. We never see your money." action={<SectionSaveButton state={apiSave} onClick={handleSaveApi} />}>
         <Field label="Provider">
           <select
             value={apiProvider}
@@ -728,13 +728,11 @@ export default function ProfilePage() {
 
       {/* Dealbreakers */}
       <Section
-        title="Your dealbreakers"
-        action={<SectionSaveButton state={filterSave} onClick={handleSaveFilters} />}
+        title="Your hard nos."
+        subtitle="Cross any of these and the job is dismissed before you ever see it. No explanation. No second chances."
+        action={<SectionSaveButton state={filterSave} onClick={handleSaveFilters} idleLabel="Apply these standards" savedLabel="Standards saved." />}
       >
-        <p className="text-sm text-gray-500 dark:text-gray-400 -mt-1 mb-3">
-          Cross any of these and the job gets rejected before you ever have to read it.
-        </p>
-        <Field label="Tech I won't work with">
+        <Field label="Won't touch these. Ever.">
           <TagInput
             tags={techDealbreakerTags}
             onChange={(tags) => { setTechDealbreakerTags(tags); markDirty() }}
@@ -743,7 +741,7 @@ export default function ProfilePage() {
             suggestions={DEALBREAKER_SUGGESTIONS}
           />
         </Field>
-        <Field label="Minimum seniority level">
+        <Field label="Below this level is beneath you.">
           <input
             type="text"
             value={titleFloor}
@@ -752,7 +750,7 @@ export default function ProfilePage() {
             className={inputCls}
           />
         </Field>
-        <Field label="Locations I'm open to (comma-separated)">
+        <Field label="Won't relocate for. Won't commute to.">
           <input
             type="text"
             value={geoAllowed}
@@ -761,7 +759,7 @@ export default function ProfilePage() {
             className={inputCls}
           />
         </Field>
-        <Field label="Company types to avoid (comma-separated)">
+        <Field label="Not interested in these. Don't show me them.">
           <input
             type="text"
             value={companyExcluded}
@@ -770,7 +768,7 @@ export default function ProfilePage() {
             className={inputCls}
           />
         </Field>
-        <Field label="Job types to avoid (comma-separated)">
+        <Field label="Not doing these. Don't ask.">
           <input
             type="text"
             value={roleExcluded}
@@ -943,17 +941,22 @@ const inputCls =
 
 function Section({
   title,
+  subtitle,
   children,
   action,
 }: {
   title: string
+  subtitle?: string
   children: React.ReactNode
   action?: React.ReactNode
 }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
+        <div>
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
+          {subtitle && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{subtitle}</p>}
+        </div>
         {action}
       </div>
       {children}

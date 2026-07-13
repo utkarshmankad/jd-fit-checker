@@ -125,9 +125,9 @@ function LoginForm() {
   const isLoading = signinLoading || signupLoading || oauthLoading
 
   const benefits = [
-    'Screen 20 JDs in 60 seconds',
-    'ATS score before you apply',
-    "Auto-reject roles that don't fit",
+    'Judge 20 jobs in 60 seconds',
+    'Know your fit before you apply',
+    "Dismisses roles that don't fit — automatically",
   ]
 
   return (
