@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Upload, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react'
+import Link from 'next/link'
+import { Upload, CheckCircle2, AlertCircle, Loader2, X, ArrowRight } from 'lucide-react'
 import type { HardRejectFilters, UserPreferences, ApiProvider } from '@/types'
 
 interface ProfileData {
@@ -644,13 +645,22 @@ export default function ProfilePage() {
       )}
 
       {/* Completion banner */}
-      {isOnboarding && !onboardingCompleted && allStepsDone && (
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 sm:px-6 py-4 flex items-center gap-3">
-          <CheckCircle2 size={20} className="text-green-600 dark:text-green-400 shrink-0" />
-          <div>
-            <p className="font-medium text-green-900 dark:text-green-200 text-sm">Standards set. Ready to judge. →</p>
-            <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">Save your profile to start.</p>
+      {allStepsDone && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 size={20} className="text-green-600 dark:text-green-400 shrink-0" />
+            <div>
+              <p className="font-medium text-green-900 dark:text-green-200 text-sm">Standards set. Ready to judge.</p>
+              <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">All sections saved.</p>
+            </div>
           </div>
+          <Link
+            href="/dashboard"
+            className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: '#1B3A5C' }}
+          >
+            Start judging jobs <ArrowRight size={14} />
+          </Link>
         </div>
       )}
 
