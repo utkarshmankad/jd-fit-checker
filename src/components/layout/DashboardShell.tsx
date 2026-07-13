@@ -67,6 +67,11 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
           </button>
         </div>
 
+        {/* Theme toggle */}
+        <div className="px-5 pt-4">
+          <ThemeToggle variant="dark" />
+        </div>
+
         {/* Nav links */}
         <nav className="flex-1 px-3 py-4 space-y-1">
           {navLinks.map(({ href, label, icon: Icon }) => {
@@ -92,10 +97,7 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
 
         {/* Bottom: user + sign out */}
         <div className="px-3 py-4 border-t border-white/10 space-y-3">
-          <div className="flex items-center justify-between px-3">
-            <p className="text-xs text-white/40 truncate">{userEmail}</p>
-            <ThemeToggle variant="dark" />
-          </div>
+          <p className="px-3 text-xs text-white/40 truncate">{userEmail}</p>
           <form action="/auth/logout" method="POST">
             <button
               type="submit"

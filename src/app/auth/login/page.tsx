@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
+import ThemeToggle from '@/components/theme/ThemeToggle'
 
 function formatAuthError(raw: string): string {
   const lower = raw.toLowerCase()
@@ -156,7 +157,11 @@ function LoginForm() {
       </div>
 
       {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-gray-900">
+      <div className="flex-1 flex flex-col p-8 bg-white dark:bg-gray-900">
+        <div className="flex justify-end">
+          <ThemeToggle />
+        </div>
+        <div className="flex-1 flex items-center justify-center">
         <div className="w-full max-w-sm space-y-5">
 
           <div>
@@ -258,6 +263,7 @@ function LoginForm() {
           {error && (
             <p className="text-sm text-red-600 dark:text-red-400 text-center">{error}</p>
           )}
+        </div>
         </div>
       </div>
     </div>

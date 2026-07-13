@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
+import ThemeToggle from '@/components/theme/ThemeToggle'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -129,7 +130,11 @@ export default function RegisterPage() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-gray-900">
+      <div className="flex-1 flex flex-col p-8 bg-white dark:bg-gray-900">
+        <div className="flex justify-end">
+          <ThemeToggle />
+        </div>
+        <div className="flex-1 flex items-center justify-center">
         <div className="w-full max-w-sm space-y-8">
           {/* Header */}
           <div>
@@ -227,6 +232,7 @@ export default function RegisterPage() {
           <p className="text-center text-xs text-gray-400 dark:text-gray-500">
             By creating an account you agree to our terms of service.
           </p>
+        </div>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { Trash2, ShieldX, ListChecks, Flag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import AuthHashRedirect from '@/components/auth-hash-redirect'
 import { LogoMark } from '@/components/Logo'
+import ThemeToggle from '@/components/theme/ThemeToggle'
 
 export default async function LandingPage() {
   const supabase = await createClient()
@@ -28,13 +29,16 @@ export default async function LandingPage() {
             <LogoMark size={26} />
             JD Fit Checker
           </span>
-          <Link
-            href="/auth/login"
-            className="px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: '#1B3A5C', color: '#fff' }}
-          >
-            Sign in →
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Link
+              href="/auth/login"
+              className="px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: '#1B3A5C', color: '#fff' }}
+            >
+              Sign in →
+            </Link>
+          </div>
         </div>
       </header>
 
