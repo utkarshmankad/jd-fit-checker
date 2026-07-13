@@ -4,6 +4,10 @@ export interface VerdictDisplay {
   bg: string
   border: string
   icon: string
+  /** Hero-element verdict line for the card design — a judgment, not a label. */
+  verdictLine: string
+  /** Hex for the card's 4px left border, distinct from the Tailwind classes above. */
+  barColor: string
 }
 
 // UI-facing display mapping. Database/API values (STRONG/DECENT/WEAK/REJECT)
@@ -16,6 +20,8 @@ const VERDICT_DISPLAY: Record<string, VerdictDisplay> = {
     bg: 'bg-green-100',
     border: 'border-green-300',
     icon: '✦',
+    verdictLine: "This one's worth it.",
+    barColor: '#16A34A',
   },
   DECENT: {
     label: 'Worth Applying',
@@ -23,6 +29,8 @@ const VERDICT_DISPLAY: Record<string, VerdictDisplay> = {
     bg: 'bg-blue-100',
     border: 'border-blue-300',
     icon: '◉',
+    verdictLine: 'Probably worth a look.',
+    barColor: '#2E75B6',
   },
   WEAK: {
     label: 'Low Priority',
@@ -30,6 +38,8 @@ const VERDICT_DISPLAY: Record<string, VerdictDisplay> = {
     bg: 'bg-gray-100',
     border: 'border-gray-300',
     icon: '○',
+    verdictLine: 'Probably not.',
+    barColor: '#9CA3AF',
   },
   REJECT: {
     label: 'Skip This One',
@@ -37,6 +47,8 @@ const VERDICT_DISPLAY: Record<string, VerdictDisplay> = {
     bg: 'bg-red-100',
     border: 'border-red-300',
     icon: '✕',
+    verdictLine: 'Skip this one.',
+    barColor: '#DC2626',
   },
 }
 
@@ -46,6 +58,8 @@ const FALLBACK_DISPLAY: VerdictDisplay = {
   bg: 'bg-gray-100',
   border: 'border-gray-300',
   icon: '○',
+  verdictLine: 'Unclear.',
+  barColor: '#9CA3AF',
 }
 
 export function getVerdictDisplay(verdict: string): VerdictDisplay {

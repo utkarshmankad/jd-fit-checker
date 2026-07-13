@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef, Fragment } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  FileSearch, Eye, ExternalLink, Download, Share2, Plus, X,
-  ChevronDown, ChevronUp, AlertTriangle, WifiOff, Pencil,
+  FileSearch, Download, Share2, Plus, X,
+  AlertTriangle, WifiOff,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { ScreeningResult, HardRejectFilters, BatchIntelligence } from '@/types'
@@ -18,16 +18,11 @@ import PaymentModal from '@/components/payment/PaymentModal'
 // import TrackButton from '@/components/tracker/TrackButton'
 import { SAMPLE_RESULTS } from '@/lib/sample-data'
 import { calculateTimeSaved } from '@/lib/utils/time-saved'
-import {
-  SCORE_TOOLTIPS, getReasonLine,
-  ScorePill, AnalysisDetailBody, FakeEmBadge,
-} from '@/components/analysis/AnalysisDetail'
-import { getVerdictDisplay } from '@/lib/utils/verdicts'
+import { VerdictCard, DismissedCard, ErrorCard, LoadingCard } from '@/components/analysis/VerdictCard'
 import { normalizeJobUrl } from '@/lib/utils/url'
 import { sanitizeCsvField } from '@/lib/utils/csv'
 import Papa from 'papaparse'
 
-type SortKey = 'composite_score' | 'ats_score' | 'role_level_score' | 'verdict'
 type InputTab = 'urls' | 'text'
 
 interface JdEntry {
@@ -55,12 +50,6 @@ const LOADING_MESSAGES = [
   'Almost done judging…',
 ]
 
-const SORT_LABELS: Record<SortKey, string> = {
-  composite_score: 'Composite',
-  ats_score: 'ATS',
-  role_level_score: 'Role fit',
-  verdict: 'Verdict',
-}
 
 const VERDICT_ORDER: Record<'STRONG' | 'DECENT' | 'WEAK' | 'REJECT', number> = {
   STRONG: 0, DECENT: 1, WEAK: 2, REJECT: 3,
@@ -98,26 +87,6 @@ function getActiveRules(hrf: HardRejectFilters | null): string[] {
   return rules
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function SkeletonRow() {
-  return (
-    <tr className="border-b border-gray-100 dark:border-gray-800">
-      <td className="px-4 sm:px-6 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24" /></td>
-      <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32" /></td>
-      <td className="px-4 py-4">
-        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse w-28" />
-        {/* Approximates the reason-line height real rows can show below the
-            badge — without this, a batch skewed toward REJECT verdicts grows
-            in row height right as the skeleton flips to a real result. */}
-        <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-40 mt-1.5" />
-      </td>
-      <td className="px-4 py-4 hidden md:table-cell"><div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-16 ml-auto" /></td>
-      <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-6 ml-auto" /></td>
-    </tr>
-  )
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -132,7 +101,6 @@ export default function DashboardPage() {
   const [results, setResults] = useState<ScreeningResult[]>([])
   const [batchTime, setBatchTime] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<SortKey>('composite_score')
   const [shareLoading, setShareLoading] = useState(false)
   const [rejectedCollapsed, setRejectedCollapsed] = useState(true)
   const [isSampleData, setIsSampleData] = useState(false)
@@ -179,7 +147,8 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    if (!screening) { setLoadingMsgIndex(0); return }
+    if (!screening) return
+    setLoadingMsgIndex(0)
     const interval = setInterval(() => {
       setLoadingMsgIndex((i) => (i + 1) % LOADING_MESSAGES.length)
     }, 2000)
@@ -509,10 +478,10 @@ export default function DashboardPage() {
   const goodResults = results.filter((r) => r.id !== '')
   const errorResults = results.filter((r) => r.id === '')
 
-  const sortedGood = [...goodResults].sort((a, b) => {
-    if (sortKey === 'verdict') return VERDICT_ORDER[a.verdict] - VERDICT_ORDER[b.verdict]
-    return b[sortKey] - a[sortKey]
-  })
+  // Ordered by verdict strength (Excellent -> Worth -> Low Priority) — not
+  // sortable by score anymore, since scores are no longer the headline; they're
+  // proof for the curious, tucked behind a per-card toggle.
+  const sortedGood = [...goodResults].sort((a, b) => VERDICT_ORDER[a.verdict] - VERDICT_ORDER[b.verdict])
   const mainResults = [...sortedGood.filter((r) => r.verdict !== 'REJECT'), ...errorResults]
   const rejectResults = sortedGood.filter((r) => r.verdict === 'REJECT')
 
@@ -532,123 +501,6 @@ export default function DashboardPage() {
     ? calculateTimeSaved(lifetimeRejectCount)
     : null
 
-  function renderResultRow(result: ScreeningResult) {
-    const isErrorRow = result.id === ''
-    const errorMsg = isErrorRow ? (result.hard_reject_reasons?.[0] ?? 'Could not scrape this URL') : null
-    const isReject = !isErrorRow && result.verdict === 'REJECT'
-    const rowKey = result.id || result.job_url || result.created_at
-    const isExpanded = expandedId === rowKey
-    const reasonLine = !isErrorRow ? getReasonLine(result) : null
-
-    return (
-      <Fragment key={rowKey}>
-        <tr className={[
-          'border-b border-gray-100 dark:border-gray-800 transition-colors',
-          isErrorRow ? 'bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50',
-          isReject ? 'border-l-4 border-red-400 dark:border-red-600' : '',
-        ].filter(Boolean).join(' ')}>
-          {/* Company */}
-          <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap align-top">
-            {isErrorRow ? <span className="text-amber-700 dark:text-amber-400">Unknown</span> : (result.company ?? '—')}
-          </td>
-          {/* Job title */}
-          <td className="px-4 py-4 text-gray-500 dark:text-gray-400 max-w-[10rem] align-top">
-            {isErrorRow ? (
-              <span className="text-amber-700 dark:text-amber-400 text-xs truncate block" title={result.job_url ?? ''}>
-                {(result.job_url ?? '').slice(0, 36)}{(result.job_url ?? '').length > 36 ? '…' : ''}
-              </span>
-            ) : (
-              <span className="flex items-start gap-1.5">
-                <span className="text-xs line-clamp-2">{result.job_title ?? '—'}</span>
-                <FakeEmBadge detection={result.analysis_json?.fake_em_detection} />
-              </span>
-            )}
-          </td>
-          {/* Verdict (PRIMARY) + reason line */}
-          <td className="px-4 py-4 align-top max-w-xs">
-            {isErrorRow ? (
-              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">⚠ Scrape failed</span>
-            ) : (
-              <div>
-                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold ${getVerdictDisplay(result.verdict).bg} ${getVerdictDisplay(result.verdict).color} border ${getVerdictDisplay(result.verdict).border}`}>
-                  {getVerdictDisplay(result.verdict).icon} {getVerdictDisplay(result.verdict).label}
-                </span>
-                {reasonLine && (
-                  <p className={`text-xs mt-1.5 leading-snug ${isReject ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                    {reasonLine}
-                  </p>
-                )}
-              </div>
-            )}
-          </td>
-          {/* Scores (SECONDARY — small, muted, right-aligned, hidden on mobile) */}
-          <td className="px-4 py-4 text-right align-top hidden md:table-cell">
-            {!isErrorRow && (
-              <div className="flex flex-col items-end gap-1.5">
-                <ScorePill label="ATS " score={result.ats_score} tip={SCORE_TOOLTIPS.ats} />
-                <ScorePill label="Role " score={result.role_level_score} tip={SCORE_TOOLTIPS.role} />
-                <ScorePill label="⊕ " score={result.composite_score} tip={SCORE_TOOLTIPS.composite} />
-              </div>
-            )}
-          </td>
-          {/* Actions */}
-          <td className="px-4 py-4 align-top">
-            <div className="flex items-center gap-2 justify-end">
-              <button onClick={() => setExpandedId(isExpanded ? null : rowKey)}
-                className={`p-1.5 rounded transition-colors ${isExpanded ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
-                title={isErrorRow ? 'View error' : 'View analysis'}>
-                <Eye size={15} />
-              </button>
-              {result.job_url && !isErrorRow && (
-                <a href={result.job_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors" title="Open URL">
-                  <ExternalLink size={15} />
-                </a>
-              )}
-              {/* Job Tracker — feature disabled, kept for later.
-              {!isErrorRow && (
-                <TrackButton
-                  screeningResultId={result.id}
-                  jobTitle={result.job_title}
-                  company={result.company}
-                  jobUrl={result.job_url}
-                  tracked={trackedIds.has(result.id)}
-                  onTracked={(item) => setTrackedIds((prev) => new Set(prev).add(item.screening_result_id as string))}
-                />
-              )}
-              */}
-            </div>
-          </td>
-        </tr>
-
-        {/* Expanded detail row */}
-        <tr className={isErrorRow ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-slate-50 dark:bg-gray-800/50'}>
-          <td colSpan={5} className="p-0">
-            <div className={`overflow-hidden transition-all duration-200 ease-in-out ${isExpanded ? 'max-h-[900px]' : 'max-h-0'}`}>
-              <div className="px-6 py-5">
-                {isErrorRow ? (
-                  <div className="space-y-3 max-w-xl">
-                    <div className="flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 rounded-lg px-3 py-2.5">
-                      <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                      <span>{errorMsg}</span>
-                    </div>
-                    {result.job_url && (
-                      <button onClick={() => handlePasteManually(result.job_url!)}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                        <Pencil size={12} /> Paste manually
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <AnalysisDetailBody result={result} />
-                )}
-              </div>
-            </div>
-          </td>
-        </tr>
-      </Fragment>
-    )
-  }
-
   return (
     <div className="space-y-6 max-w-6xl">
       {!profileBannerDismissed && hasApiKey === true && !hasPreferences && (
@@ -666,7 +518,7 @@ export default function DashboardPage() {
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Reject the bad ones</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Judge the list.</h1>
           {lifetimeSaved && (
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Lifetime: {lifetimeSaved} back in your life, across every batch</p>
           )}
@@ -858,111 +710,87 @@ export default function DashboardPage() {
               </p>
             </div>
           )}
-          {batchDone && !isSampleData && verdictCounts.REJECT === 0 && goodResults.length > 0 && (
-            <div style={{ backgroundColor: '#1B3A5C' }} className="rounded-xl px-6 py-4 text-white flex items-center gap-3">
-              <span className="text-green-400 dark:text-green-500 text-xl font-bold">✓</span>
-              <p>All {goodResults.length} cleared your standards. Rare. Pick the best one.</p>
-            </div>
+
+          {/* Batch completion line */}
+          {goodResults.length > 0 && skeletonCount === 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 px-1">
+              {verdictCounts.REJECT === goodResults.length ? (
+                <>Judged {goodResults.length}. None cleared your standards. Try a different search. Or lower one filter.</>
+              ) : verdictCounts.REJECT === 0 ? (
+                <>Judged {goodResults.length}. All {goodResults.length} cleared your standards. Rare. Pick the best one.</>
+              ) : (
+                <>Judged {goodResults.length}. {worthALook} worth your time. {verdictCounts.REJECT} dismissed. {calculateTimeSaved(verdictCounts.REJECT)} back in your life.</>
+              )}
+              {errorResults.length > 0 && <span className="ml-1 text-amber-600 dark:text-amber-400">({errorResults.length} failed to scrape)</span>}
+            </p>
+          )}
+          {batchTime && skeletonCount === 0 && goodResults.length > 0 && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 px-1 -mt-2">Judged {timeAgo(batchTime)}</p>
           )}
 
-          {/* Results table */}
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-              <div>
-                <h2 className="font-semibold text-gray-900 dark:text-gray-100">
-                  Results
-                  {errorResults.length > 0 && <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400">({errorResults.length} failed to scrape)</span>}
-                </h2>
-                {goodResults.length > 0 && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Judged {goodResults.length}</span>
-                    {verdictCounts.REJECT > 0 && (
-                      <span className="ml-1">— <span className="text-green-600 dark:text-green-400 font-medium">{worthALook} worth your time</span> · dismissed {verdictCounts.REJECT} you&apos;ll never have to read</span>
-                    )}
-                    {verdictCounts.REJECT === 0 && worthALook > 0 && (
-                      <span className="ml-1">— <span className="text-green-600 dark:text-green-400 font-medium">{worthALook} worth your time</span></span>
-                    )}
-                    {skeletonCount > 0 && <span className="text-gray-400 dark:text-gray-500 italic ml-1">{skeletonCount} in progress…</span>}
-                  </p>
-                )}
-                {batchTime && skeletonCount === 0 && goodResults.length > 0 && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Judged {timeAgo(batchTime)}</p>
-                )}
+          {/* Zone 1 — everything that isn't dismissed, plus scrape failures */}
+          <div className="space-y-3">
+            {mainResults.map((result) => (
+              result.id === '' ? (
+                <ErrorCard
+                  key={result.job_url || result.created_at}
+                  result={result}
+                  onOpen={result.job_url ? () => window.open(result.job_url!, '_blank', 'noopener,noreferrer') : undefined}
+                  onEdit={result.job_url ? () => handlePasteManually(result.job_url!) : undefined}
+                />
+              ) : (
+                <VerdictCard
+                  key={result.id}
+                  result={result}
+                  isExpanded={expandedId === result.id}
+                  onToggle={() => setExpandedId(expandedId === result.id ? null : result.id)}
+                />
+              )
+            ))}
+            {Array.from({ length: skeletonCount }).map((_, i) => (
+              <LoadingCard key={`skel-${i}`} message={LOADING_MESSAGES[loadingMsgIndex]} />
+            ))}
+          </div>
+
+          {/* Zone 2 — dismissed, grouped under a divider, smaller cards */}
+          {rejectResults.length > 0 && (
+            <div className="pt-2">
+              <div className="flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+                <span className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                <span>— Dismissed ({rejectResults.length}) —</span>
+                <span className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs text-gray-400 dark:text-gray-500 mr-1">Sort:</span>
-                {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-                  <button key={k} onClick={() => setSortKey(k)}
-                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${sortKey === k ? 'bg-gray-900 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
-                    {SORT_LABELS[k]}
-                  </button>
+              <div className="mt-3 space-y-2">
+                {(rejectedCollapsed ? rejectResults.slice(0, 3) : rejectResults).map((result) => (
+                  <DismissedCard key={result.id} result={result} />
                 ))}
               </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                    <th className="text-left px-4 sm:px-6 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Company</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Job title</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Verdict</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap text-xs hidden md:table-cell">Scores</th>
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {mainResults.map(renderResultRow)}
-                  {Array.from({ length: skeletonCount }).map((_, i) => (
-                    <SkeletonRow key={`skel-${i}`} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Collapsible reject section */}
-            {rejectResults.length > 0 && (
-              <div className="border-t border-gray-100 dark:border-gray-800">
+              {rejectResults.length > 3 && (
                 <button
                   onClick={() => setRejectedCollapsed((v) => !v)}
-                  className="w-full flex items-center justify-between px-4 sm:px-6 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-400 dark:bg-red-500 inline-block" />
-                    Skip These ({rejectResults.length}) — click to see why
-                  </span>
-                  {rejectedCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                </button>
-                {!rejectedCollapsed && (
-                  <div className="overflow-x-auto border-t border-gray-100 dark:border-gray-800">
-                    <table className="w-full text-sm">
-                      <tbody>
-                        {rejectResults.map(renderResultRow)}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Confidence disclaimer */}
-            {goodResults.length > 0 && (
-              <div className="px-4 sm:px-6 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                <p className="text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
-                  Scores reflect resume-to-JD fit, not a guarantee of callbacks. Use them to prioritize, not to predict.
-                </p>
-              </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-gray-800">
-              <button onClick={exportCSV} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                <Download size={15} /> Export CSV
-              </button>
-              {!isSampleData && (
-                <button onClick={handleShare} disabled={shareLoading} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors disabled:opacity-50">
-                  <Share2 size={15} /> {shareLoading ? 'Sharing...' : 'Share results'}
+                  className="mt-2 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline"
+                >
+                  {rejectedCollapsed ? `Show all dismissed (${rejectResults.length}) →` : 'Show fewer'}
                 </button>
               )}
             </div>
+          )}
+
+          {goodResults.length > 0 && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 leading-relaxed px-1">
+              Scores reflect resume-to-JD fit, not a guarantee of callbacks. Use them to prioritize, not to predict.
+            </p>
+          )}
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+            <button onClick={exportCSV} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors bg-white dark:bg-gray-900">
+              <Download size={15} /> Export CSV
+            </button>
+            {!isSampleData && (
+              <button onClick={handleShare} disabled={shareLoading} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors disabled:opacity-50 bg-white dark:bg-gray-900">
+                <Share2 size={15} /> {shareLoading ? 'Sharing...' : 'Share results'}
+              </button>
+            )}
           </div>
 
           {batchIntelligence && (
