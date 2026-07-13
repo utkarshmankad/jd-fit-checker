@@ -5,7 +5,6 @@ import { Copy, Check } from 'lucide-react'
 
 interface ReferralInfo {
   code: string
-  referral_link: string
   referrals_count: number
   bonus_screens_earned: number
 }
@@ -23,9 +22,9 @@ export default function ReferralCard() {
 
   if (!info) return null
 
-  function copyLink() {
+  function copyCode() {
     if (!info) return
-    navigator.clipboard.writeText(info.referral_link).then(() => {
+    navigator.clipboard.writeText(info.code).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
@@ -40,11 +39,11 @@ export default function ReferralCard() {
         </p>
       </div>
       <button
-        onClick={copyLink}
+        onClick={copyCode}
         className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
       >
         {copied ? <Check size={14} className="text-green-600 dark:text-green-400" /> : <Copy size={14} />}
-        {copied ? 'Copied!' : 'Copy referral link'}
+        {copied ? 'Copied!' : `Copy code: ${info.code}`}
       </button>
     </div>
   )

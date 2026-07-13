@@ -1,8 +1,15 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { Webhook } from 'npm:standardwebhooks@1'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
 const FROM_EMAIL = Deno.env.get('FROM_EMAIL') ?? 'JobSnob <noreply@jobsnob.fyi>'
 const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://jobsnob.fyi'
+// The secret shown in Supabase Dashboard -> Authentication -> Hooks when
+// creating the "Send Email" hook (starts with "v1,whsec_..."). This function
+// is deployed with --no-verify-jwt, since Auth Hook calls carry a signed
+// webhook payload, not a user JWT — this signature check is what actually
+// gates the endpoint instead, so it isn't open to anyone who finds the URL.
+const HOOK_SECRET = Deno.env.get('SEND_EMAIL_HOOK_SECRET')!
+const wh = new Webhook(HOOK_SECRET)
 
 interface AuthHookPayload {
   user: {
@@ -155,17 +162,17 @@ function buildEmail(payload: AuthHookPayload): { subject: string; html: string }
 }
 
 Deno.serve(async (req) => {
-  // Supabase sends a JWT in Authorization header — verify it
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response('Unauthorized', { status: 401 })
-  }
+  const rawBody = await req.text()
 
   let payload: AuthHookPayload
   try {
-    payload = await req.json() as AuthHookPayload
-  } catch {
-    return new Response('Bad request', { status: 400 })
+    // Verifies webhook-id/webhook-timestamp/webhook-signature headers against
+    // HOOK_SECRET (HMAC over the exact raw body) — this is the real auth
+    // check for this endpoint. Throws on missing/invalid/expired signature.
+    payload = wh.verify(rawBody, Object.fromEntries(req.headers)) as AuthHookPayload
+  } catch (e) {
+    console.error('Webhook signature verification failed:', e)
+    return new Response('Unauthorized', { status: 401 })
   }
 
   const { subject, html } = buildEmail(payload)
