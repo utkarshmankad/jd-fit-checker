@@ -137,7 +137,7 @@ function LoginForm() {
         className="hidden md:flex md:w-[40%] flex-col justify-between p-10"
         style={{ backgroundColor: '#1B3A5C' }}
       >
-        <p className="text-white text-2xl font-bold tracking-tight">JD Fit Checker</p>
+        <p className="text-white text-2xl font-bold tracking-tight">JobSnob</p>
         <div className="space-y-8">
           <h2 className="text-white text-3xl font-bold leading-snug">
             Stop reading JDs that waste your time.

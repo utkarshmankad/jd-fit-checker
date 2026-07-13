@@ -27,7 +27,7 @@ function buildDigestHtml(rows: Pick<Feedback, 'email' | 'message' | 'page' | 'cr
     )
     .join('')
   return `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;">
-    <h2 style="color:#1B3A5C;">JD Fit Checker — ${rows.length} new feedback ${rows.length === 1 ? 'item' : 'items'}</h2>
+    <h2 style="color:#1B3A5C;">JobSnob — ${rows.length} new feedback ${rows.length === 1 ? 'item' : 'items'}</h2>
     ${items}
   </div>`
 }
@@ -67,9 +67,9 @@ export async function GET(request: NextRequest) {
 
   const resend = new Resend(RESEND_KEY)
   const { error: sendError } = await resend.emails.send({
-    from: process.env.FEEDBACK_EMAIL_FROM || 'JD Fit Checker <onboarding@resend.dev>',
+    from: process.env.FEEDBACK_EMAIL_FROM || 'JobSnob <onboarding@resend.dev>',
     to: TO_EMAIL,
-    subject: `JD Fit Checker feedback — ${rows.length} new`,
+    subject: `JobSnob feedback — ${rows.length} new`,
     html: buildDigestHtml(rows),
   })
 

@@ -73,7 +73,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
         order_id: order.order_id,
         amount: order.amount,
         currency: order.currency,
-        name: 'JD Fit Checker',
+        name: 'JobSnob',
         description: 'Monthly subscription — unlimited screens',
         prefill: {
           email: userInfo?.email ?? '',

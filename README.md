@@ -1,4 +1,4 @@
-# JD Fit Checker
+# JobSnob
 
 Screen job descriptions against your profile and preferences using AI. Paste JD text or drop LinkedIn job URLs — get ATS scores, role-level scores, composite verdicts, and gap analysis in seconds.
 
@@ -76,7 +76,7 @@ src/
 
 ```bash
 git clone <repo>
-cd jd-fit-checker
+cd jobsnob
 npm install
 ```
 

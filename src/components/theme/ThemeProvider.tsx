@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
-const STORAGE_KEY = 'jdfit-theme'
+const STORAGE_KEY = 'jobsnob-theme'
 
 interface ThemeContextValue {
   mode: ThemeMode

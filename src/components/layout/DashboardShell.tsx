@@ -57,7 +57,7 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
         <div className="flex items-center justify-between px-5 py-5 border-b border-white/10">
           <Link href="/dashboard" className="flex items-center gap-2" onClick={() => setSidebarOpen(false)}>
             <LogoMark size={26} />
-            <span className="text-white font-bold text-lg tracking-tight">JD Fit Checker</span>
+            <span className="text-white font-bold text-lg tracking-tight">JobSnob</span>
           </Link>
           <button
             className="md:hidden text-white/70 hover:text-white"
@@ -122,7 +122,7 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
           </button>
           <Link href="/dashboard" className="flex items-center gap-2 flex-1">
             <LogoMark size={22} />
-            <span className="font-semibold text-gray-900 dark:text-gray-100">JD Fit Checker</span>
+            <span className="font-semibold text-gray-900 dark:text-gray-100">JobSnob</span>
           </Link>
           <ThemeToggle />
         </header>

@@ -10,7 +10,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'JD Fit Checker',
+  title: 'JobSnob',
   description: 'Instantly evaluate whether a job description is worth applying for.',
 }
 

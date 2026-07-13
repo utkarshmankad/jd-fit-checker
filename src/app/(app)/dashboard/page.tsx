@@ -44,7 +44,7 @@ type ScreenError =
   | { type: 'network'; message?: string }
   | { type: 'service_error'; message?: string }
 
-const PROFILE_BANNER_KEY = 'jdfit-profile-banner-dismissed'
+const PROFILE_BANNER_KEY = 'jobsnob-profile-banner-dismissed'
 const PRICING_ENABLED = process.env.NEXT_PUBLIC_PRICING_ENABLED === 'true'
 
 const SORT_LABELS: Record<SortKey, string> = {

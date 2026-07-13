@@ -75,7 +75,7 @@ export default function RegisterPage() {
         throw new Error(error)
       }
 
-      toast.success('Account created! Welcome to JD Fit Checker.')
+      toast.success('Account created! Welcome to JobSnob.')
       router.push('/dashboard')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Registration failed')
@@ -101,7 +101,7 @@ export default function RegisterPage() {
         className="hidden md:flex md:w-[40%] flex-col justify-between p-10"
         style={{ backgroundColor: '#1B3A5C' }}
       >
-        <p className="text-white text-2xl font-bold tracking-tight">JD Fit Checker</p>
+        <p className="text-white text-2xl font-bold tracking-tight">JobSnob</p>
 
         <div className="space-y-6">
           <h2 className="text-white text-3xl font-bold leading-snug">

@@ -5,7 +5,7 @@ import { calculateTimeSaved } from '@/lib/utils/time-saved'
 import { getVerdictDisplay } from '@/lib/utils/verdicts'
 import { LogoMark } from '@/components/Logo'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://jdfit.in'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://jobsnob.fyi'
 
 async function getReport(slug: string): Promise<{ report: SharedReport; userName: string | null } | null> {
   const service = createServiceClient()
@@ -42,7 +42,7 @@ export async function generateMetadata({
     : 'JD Screening Report'
   const description = result
     ? `${result.userName ? `${result.userName} screened` : 'Screened'} ${result.report.results_snapshot.length} job descriptions with AI. See fit scores, gap analysis, and auto-rejected roles.`
-    : 'View this shared job screening report from JD Fit Checker.'
+    : 'View this shared job screening report from JobSnob.'
 
   return {
     title,
@@ -51,8 +51,8 @@ export async function generateMetadata({
       title,
       description,
       url: `${APP_URL}/report/${slug}`,
-      siteName: 'JD Fit Checker',
-      images: [{ url: `${APP_URL}/og-report.png`, width: 1200, height: 630, alt: 'JD Fit Checker shared report' }],
+      siteName: 'JobSnob',
+      images: [{ url: `${APP_URL}/og-report.png`, width: 1200, height: 630, alt: 'JobSnob shared report' }],
       type: 'website',
     },
     twitter: {
@@ -297,7 +297,7 @@ export default async function ReportPage({
                 Scored by AI against resume + hard-reject rules · Not a guarantee of interview success
               </span>
               <a href={APP_URL} className="text-xs font-semibold" style={{ color: '#1B3A5C' }}>
-                <span className="inline-flex items-center gap-1.5"><LogoMark size={14} />Powered by JD Fit Checker</span>
+                <span className="inline-flex items-center gap-1.5"><LogoMark size={14} />Powered by JobSnob</span>
               </a>
             </div>
           </div>
@@ -339,7 +339,7 @@ export default async function ReportPage({
       {/* ── Footer ── */}
       <footer className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-6 py-5">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span className="flex items-center gap-1.5 font-bold text-sm" style={{ color: '#1B3A5C' }}><LogoMark size={16} />JD Fit Checker</span>
+          <span className="flex items-center gap-1.5 font-bold text-sm" style={{ color: '#1B3A5C' }}><LogoMark size={16} />JobSnob</span>
           <span className="text-sm text-gray-400 dark:text-gray-500 hidden sm:block">
             Resume-to-JD fit analysis for senior engineers and EMs
           </span>

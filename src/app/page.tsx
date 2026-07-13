@@ -26,7 +26,7 @@ export default async function LandingPage() {
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
           <span className="flex items-center gap-2 font-bold text-lg" style={{ color: '#1B3A5C' }}>
             <LogoMark size={26} />
-            JD Fit Checker
+            JobSnob
           </span>
           <Link
             href="/auth/login"
@@ -104,7 +104,7 @@ export default async function LandingPage() {
               </ul>
             </div>
             <div className="bg-white rounded-xl p-7 border-2 shadow-sm" style={{ borderColor: '#1B3A5C' }}>
-              <h3 className="font-semibold mb-4" style={{ color: '#1B3A5C' }}>JD Fit Checker:</h3>
+              <h3 className="font-semibold mb-4" style={{ color: '#1B3A5C' }}>JobSnob:</h3>
               <ul className="space-y-3">
                 {[
                   'Paste 20 URLs at once',
@@ -416,7 +416,7 @@ export default async function LandingPage() {
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="flex items-center gap-1.5 font-bold text-sm" style={{ color: '#1B3A5C' }}>
             <LogoMark size={18} />
-            JD Fit Checker
+            JobSnob
           </span>
           <span className="text-sm text-gray-400 hidden sm:block">
             Built by an EM, for EMs · Bangalore

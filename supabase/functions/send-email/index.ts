@@ -1,8 +1,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
-const FROM_EMAIL = Deno.env.get('FROM_EMAIL') ?? 'JD Fit Checker <noreply@jdfitchecker.com>'
-const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://jd-fit-checker.vercel.app'
+const FROM_EMAIL = Deno.env.get('FROM_EMAIL') ?? 'JobSnob <noreply@jobsnob.fyi>'
+const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://jobsnob.fyi'
 
 interface AuthHookPayload {
   user: {
@@ -48,7 +48,7 @@ function emailTemplate(title: string, heading: string, body: string, ctaUrl: str
       <table width="480" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
         <tr>
           <td style="background:#1B3A5C;padding:24px 32px">
-            <p style="margin:0;color:#fff;font-size:18px;font-weight:700">JD Fit Checker</p>
+            <p style="margin:0;color:#fff;font-size:18px;font-weight:700">JobSnob</p>
           </td>
         </tr>
         <tr>
@@ -86,7 +86,7 @@ function buildEmail(payload: AuthHookPayload): { subject: string; html: string }
   switch (type) {
     case 'signup':
       return {
-        subject: 'Confirm your JD Fit Checker account',
+        subject: 'Confirm your JobSnob account',
         html: emailTemplate(
           'Confirm your account',
           'Confirm your email',
@@ -97,10 +97,10 @@ function buildEmail(payload: AuthHookPayload): { subject: string; html: string }
       }
     case 'magiclink':
       return {
-        subject: 'Your sign-in link for JD Fit Checker',
+        subject: 'Your sign-in link for JobSnob',
         html: emailTemplate(
           'Sign in link',
-          'Sign in to JD Fit Checker',
+          'Sign in to JobSnob',
           'Click the button below to sign in. This link expires in 1 hour and can only be used once.',
           confirmUrl,
           'Sign in'
@@ -108,7 +108,7 @@ function buildEmail(payload: AuthHookPayload): { subject: string; html: string }
       }
     case 'invite':
       return {
-        subject: "You've been invited to JD Fit Checker",
+        subject: "You've been invited to JobSnob",
         html: emailTemplate(
           'Invitation',
           "You've been invited",
@@ -119,7 +119,7 @@ function buildEmail(payload: AuthHookPayload): { subject: string; html: string }
       }
     case 'recovery':
       return {
-        subject: 'Reset your JD Fit Checker password',
+        subject: 'Reset your JobSnob password',
         html: emailTemplate(
           'Reset password',
           'Reset your password',
@@ -131,7 +131,7 @@ function buildEmail(payload: AuthHookPayload): { subject: string; html: string }
     case 'email_change_new':
     case 'email_change_current':
       return {
-        subject: 'Confirm your new email for JD Fit Checker',
+        subject: 'Confirm your new email for JobSnob',
         html: emailTemplate(
           'Confirm email change',
           'Confirm your new email',
@@ -142,7 +142,7 @@ function buildEmail(payload: AuthHookPayload): { subject: string; html: string }
       }
     default:
       return {
-        subject: 'Action required for JD Fit Checker',
+        subject: 'Action required for JobSnob',
         html: emailTemplate(
           'Action required',
           'Action required',

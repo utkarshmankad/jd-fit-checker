@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { BatchIntelligence } from '@/types'
 
-const SEEN_KEY = 'jdfit-batch-intel-seen'
+const SEEN_KEY = 'jobsnob-batch-intel-seen'
 const MIN_BATCH_SIZE = 3
 
 interface BatchIntelligencePanelProps {

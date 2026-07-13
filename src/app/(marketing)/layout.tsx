@@ -8,7 +8,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
         <Link href="/" className="flex items-center gap-2 font-bold text-lg" style={{ color: '#1B3A5C' }}>
           <LogoMark size={24} />
-          JD Fit Checker
+          JobSnob
         </Link>
         <div className="flex items-center gap-3">
           <ThemeToggle />

@@ -35,12 +35,12 @@ const SCRAPER_SCRIPT = `(function () {
     return e;
   }
   function showPanel() {
-    var old = document.getElementById("jdfit-panel");
+    var old = document.getElementById("jobsnob-panel");
     if (old) old.remove();
     var panel = el("div", "position:fixed;top:16px;right:16px;z-index:2147483647;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.18);padding:16px;width:400px;max-height:80vh;display:flex;flex-direction:column;font-family:-apple-system,sans-serif;");
-    panel.id = "jdfit-panel";
+    panel.id = "jobsnob-panel";
     var hdr = el("div", "display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;");
-    var title = el("b", "color:#1B3A5C;font-size:14px;", "JD Fit Checker — " + urls.length + " job" + (urls.length !== 1 ? "s" : "") + " found");
+    var title = el("b", "color:#1B3A5C;font-size:14px;", "JobSnob — " + urls.length + " job" + (urls.length !== 1 ? "s" : "") + " found");
     var xBtn = el("button", "border:none;background:none;cursor:pointer;font-size:20px;color:#94a3b8;line-height:1;", "\\u00d7");
     xBtn.addEventListener("click", function() { panel.remove(); });
     hdr.appendChild(title); hdr.appendChild(xBtn); panel.appendChild(hdr);
@@ -89,7 +89,7 @@ const LINKEDIN_CONSOLE_SCRIPT = `(async () => {
   }
   const urls = [...ids].slice(0, 20).map(id => 'https://www.linkedin.com/jobs/view/' + id + '/').join('\\n');
   try { await navigator.clipboard.writeText(urls); } catch (e) { prompt('Copy URLs:', urls); }
-  alert('Copied ' + ids.size + ' job URLs! Paste into JD Fit Checker.');
+  alert('Copied ' + ids.size + ' job URLs! Paste into JobSnob.');
 })();`
 
 const SITES = [
