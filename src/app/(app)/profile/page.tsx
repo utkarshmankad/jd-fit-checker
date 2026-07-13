@@ -292,7 +292,7 @@ export default function ProfilePage() {
 
   // API key
   const [apiKey, setApiKey] = useState('')
-  const [apiProvider, setApiProvider] = useState<ApiProvider>('anthropic')
+  const [apiProvider] = useState<ApiProvider>('openai')
   const [hasExistingApiKey, setHasExistingApiKey] = useState(false)
   const [apiSave, setApiSave] = useState<SaveState>('idle')
 
@@ -366,7 +366,6 @@ export default function ProfilePage() {
       const { profile } = (await res.json()) as { profile: ProfileData }
 
       setFullName(profile.full_name ?? '')
-      setApiProvider(profile.api_provider ?? 'anthropic')
       setHasExistingApiKey(profile.has_api_key)
       setTier(profile.tier)
       setScreensUsed(profile.screens_used_this_month)
@@ -692,34 +691,13 @@ export default function ProfilePage() {
       {/* AI provider */}
       <Section title="The brain." subtitle="Your key. Your AI. We use it to judge. We never see your money." action={<SectionSaveButton state={apiSave} onClick={handleSaveApi} />}>
         <Field label="Provider">
-          <select
-            value={apiProvider}
-            onChange={(e) => { setApiProvider(e.target.value as ApiProvider); markDirty() }}
-            className={inputCls}
-          >
-            <option value="anthropic">Anthropic (Claude)</option>
-            <option value="openai">OpenAI (GPT)</option>
-            <option value="groq">Groq (Llama — fast, free tier)</option>
-            <option value="deepseek">DeepSeek</option>
-          </select>
-          {apiProvider === 'openai' && (
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 leading-relaxed">
-              OpenAI&apos;s default (free/low-spend) tier caps at 20 requests/minute — large batches
-              will screen more slowly to stay under that, and pause-and-resume automatically if
-              you hit it. To go faster: spend $5+ on your OpenAI account to unlock a higher tier,
-              request a rate-limit increase, or switch to Anthropic above (no equivalent cap).
-            </p>
-          )}
-          {apiProvider === 'groq' && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
-              Free key at <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="underline">console.groq.com/keys</a>. Fast and free for moderate use, but quality on this kind of structured extraction is a step below Claude/GPT.
-            </p>
-          )}
-          {apiProvider === 'deepseek' && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed">
-              Key at <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer" className="underline">platform.deepseek.com/api_keys</a>. Cheap, strong reasoning — good budget option.
-            </p>
-          )}
+          <input type="text" value="OpenAI (GPT)" readOnly disabled className={`${inputCls} cursor-not-allowed opacity-70`} />
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 leading-relaxed">
+            OpenAI&apos;s default (free/low-spend) tier caps at 20 requests/minute — large batches
+            will screen more slowly to stay under that, and pause-and-resume automatically if
+            you hit it. To go faster: spend $5+ on your OpenAI account to unlock a higher tier,
+            or request a rate-limit increase.
+          </p>
         </Field>
         <Field label="API key">
           <input
