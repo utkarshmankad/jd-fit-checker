@@ -17,7 +17,12 @@ const MIN_BATCH_SIZE_FOR_INTELLIGENCE = 3
 // function timeout kills it — uncleanly, after any quota already reserved for
 // remaining un-attempted items with no chance to give it back. Bounding each
 // item keeps a bad item from taking down the rest of the batch with it.
-const FASTAPI_TIMEOUT_MS = 45_000
+// 60s gives headroom for the realistic worst case on the FastAPI side: a
+// LinkedIn scrape needing its bot-block retry (~2 x 12s + 1s) plus one LLM
+// call (bounded to 20s there) comes to ~45s: too close to the old 45s
+// budget here, causing spurious "screening service timed out" failures on
+// exactly the links that legitimately needed the retry to succeed at all.
+const FASTAPI_TIMEOUT_MS = 60_000
 
 type FastAPIResult = AnalysisResult & {
   job_title?: string
