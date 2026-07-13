@@ -110,7 +110,7 @@ function CopyButton({ text, label = 'Copy script' }: { text: string; label?: str
     <button
       onClick={copy}
       className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-        copied ? 'bg-green-600 text-white' : 'text-white'
+        copied ? 'bg-green-600 dark:bg-green-700 text-white' : 'text-white'
       }`}
       style={copied ? {} : { backgroundColor: '#1B3A5C' }}
     >
@@ -136,12 +136,12 @@ function Step({
       <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: '#1B3A5C' }}>
         {num}
       </div>
-      <div className="flex-1 min-w-0 pb-6 border-b border-gray-100 last:border-0 last:pb-0">
+      <div className="flex-1 min-w-0 pb-6 border-b border-gray-100 dark:border-gray-800 last:border-0 last:pb-0">
         <div className="flex items-center gap-2 mb-1">
-          <Icon size={15} className="text-gray-400" />
-          <h3 className="font-semibold text-gray-900 text-sm">{title}</h3>
+          <Icon size={15} className="text-gray-400 dark:text-gray-500" />
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{title}</h3>
         </div>
-        <div className="text-sm text-gray-600 space-y-2">{children}</div>
+        <div className="text-sm text-gray-600 dark:text-gray-300 space-y-2">{children}</div>
       </div>
     </div>
   )
@@ -151,14 +151,14 @@ export default function GuidePage() {
   return (
     <div className="max-w-2xl space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">How to use</h1>
-        <p className="text-sm text-gray-500 mt-1">Scrape job links from any career page and screen them in bulk.</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">How to use</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Scrape job links from any career page and screen them in bulk.</p>
       </div>
 
       {/* Quick workflow */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="px-5 pt-5 pb-3">
-          <h2 className="font-semibold text-gray-900">Workflow</h2>
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Workflow</h2>
         </div>
         <div className="px-5 space-y-5">
           <Step num={1} icon={MousePointer} title="Go to a company's jobs page">
@@ -166,21 +166,21 @@ export default function GuidePage() {
           </Step>
 
           <Step num={2} icon={Terminal} title="Run the scraper script in browser console">
-            <p>Open DevTools (<kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">F12</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">Cmd+Option+J</kbd>), paste the script below into the Console tab, and press Enter.</p>
+            <p>Open DevTools (<kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono">F12</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono">Cmd+Option+J</kbd>), paste the script below into the Console tab, and press Enter.</p>
           </Step>
         </div>
 
         {/* Code block outside flex chain so it can fill full card width */}
-        <div className="mx-5 mb-3 rounded-lg border border-gray-200 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
-            <span className="text-xs font-mono text-gray-500">Scraper script — paste into browser console</span>
+        <div className="mx-5 mb-3 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
+            <span className="text-xs font-mono text-gray-500 dark:text-gray-400">Scraper script — paste into browser console</span>
             <CopyButton text={SCRAPER_SCRIPT} />
           </div>
-          <pre className="px-4 py-3 text-xs font-mono bg-gray-950 text-green-400 leading-relaxed overflow-x-auto max-h-48 w-full box-border">
+          <pre className="px-4 py-3 text-xs font-mono bg-gray-950 text-green-400 dark:text-green-500 leading-relaxed overflow-x-auto max-h-48 w-full box-border">
             {SCRAPER_SCRIPT}
           </pre>
         </div>
-        <p className="text-xs text-gray-400 px-5 pb-3">A panel will appear with all job URLs found. Scroll down to load more listings before running if the page uses infinite scroll.</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 px-5 pb-3">A panel will appear with all job URLs found. Scroll down to load more listings before running if the page uses infinite scroll.</p>
 
         <div className="px-5 space-y-5 pb-5">
 
@@ -189,66 +189,66 @@ export default function GuidePage() {
           </Step>
 
           <Step num={4} icon={Zap} title="Paste and screen">
-            <p>Go to <a href="/dashboard" className="text-blue-600 hover:underline font-medium">Screen JDs</a>, select the <strong>Paste URLs</strong> tab, paste the links, and click <strong>Screen all</strong>.</p>
+            <p>Go to <a href="/dashboard" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Screen JDs</a>, select the <strong>Paste URLs</strong> tab, paste the links, and click <strong>Screen all</strong>.</p>
           </Step>
         </div>
       </div>
 
       {/* LinkedIn bulk import */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="px-5 pt-5 pb-3">
-          <h2 className="font-semibold text-gray-900">LinkedIn bulk import</h2>
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">LinkedIn bulk import</h2>
         </div>
         <div className="px-5 space-y-5">
           <Step num={1} icon={Globe} title="Open any LinkedIn Jobs page">
             <p>
-              <a href="https://www.linkedin.com/jobs/collections/recommended/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">Recommended</a>,
+              <a href="https://www.linkedin.com/jobs/collections/recommended/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Recommended</a>,
               a search results page, or a saved job alert — while logged in.
             </p>
           </Step>
 
           <Step num={2} icon={Terminal} title="Run the LinkedIn script in browser console">
-            <p>Open DevTools (<kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">F12</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">Cmd+Option+J</kbd>), paste the script below into the Console tab, and press Enter.</p>
+            <p>Open DevTools (<kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono">F12</kbd> or <kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono">Cmd+Option+J</kbd>), paste the script below into the Console tab, and press Enter.</p>
           </Step>
         </div>
 
-        <div className="mx-5 mb-3 rounded-lg border border-gray-200 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
-            <span className="text-xs font-mono text-gray-500">LinkedIn script — paste into browser console</span>
+        <div className="mx-5 mb-3 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
+            <span className="text-xs font-mono text-gray-500 dark:text-gray-400">LinkedIn script — paste into browser console</span>
             <CopyButton text={LINKEDIN_CONSOLE_SCRIPT} />
           </div>
-          <pre className="px-4 py-3 text-xs font-mono bg-gray-950 text-green-400 leading-relaxed overflow-x-auto max-h-48 w-full box-border">
+          <pre className="px-4 py-3 text-xs font-mono bg-gray-950 text-green-400 dark:text-green-500 leading-relaxed overflow-x-auto max-h-48 w-full box-border">
             {LINKEDIN_CONSOLE_SCRIPT}
           </pre>
         </div>
-        <p className="text-xs text-gray-400 px-5 pb-3">It auto-scrolls, collects up to 20 jobs, and copies the URLs to your clipboard — wait ~10 seconds for it to finish.</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 px-5 pb-3">It auto-scrolls, collects up to 20 jobs, and copies the URLs to your clipboard — wait ~10 seconds for it to finish.</p>
 
         <div className="px-5 space-y-5 pb-5">
           <Step num={3} icon={Zap} title="Paste and screen">
-            <p>Go to <a href="/dashboard" className="text-blue-600 hover:underline font-medium">Screen JDs</a>, select the <strong>Job URLs</strong> tab, paste the links, and click <strong>Screen all</strong>. If there are more than 20 jobs, scroll down on LinkedIn and run the script again to grab the rest.</p>
+            <p>Go to <a href="/dashboard" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">Screen JDs</a>, select the <strong>Job URLs</strong> tab, paste the links, and click <strong>Screen all</strong>. If there are more than 20 jobs, scroll down on LinkedIn and run the script again to grab the rest.</p>
           </Step>
         </div>
       </div>
 
       {/* Supported sites */}
-      <div className="bg-white rounded-xl border border-gray-200 px-5 py-5">
-        <h2 className="font-semibold text-gray-900 mb-3">Supported sites</h2>
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-5">
+        <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Supported sites</h2>
         <div className="flex flex-wrap gap-2">
           {SITES.map((s) => (
-            <span key={s} className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+            <span key={s} className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-xs font-medium">
               {s}
             </span>
           ))}
         </div>
-        <p className="text-xs text-gray-400 mt-3">
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
           If a site uses a URL pattern the script misses, scroll down more and retry — some ATSes load jobs lazily. Most custom career pages work as long as job links appear as <code className="font-mono">&lt;a href&gt;</code> tags.
         </p>
       </div>
 
       {/* Tips */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-5 py-4">
         <h2 className="font-semibold text-amber-900 text-sm mb-2">Tips</h2>
-        <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
+        <ul className="text-sm text-amber-800 dark:text-amber-300 space-y-1 list-disc list-inside">
           <li>The LinkedIn script caps out at 20 jobs per run — scroll down and run it again to collect more</li>
           <li>Scroll to bottom before running on infinite-scroll pages (Indeed, Greenhouse listings)</li>
           <li>On Workday, navigate into a job category first — the root page may not list individual jobs</li>

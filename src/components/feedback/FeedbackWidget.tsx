@@ -48,14 +48,14 @@ export default function FeedbackWidget() {
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+          <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Send feedback</h2>
-              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Send feedback</h2>
+              <button onClick={() => setOpen(false)} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
                 <X size={18} />
               </button>
             </div>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               Bug, idea, or a complaint — goes straight to the person building this.
             </p>
             <textarea
@@ -64,7 +64,7 @@ export default function FeedbackWidget() {
               rows={5}
               maxLength={MAX_MESSAGE_CHARS}
               placeholder="What's on your mind?"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
             />
             <button

@@ -14,24 +14,24 @@ export default function WhyNotChatGptModal({ open, onClose }: { open: boolean; o
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">
-          <h2 className="text-xl font-bold text-gray-900">Why not just use ChatGPT?</h2>
-          <button onClick={onClose} className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors" title="Close">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Why not just use ChatGPT?</h2>
+          <button onClick={onClose} className="shrink-0 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" title="Close">
             <X size={18} />
           </button>
         </div>
         <ul className="space-y-3">
           {POINTS.map((point, i) => (
-            <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600 leading-relaxed">
-              <span className="shrink-0 mt-1 w-1.5 h-1.5 rounded-full bg-gray-300" />
+            <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+              <span className="shrink-0 mt-1 w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600" />
               {point}
             </li>
           ))}
         </ul>
         <button
           onClick={onClose}
-          className="w-full py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          className="w-full py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
         >
           Close
         </button>

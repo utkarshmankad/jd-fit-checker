@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { FileSearch, History, User, LogOut, Menu, X, BookOpen /*, Briefcase */ } from 'lucide-react'
 import { LogoMark } from '@/components/Logo'
 import FeedbackWidget from '@/components/feedback/FeedbackWidget'
+import ThemeToggle from '@/components/theme/ThemeToggle'
 
 const navLinks = [
   { href: '/dashboard', label: 'Screen JDs', icon: FileSearch },
@@ -90,8 +91,11 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
         </nav>
 
         {/* Bottom: user + sign out */}
-        <div className="px-3 py-4 border-t border-white/10 space-y-2">
-          <p className="px-3 text-xs text-white/40 truncate">{userEmail}</p>
+        <div className="px-3 py-4 border-t border-white/10 space-y-3">
+          <div className="flex items-center justify-between px-3">
+            <p className="text-xs text-white/40 truncate">{userEmail}</p>
+            <ThemeToggle variant="dark" />
+          </div>
           <form action="/auth/logout" method="POST">
             <button
               type="submit"
@@ -107,17 +111,18 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200">
+        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="text-gray-600 hover:text-gray-900"
+            className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
           >
             <Menu size={22} />
           </button>
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2 flex-1">
             <LogoMark size={22} />
-            <span className="font-semibold text-gray-900">JD Fit Checker</span>
+            <span className="font-semibold text-gray-900 dark:text-gray-100">JD Fit Checker</span>
           </Link>
+          <ThemeToggle />
         </header>
 
         <main className="flex-1 bg-surface p-4 md:p-6 lg:p-8">{children}</main>

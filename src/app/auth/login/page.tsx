@@ -23,10 +23,10 @@ function Divider({ label }: { label: string }) {
   return (
     <div className="relative my-1">
       <div className="absolute inset-0 flex items-center">
-        <div className="w-full border-t border-gray-200" />
+        <div className="w-full border-t border-gray-200 dark:border-gray-700" />
       </div>
       <div className="relative flex justify-center text-xs">
-        <span className="px-3 bg-white text-gray-400 uppercase tracking-wide">{label}</span>
+        <span className="px-3 bg-white dark:bg-gray-900 text-gray-400 dark:text-gray-500 uppercase tracking-wide">{label}</span>
       </div>
     </div>
   )
@@ -144,7 +144,7 @@ function LoginForm() {
           <ul className="space-y-4">
             {benefits.map((b) => (
               <li key={b} className="flex items-center gap-3 text-white/90">
-                <svg className="w-5 h-5 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-green-400 dark:text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <span className="text-base">{b}</span>
@@ -156,19 +156,19 @@ function LoginForm() {
       </div>
 
       {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-white">
+      <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-gray-900">
         <div className="w-full max-w-sm space-y-5">
 
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Welcome</h1>
-            <p className="text-sm text-gray-500 mt-1">Sign in or create your account.</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Welcome</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Sign in or create your account.</p>
           </div>
 
           {/* Google */}
           <button
             onClick={handleGoogleSignIn}
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-medium text-sm hover:bg-gray-50 dark:hover:bg-gray-800/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -189,7 +189,7 @@ function LoginForm() {
               value={signinEmail}
               onChange={(e) => setSigninEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <div className="relative">
               <input
@@ -198,12 +198,12 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3 pr-16 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 pr-16 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 {showPassword ? 'Hide' : 'Show'}
               </button>
@@ -222,15 +222,15 @@ function LoginForm() {
 
           {/* Magic link sign-up */}
           {magicLinkSent ? (
-            <div className="rounded-lg bg-green-50 border border-green-200 p-4 text-center space-y-1.5">
-              <p className="text-green-800 font-semibold text-sm">Check your inbox</p>
-              <p className="text-green-700 text-xs">
+            <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 text-center space-y-1.5">
+              <p className="text-green-800 dark:text-green-300 font-semibold text-sm">Check your inbox</p>
+              <p className="text-green-700 dark:text-green-400 text-xs">
                 Sign-up link sent to <strong>{signupEmail}</strong>.
               </p>
               <button
                 type="button"
                 onClick={() => { setMagicLinkSent(false); setSignupEmail('') }}
-                className="text-xs text-green-600 underline"
+                className="text-xs text-green-600 dark:text-green-400 underline"
               >
                 Use a different email
               </button>
@@ -243,12 +243,12 @@ function LoginForm() {
                 value={signupEmail}
                 onChange={(e) => setSignupEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <button
                 type="submit"
                 disabled={isLoading || !signupEmail}
-                className="w-full py-3 rounded-lg font-medium text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-gray-700 hover:bg-gray-800"
+                className="w-full py-3 rounded-lg font-medium text-sm text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-gray-700 dark:bg-gray-300 hover:bg-gray-800"
               >
                 {signupLoading ? 'Sending…' : 'Send sign-up link'}
               </button>
@@ -256,7 +256,7 @@ function LoginForm() {
           )}
 
           {error && (
-            <p className="text-sm text-red-600 text-center">{error}</p>
+            <p className="text-sm text-red-600 dark:text-red-400 text-center">{error}</p>
           )}
         </div>
       </div>
@@ -267,8 +267,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
+        <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-blue-600 rounded-full animate-spin" />
       </div>
     }>
       <LoginForm />

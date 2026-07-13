@@ -19,7 +19,7 @@ export default function TrackButton({ screeningResultId, jobTitle, company, jobU
 
   if (tracked) {
     return (
-      <span className="p-1.5 rounded text-green-600" title="Tracked">
+      <span className="p-1.5 rounded text-green-600 dark:text-green-400" title="Tracked">
         <BriefcaseBusiness size={15} />
       </span>
     )
@@ -53,7 +53,7 @@ export default function TrackButton({ screeningResultId, jobTitle, company, jobU
     <button
       onClick={handleClick}
       disabled={loading}
-      className="p-1.5 rounded hover:bg-gray-200 text-gray-500 transition-colors disabled:opacity-50"
+      className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors disabled:opacity-50"
       title="Track this job"
     >
       <Briefcase size={15} />

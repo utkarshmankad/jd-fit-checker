@@ -35,7 +35,7 @@ interface WordmarkProps {
   className?: string
 }
 
-export default function Logo({ markSize = 24, textClassName = 'font-bold text-lg text-gray-900', className = '' }: WordmarkProps) {
+export default function Logo({ markSize = 24, textClassName = 'font-bold text-lg text-gray-900 dark:text-gray-100', className = '' }: WordmarkProps) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
       <LogoMark size={markSize} />

@@ -14,7 +14,7 @@ export function FakeEmBadge({ detection }: { detection?: FakeEmDetection }) {
   if (!isFakeEmFlagged(detection)) return null
   return (
     <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white shrink-0"
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600 dark:bg-red-700 text-white shrink-0"
       title="This role reads like a fake/inflated Engineering Manager title"
     >
       🚩 Fake EM Detected
@@ -25,15 +25,15 @@ export function FakeEmBadge({ detection }: { detection?: FakeEmDetection }) {
 export function FakeEmCallout({ detection }: { detection?: FakeEmDetection }) {
   if (!isFakeEmFlagged(detection)) return null
   return (
-    <div className="bg-red-50 border border-red-300 rounded-lg px-3 py-3">
-      <p className="text-xs font-bold text-red-700 uppercase tracking-wide mb-1.5">Why we flagged this:</p>
+    <div className="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg px-3 py-3">
+      <p className="text-xs font-bold text-red-700 dark:text-red-400 uppercase tracking-wide mb-1.5">Why we flagged this:</p>
       {detection!.actual_level_assessment && (
-        <p className="text-sm font-bold text-red-800 mb-2">{detection!.actual_level_assessment}</p>
+        <p className="text-sm font-bold text-red-800 dark:text-red-300 mb-2">{detection!.actual_level_assessment}</p>
       )}
       {detection!.red_flags?.length > 0 && (
         <ul className="space-y-1">
           {detection!.red_flags.map((flag, i) => (
-            <li key={i} className="text-sm text-red-700 flex items-start gap-1.5">
+            <li key={i} className="text-sm text-red-700 dark:text-red-400 flex items-start gap-1.5">
               <span className="shrink-0">🚩</span>{flag}
             </li>
           ))}
@@ -50,9 +50,9 @@ export const SCORE_TOOLTIPS = {
 }
 
 export function scoreTextClass(n: number) {
-  if (n >= 70) return 'text-green-600'
-  if (n >= 50) return 'text-amber-500'
-  return 'text-red-500'
+  if (n >= 70) return 'text-green-600 dark:text-green-400'
+  if (n >= 50) return 'text-amber-500 dark:text-amber-400'
+  return 'text-red-500 dark:text-red-400'
 }
 
 export function whyVerdict(r: ScreeningResult): string {
@@ -92,7 +92,7 @@ export function ScoreTooltip({ tip, children }: { tip: string; children: React.R
   return (
     <span className="relative group inline-flex items-center gap-1 cursor-default">
       {children}
-      <Info size={10} className="text-gray-300 opacity-60 shrink-0" />
+      <Info size={10} className="text-gray-300 dark:text-gray-600 opacity-60 shrink-0" />
       <span className="absolute bottom-full right-0 mb-2 w-52 bg-gray-900 text-white text-xs rounded-lg px-2.5 py-2 leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none whitespace-normal text-left shadow-lg">
         {tip}
         <span className="absolute top-full right-2 border-4 border-transparent border-t-gray-900" />
@@ -104,7 +104,7 @@ export function ScoreTooltip({ tip, children }: { tip: string; children: React.R
 export function ScorePill({ label, score, tip }: { label: string; score: number; tip: string }) {
   return (
     <ScoreTooltip tip={tip}>
-      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-xs text-gray-400 dark:text-gray-500">{label}</span>
       <span className={`text-xs font-semibold ${scoreTextClass(score)}`}>{score}</span>
     </ScoreTooltip>
   )
@@ -114,17 +114,17 @@ export function RequirementsChecklist({ items }: { items: RequirementCheck[] }) 
   if (!items?.length) return null
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-500 mb-2">Requirements check</p>
+      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Requirements check</p>
       <ul className="space-y-2">
         {items.map((item, i) => {
           const icon = item.status === 'met' ? '✓' : item.status === 'partial' ? '◐' : '✗'
-          const cls = item.status === 'met' ? 'text-green-600' : item.status === 'partial' ? 'text-amber-600' : 'text-red-600'
+          const cls = item.status === 'met' ? 'text-green-600 dark:text-green-400' : item.status === 'partial' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
           return (
             <li key={i} className="flex items-start gap-2 text-sm">
               <span className={`shrink-0 font-bold mt-0.5 ${cls}`}>{icon}</span>
               <span>
-                <span className="text-gray-800">{item.requirement}</span>
-                {item.evidence && <span className="text-gray-400 text-xs ml-1">— {item.evidence}</span>}
+                <span className="text-gray-800 dark:text-gray-200">{item.requirement}</span>
+                {item.evidence && <span className="text-gray-400 dark:text-gray-500 text-xs ml-1">— {item.evidence}</span>}
               </span>
             </li>
           )
@@ -137,12 +137,12 @@ export function RequirementsChecklist({ items }: { items: RequirementCheck[] }) 
 export function SoftConcernsCallout({ concerns }: { concerns?: string[] }) {
   if (!concerns?.length) return null
   return (
-    <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-3">
-      <p className="text-xs font-semibold text-amber-700 mb-1.5">Worth checking:</p>
+    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-3">
+      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1.5">Worth checking:</p>
       <ul className="space-y-1">
         {concerns.map((c, i) => (
-          <li key={i} className="text-sm text-amber-800 flex items-start gap-1.5">
-            <span className="text-amber-500 mt-0.5 shrink-0">•</span>{c}
+          <li key={i} className="text-sm text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
+            <span className="text-amber-500 dark:text-amber-400 mt-0.5 shrink-0">•</span>{c}
           </li>
         ))}
       </ul>
@@ -153,25 +153,25 @@ export function SoftConcernsCallout({ concerns }: { concerns?: string[] }) {
 export function ColoredRecommendation({ text }: { text: string }) {
   if (!text) return null
   const match = text.match(/^(APPLY IF|APPLY|SKIP)([\s\S]*)/)
-  if (!match) return <p className="text-sm text-blue-900 leading-relaxed">{text}</p>
+  if (!match) return <p className="text-sm text-blue-900 dark:text-blue-200 leading-relaxed">{text}</p>
   const keyword = match[1]
   const rest = match[2]
-  const color = keyword === 'SKIP' ? 'text-red-600' : keyword === 'APPLY IF' ? 'text-amber-600' : 'text-green-600'
+  const color = keyword === 'SKIP' ? 'text-red-600 dark:text-red-400' : keyword === 'APPLY IF' ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'
   return (
-    <p className="text-sm text-blue-900 leading-relaxed">
+    <p className="text-sm text-blue-900 dark:text-blue-200 leading-relaxed">
       <span className={`font-bold ${color}`}>{keyword}</span>{rest}
     </p>
   )
 }
 
 export function SkillPills({ label, skills, variant }: { label: string; skills: string[]; variant: 'match' | 'miss' }) {
-  const pillCls = variant === 'match' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+  const pillCls = variant === 'match' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
   const prefix = variant === 'match' ? '✓ ' : '✗ '
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-500 mb-2">{label}</p>
+      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">{label}</p>
       <div className="flex flex-wrap gap-1.5">
-        {skills.length === 0 ? <span className="text-xs text-gray-400">None</span> : skills.map((s) => (
+        {skills.length === 0 ? <span className="text-xs text-gray-400 dark:text-gray-500">None</span> : skills.map((s) => (
           <span key={s} className={`px-2 py-0.5 rounded-full text-xs font-medium ${pillCls}`}>{prefix}{s}</span>
         ))}
       </div>
@@ -183,8 +183,8 @@ export function AnalysisBlock({ label, text }: { label: string; text: string }) 
   if (!text) return null
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-500 mb-1">{label}</p>
-      <p className="text-sm text-gray-700 leading-relaxed">{text}</p>
+      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{label}</p>
+      <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{text}</p>
     </div>
   )
 }
@@ -194,18 +194,18 @@ export function AnalysisDetailBody({ result }: { result: ScreeningResult }) {
     <div className="space-y-4 max-w-3xl">
       {/* a. Headline + why verdict */}
       {result.analysis_json?.headline && (
-        <p className="text-sm font-medium text-gray-700">{result.analysis_json.headline}</p>
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{result.analysis_json.headline}</p>
       )}
-      <p className="text-xs text-gray-400 italic">{whyVerdict(result)}</p>
+      <p className="text-xs text-gray-400 dark:text-gray-500 italic">{whyVerdict(result)}</p>
 
       {/* Fake EM detection — most trustworthy signal we produce, shown first */}
       <FakeEmCallout detection={result.analysis_json?.fake_em_detection} />
 
       {/* Hard reject */}
       {result.hard_reject_reasons?.length > 0 && result.verdict === 'REJECT' && (
-        <div className="px-3 py-2 rounded-lg bg-red-50 border border-red-200">
-          <p className="text-xs font-semibold text-red-600 mb-0.5">Hard reject</p>
-          <p className="text-sm text-red-700">{result.hard_reject_reasons[0]}</p>
+        <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+          <p className="text-xs font-semibold text-red-600 dark:text-red-400 mb-0.5">Hard reject</p>
+          <p className="text-sm text-red-700 dark:text-red-400">{result.hard_reject_reasons[0]}</p>
         </div>
       )}
 
@@ -219,7 +219,7 @@ export function AnalysisDetailBody({ result }: { result: ScreeningResult }) {
 
       {/* c. Score breakdown (supplementary) */}
       {result.verdict !== 'REJECT' && (
-        <p className="text-xs font-mono text-gray-400 bg-gray-100 rounded px-2 py-1 inline-block">
+        <p className="text-xs font-mono text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded px-2 py-1 inline-block">
           Composite {result.composite_score} = (ATS {result.ats_score} × 0.45) + (Role {result.role_level_score} × 0.55) = {(result.ats_score * 0.45 + result.role_level_score * 0.55).toFixed(1)}
         </p>
       )}
@@ -227,8 +227,8 @@ export function AnalysisDetailBody({ result }: { result: ScreeningResult }) {
       {/* d. Recommendation */}
       {result.analysis_json?.recommendation && (
         <div>
-          <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1.5">Recommendation</p>
-          <div className="bg-blue-50 border-l-4 border-blue-500 p-3 rounded-r-md">
+          <p className="text-xs font-semibold text-blue-500 dark:text-blue-400 uppercase tracking-wide mb-1.5">Recommendation</p>
+          <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-3 rounded-r-md">
             <ColoredRecommendation text={result.analysis_json.recommendation} />
           </div>
         </div>

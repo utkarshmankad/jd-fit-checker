@@ -85,8 +85,8 @@ export default function RegisterPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
+        <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-blue-600 rounded-full animate-spin" />
       </div>
     )
   }
@@ -116,7 +116,7 @@ export default function RegisterPage() {
               'Auto-reject roles that don\'t fit',
             ].map((t) => (
               <li key={t} className="flex items-center gap-3 text-white/80 text-sm">
-                <svg className="w-4 h-4 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-green-400 dark:text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 {t}
@@ -129,22 +129,22 @@ export default function RegisterPage() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-white">
+      <div className="flex-1 flex items-center justify-center p-8 bg-white dark:bg-gray-900">
         <div className="w-full max-w-sm space-y-8">
           {/* Header */}
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create your account</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Signed in as{' '}
-              <span className="font-medium text-gray-700">{email}</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">{email}</span>
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Full name */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-gray-700">
-                Full name <span className="text-red-500">*</span>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                Full name <span className="text-red-500 dark:text-red-400">*</span>
               </label>
               <input
                 type="text"
@@ -153,25 +153,25 @@ export default function RegisterPage() {
                 placeholder="Jane Smith"
                 required
                 autoFocus
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
 
             {/* Email (read-only) */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-gray-700">Email</label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">Email</label>
               <input
                 type="email"
                 value={email}
                 readOnly
-                className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm text-gray-500 bg-gray-50 cursor-not-allowed"
+                className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 cursor-not-allowed"
               />
             </div>
 
             {/* Password */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-gray-700">
-                Password <span className="text-red-500">*</span>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                Password <span className="text-red-500 dark:text-red-400">*</span>
               </label>
               <div className="relative">
                 <input
@@ -181,25 +181,25 @@ export default function RegisterPage() {
                   placeholder="At least 8 characters"
                   required
                   minLength={8}
-                  className="w-full px-4 py-3 pr-10 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-3 pr-10 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-xs"
                 >
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
               {password && password.length < 8 && (
-                <p className="text-xs text-red-500">Too short — need at least 8 characters</p>
+                <p className="text-xs text-red-500 dark:text-red-400">Too short — need at least 8 characters</p>
               )}
             </div>
 
             {/* Confirm password */}
             <div className="space-y-1">
-              <label className="block text-xs font-medium text-gray-700">
-                Confirm password <span className="text-red-500">*</span>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                Confirm password <span className="text-red-500 dark:text-red-400">*</span>
               </label>
               <input
                 type={showPassword ? 'text' : 'password'}
@@ -207,10 +207,10 @@ export default function RegisterPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repeat password"
                 required
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {confirmPassword && password !== confirmPassword && (
-                <p className="text-xs text-red-500">Passwords don&apos;t match</p>
+                <p className="text-xs text-red-500 dark:text-red-400">Passwords don&apos;t match</p>
               )}
             </div>
 
@@ -224,7 +224,7 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          <p className="text-center text-xs text-gray-400">
+          <p className="text-center text-xs text-gray-400 dark:text-gray-500">
             By creating an account you agree to our terms of service.
           </p>
         </div>

@@ -26,21 +26,21 @@ function verdictFilterLabel(v: VerdictFilter) {
 }
 
 function verdictFilterClass(v: VerdictFilter, active: boolean) {
-  if (!active) return 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
+  if (!active) return 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
   if (v === 'ALL') return 'bg-gray-900 text-white border border-gray-900'
   const map: Record<string, string> = {
-    STRONG: 'bg-green-600 text-white border border-green-600',
+    STRONG: 'bg-green-600 dark:bg-green-700 text-white border border-green-600',
     DECENT: 'bg-blue-600 text-white border border-blue-600',
     WEAK: 'bg-gray-500 text-white border border-gray-500',
-    REJECT: 'bg-red-600 text-white border border-red-600',
+    REJECT: 'bg-red-600 dark:bg-red-700 text-white border border-red-600',
   }
   return map[v] ?? 'bg-gray-900 text-white border border-gray-900'
 }
 
 function scoreClass(n: number) {
-  if (n >= 70) return 'text-green-700 font-semibold'
-  if (n >= 50) return 'text-amber-600 font-semibold'
-  return 'text-red-600 font-semibold'
+  if (n >= 70) return 'text-green-700 dark:text-green-400 font-semibold'
+  if (n >= 50) return 'text-amber-600 dark:text-amber-400 font-semibold'
+  return 'text-red-600 dark:text-red-400 font-semibold'
 }
 
 function formatDate(iso: string) {
@@ -123,7 +123,7 @@ export default function HistoryPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="text-gray-400 text-sm">Loading history...</div>
+        <div className="text-gray-400 dark:text-gray-500 text-sm">Loading history...</div>
       </div>
     )
   }
@@ -131,12 +131,12 @@ export default function HistoryPage() {
   if (batches.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <History size={48} className="text-gray-300 mb-4" />
-        <p className="text-gray-500 font-medium">No screening history yet</p>
-        <p className="text-gray-400 text-sm mt-1">
+        <History size={48} className="text-gray-300 dark:text-gray-600 mb-4" />
+        <p className="text-gray-500 dark:text-gray-400 font-medium">No screening history yet</p>
+        <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
           Your past sessions will appear here after your first screen.
         </p>
-        <a href="/dashboard" className="mt-4 text-sm text-blue-600 underline">
+        <a href="/dashboard" className="mt-4 text-sm text-blue-600 dark:text-blue-400 underline">
           Screen your first JD →
         </a>
       </div>
@@ -146,8 +146,8 @@ export default function HistoryPage() {
   return (
     <div className="space-y-5 max-w-4xl">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-gray-900">Screening history</h1>
-        <span className="text-sm text-gray-400">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Screening history</h1>
+        <span className="text-sm text-gray-400 dark:text-gray-500">
           {filteredCount} of {totalCount} roles across {filteredBatches.length} batch{filteredBatches.length !== 1 ? 'es' : ''}
         </span>
       </div>
@@ -155,13 +155,13 @@ export default function HistoryPage() {
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search company or role..."
-            className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
 
@@ -180,7 +180,7 @@ export default function HistoryPage() {
 
       {/* Batch sections */}
       {filteredBatches.length === 0 ? (
-        <div className="py-16 text-center text-gray-400 text-sm">
+        <div className="py-16 text-center text-gray-400 dark:text-gray-500 text-sm">
           No results match your filters.
         </div>
       ) : (
@@ -188,22 +188,22 @@ export default function HistoryPage() {
           {filteredBatches.map((batch) => {
             const isCollapsed = collapsedBatches.has(batch.batch_id)
             return (
-              <div key={batch.batch_id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div key={batch.batch_id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                 {/* Batch header */}
-                <div className="flex items-center justify-between px-5 py-3.5 bg-gray-50 border-b border-gray-100">
+                <div className="flex items-center justify-between px-5 py-3.5 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800">
                   <button
                     onClick={() => toggleBatch(batch.batch_id)}
-                    className="flex items-center gap-2 text-sm font-semibold text-gray-900 hover:text-gray-700 transition-colors"
+                    className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
                   >
                     {isCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                     <span>{formatDate(batch.created_at)}</span>
-                    <span className="text-xs font-normal text-gray-400">{formatTime(batch.created_at)}</span>
-                    <span className="text-xs font-normal text-gray-400">· {batch.results.length} job{batch.results.length !== 1 ? 's' : ''}</span>
+                    <span className="text-xs font-normal text-gray-400 dark:text-gray-500">{formatTime(batch.created_at)}</span>
+                    <span className="text-xs font-normal text-gray-400 dark:text-gray-500">· {batch.results.length} job{batch.results.length !== 1 ? 's' : ''}</span>
                   </button>
                   <button
                     onClick={() => handleExport(batch.batch_id)}
                     title="Download batch as CSV"
-                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
                   >
                     <Download size={11} />
                     Download CSV
@@ -218,28 +218,28 @@ export default function HistoryPage() {
                       const reasonLine = getReasonLine(r as ScreeningResult)
                       return (
                         <Fragment key={rowKey}>
-                          <div className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
-                                <p className="font-semibold text-gray-900 text-sm truncate">{r.company ?? '—'}</p>
+                                <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">{r.company ?? '—'}</p>
                                 {r.job_url && (
                                   <a
                                     href={r.job_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     title="Open job posting"
-                                    className="shrink-0 text-blue-400 hover:text-blue-600 transition-colors"
+                                    className="shrink-0 text-blue-400 dark:text-blue-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                   >
                                     <ExternalLink size={12} />
                                   </a>
                                 )}
                               </div>
-                              <p className="text-xs text-gray-500 mt-0.5 truncate flex items-center gap-1.5">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate flex items-center gap-1.5">
                                 <span className="truncate">{r.job_title ?? '—'}</span>
                                 <FakeEmBadge detection={r.analysis_json?.fake_em_detection} />
                               </p>
                               {reasonLine && (
-                                <p className="text-xs text-gray-400 mt-1 truncate">{reasonLine}</p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{reasonLine}</p>
                               )}
                             </div>
 
@@ -259,7 +259,7 @@ export default function HistoryPage() {
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 onClick={() => setExpandedRowId(isExpanded ? null : rowKey)}
-                                className={`p-1.5 rounded transition-colors ${isExpanded ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-gray-500 hover:bg-gray-200'}`}
+                                className={`p-1.5 rounded transition-colors ${isExpanded ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
                                 title="View analysis"
                               >
                                 <Eye size={15} />
@@ -278,7 +278,7 @@ export default function HistoryPage() {
                           </div>
 
                           {isExpanded && (
-                            <div className="bg-slate-50 px-6 py-5">
+                            <div className="bg-slate-50 dark:bg-gray-800/50 px-6 py-5">
                               <AnalysisDetailBody result={r as ScreeningResult} />
                             </div>
                           )}

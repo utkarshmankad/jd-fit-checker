@@ -33,7 +33,7 @@ export default function UsageWidget({
 }: UsageWidgetProps) {
   if (tier === 'paid') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-300">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-300 dark:border-green-700">
         ✓ Active Search · Unlimited
       </span>
     )
@@ -45,38 +45,38 @@ export default function UsageWidget({
     const pct = Math.min(100, (screens_used_total / effectiveBetaLimit) * 100)
     const color = remaining === 0 ? 'red' : remaining < 5 ? 'amber' : 'green'
     const colorCls = {
-      green: 'bg-green-100 text-green-800 border-green-300',
-      amber: 'bg-amber-100 text-amber-800 border-amber-300',
-      red: 'bg-red-100 text-red-800 border-red-300',
+      green: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700',
+      amber: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700',
+      red: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700',
     }[color]
-    const barCls = { green: 'bg-green-500', amber: 'bg-amber-500', red: 'bg-red-500' }[color]
+    const barCls = { green: 'bg-green-500 dark:bg-green-600', amber: 'bg-amber-500 dark:bg-amber-600', red: 'bg-red-500 dark:bg-red-600' }[color]
 
     return (
       <div className="flex flex-col items-end gap-1.5">
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${colorCls}`}>
           🧪 Beta access · {remaining} of {effectiveBetaLimit} free scans left
         </span>
-        <div className="w-40 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div className="w-40 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
           <div className={`h-1.5 rounded-full ${barCls} transition-all`} style={{ width: `${pct}%` }} />
         </div>
         {referral_bonus_screens > 0 && (
-          <p className="text-xs text-green-600 font-medium">+ {referral_bonus_screens} referral bonus</p>
+          <p className="text-xs text-green-600 dark:text-green-400 font-medium">+ {referral_bonus_screens} referral bonus</p>
         )}
         {remaining > 0 && (
           <button
             onClick={() => document.getElementById('referral-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-            className="text-xs font-semibold text-blue-600 underline"
+            className="text-xs font-semibold text-blue-600 dark:text-blue-400 underline"
           >
             Refer a friend for +10 more scans
           </button>
         )}
         {remaining === 0 && (
           pricingEnabled ? (
-            <button onClick={onUpgradeClick} className="text-xs font-semibold text-red-600 underline">
+            <button onClick={onUpgradeClick} className="text-xs font-semibold text-red-600 dark:text-red-400 underline">
               Upgrade to Active Search →
             </button>
           ) : (
-            <a href="/profile" className="text-xs font-semibold text-red-600 underline">
+            <a href="/profile" className="text-xs font-semibold text-red-600 dark:text-red-400 underline">
               Add your own API key to keep going →
             </a>
           )
@@ -90,16 +90,16 @@ export default function UsageWidget({
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-300">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">
         Free · {remaining} screens this week
       </span>
-      <p className="text-xs text-gray-400">Resets {formatResetDate(week_reset_at)}</p>
+      <p className="text-xs text-gray-400 dark:text-gray-500">Resets {formatResetDate(week_reset_at)}</p>
       {referral_bonus_screens > 0 && (
-        <p className="text-xs text-green-600 font-medium">+ {referral_bonus_screens} referral bonus</p>
+        <p className="text-xs text-green-600 dark:text-green-400 font-medium">+ {referral_bonus_screens} referral bonus</p>
       )}
       <button
         onClick={() => document.getElementById('referral-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-        className="text-xs font-semibold text-blue-600 underline"
+        className="text-xs font-semibold text-blue-600 dark:text-blue-400 underline"
       >
         Refer a friend for +10 screens
       </button>

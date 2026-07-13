@@ -1,8 +1,19 @@
 @import "tailwindcss";
 
+/* Class-based dark mode (not just prefers-color-scheme) so the
+   light/dark/system toggle can force a mode regardless of OS setting.
+   ThemeProvider (src/components/theme/ThemeProvider.tsx) stamps .dark
+   onto <html> when active. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #F8FAFC;
   --foreground: #0F172A;
+}
+
+.dark {
+  --background: #0B1220;
+  --foreground: #E2E8F0;
 }
 
 @theme inline {
@@ -15,7 +26,7 @@
   --color-success: #16A34A;
   --color-warning: #D97706;
   --color-danger: #DC2626;
-  --color-surface: #F8FAFC;
+  --color-surface: var(--background);
 
   --font-sans: var(--font-inter);
 }

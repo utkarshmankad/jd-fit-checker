@@ -94,18 +94,18 @@ function getActiveRules(hrf: HardRejectFilters | null): string[] {
 
 function SkeletonRow() {
   return (
-    <tr className="border-b border-gray-100">
-      <td className="px-4 sm:px-6 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-24" /></td>
-      <td className="px-4 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-32" /></td>
+    <tr className="border-b border-gray-100 dark:border-gray-800">
+      <td className="px-4 sm:px-6 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24" /></td>
+      <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32" /></td>
       <td className="px-4 py-4">
-        <div className="h-6 bg-gray-200 rounded-full animate-pulse w-28" />
+        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse w-28" />
         {/* Approximates the reason-line height real rows can show below the
             badge — without this, a batch skewed toward REJECT verdicts grows
             in row height right as the skeleton flips to a real result. */}
-        <div className="h-3 bg-gray-100 rounded animate-pulse w-40 mt-1.5" />
+        <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-40 mt-1.5" />
       </td>
-      <td className="px-4 py-4 hidden md:table-cell"><div className="h-3 bg-gray-200 rounded animate-pulse w-16 ml-auto" /></td>
-      <td className="px-4 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse w-6 ml-auto" /></td>
+      <td className="px-4 py-4 hidden md:table-cell"><div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-16 ml-auto" /></td>
+      <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-6 ml-auto" /></td>
     </tr>
   )
 }
@@ -526,18 +526,18 @@ export default function DashboardPage() {
     return (
       <Fragment key={rowKey}>
         <tr className={[
-          'border-b border-gray-100 transition-colors',
-          isErrorRow ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-gray-50',
-          isReject ? 'border-l-4 border-red-400' : '',
+          'border-b border-gray-100 dark:border-gray-800 transition-colors',
+          isErrorRow ? 'bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50',
+          isReject ? 'border-l-4 border-red-400 dark:border-red-600' : '',
         ].filter(Boolean).join(' ')}>
           {/* Company */}
-          <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 whitespace-nowrap align-top">
-            {isErrorRow ? <span className="text-amber-700">Unknown</span> : (result.company ?? '—')}
+          <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap align-top">
+            {isErrorRow ? <span className="text-amber-700 dark:text-amber-400">Unknown</span> : (result.company ?? '—')}
           </td>
           {/* Job title */}
-          <td className="px-4 py-4 text-gray-500 max-w-[10rem] align-top">
+          <td className="px-4 py-4 text-gray-500 dark:text-gray-400 max-w-[10rem] align-top">
             {isErrorRow ? (
-              <span className="text-amber-700 text-xs truncate block" title={result.job_url ?? ''}>
+              <span className="text-amber-700 dark:text-amber-400 text-xs truncate block" title={result.job_url ?? ''}>
                 {(result.job_url ?? '').slice(0, 36)}{(result.job_url ?? '').length > 36 ? '…' : ''}
               </span>
             ) : (
@@ -550,14 +550,14 @@ export default function DashboardPage() {
           {/* Verdict (PRIMARY) + reason line */}
           <td className="px-4 py-4 align-top max-w-xs">
             {isErrorRow ? (
-              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-amber-100 text-amber-800 border border-amber-300">⚠ Scrape failed</span>
+              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">⚠ Scrape failed</span>
             ) : (
               <div>
                 <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-bold ${getVerdictDisplay(result.verdict).bg} ${getVerdictDisplay(result.verdict).color} border ${getVerdictDisplay(result.verdict).border}`}>
                   {getVerdictDisplay(result.verdict).icon} {getVerdictDisplay(result.verdict).label}
                 </span>
                 {reasonLine && (
-                  <p className={`text-xs mt-1.5 leading-snug ${isReject ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+                  <p className={`text-xs mt-1.5 leading-snug ${isReject ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
                     {reasonLine}
                   </p>
                 )}
@@ -578,12 +578,12 @@ export default function DashboardPage() {
           <td className="px-4 py-4 align-top">
             <div className="flex items-center gap-2 justify-end">
               <button onClick={() => setExpandedId(isExpanded ? null : rowKey)}
-                className={`p-1.5 rounded transition-colors ${isExpanded ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-gray-500 hover:bg-gray-200'}`}
+                className={`p-1.5 rounded transition-colors ${isExpanded ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
                 title={isErrorRow ? 'View error' : 'View analysis'}>
                 <Eye size={15} />
               </button>
               {result.job_url && !isErrorRow && (
-                <a href={result.job_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded hover:bg-gray-200 text-gray-500 transition-colors" title="Open URL">
+                <a href={result.job_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors" title="Open URL">
                   <ExternalLink size={15} />
                 </a>
               )}
@@ -604,19 +604,19 @@ export default function DashboardPage() {
         </tr>
 
         {/* Expanded detail row */}
-        <tr className={isErrorRow ? 'bg-amber-50' : 'bg-slate-50'}>
+        <tr className={isErrorRow ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-slate-50 dark:bg-gray-800/50'}>
           <td colSpan={5} className="p-0">
             <div className={`overflow-hidden transition-all duration-200 ease-in-out ${isExpanded ? 'max-h-[900px]' : 'max-h-0'}`}>
               <div className="px-6 py-5">
                 {isErrorRow ? (
                   <div className="space-y-3 max-w-xl">
-                    <div className="flex items-start gap-2 text-sm text-amber-800 bg-amber-100 rounded-lg px-3 py-2.5">
+                    <div className="flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 rounded-lg px-3 py-2.5">
                       <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                       <span>{errorMsg}</span>
                     </div>
                     {result.job_url && (
                       <button onClick={() => handlePasteManually(result.job_url!)}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                         <Pencil size={12} /> Paste manually
                       </button>
                     )}
@@ -635,13 +635,13 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {!profileBannerDismissed && hasApiKey === true && !hasPreferences && (
-        <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+        <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm">
           <AlertTriangle size={16} className="shrink-0 mt-0.5" />
           <span className="flex-1">
             No dealbreakers set — any job could slip through.{' '}
             <a href="/profile" className="font-semibold underline">Tell us what to reject →</a>
           </span>
-          <button onClick={dismissProfileBanner} className="shrink-0 text-amber-500 hover:text-amber-700 transition-colors" title="Dismiss">
+          <button onClick={dismissProfileBanner} className="shrink-0 text-amber-500 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-400 transition-colors" title="Dismiss">
             <X size={15} />
           </button>
         </div>
@@ -649,9 +649,9 @@ export default function DashboardPage() {
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reject the bad ones</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Reject the bad ones</h1>
           {lifetimeSaved && (
-            <p className="text-xs text-gray-400 mt-0.5">Lifetime: {lifetimeSaved} saved across your screening history</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Lifetime: {lifetimeSaved} saved across your screening history</p>
           )}
         </div>
         {usage && (
@@ -673,13 +673,13 @@ export default function DashboardPage() {
       {usage && usage.tier !== 'paid' && <ReferralCard />}
 
       {/* Input card */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="px-6 pt-6 pb-0">
-          <div className="flex items-center justify-between border-b border-gray-200">
+          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
             <div className="flex">
               {(['urls', 'text'] as InputTab[]).map((t) => (
                 <button key={t} onClick={() => { setTab(t); setResults([]); setBatchTime(null); setScreenError(null); setIsSampleData(false) }}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                  className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
                   {t === 'urls' ? 'Job URLs' : 'Paste JD text'}
                 </button>
               ))}
@@ -687,7 +687,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setShowChatGptModal(true)}
-              className="mb-2 text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors shrink-0"
+              className="mb-2 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline underline-offset-2 transition-colors shrink-0"
             >
               How is this different from ChatGPT?
             </button>
@@ -699,43 +699,43 @@ export default function DashboardPage() {
             <>
               <textarea value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setScreenError(null) }} rows={5}
                 placeholder="Paste job URLs here, one per line. We'll tell you which ones aren't worth your time."
-                className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-              {urlInput.trim() && <p className="text-xs text-gray-400">{urlCount} URL{urlCount !== 1 ? 's' : ''} detected</p>}
+                className="w-full resize-none rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              {urlInput.trim() && <p className="text-xs text-gray-400 dark:text-gray-500">{urlCount} URL{urlCount !== 1 ? 's' : ''} detected</p>}
 
-              <p className="text-xs text-gray-400">
-                Bulk import from LinkedIn? <a href="/dashboard/guide" className="text-blue-600 hover:underline font-medium">See the guide →</a>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                Bulk import from LinkedIn? <a href="/dashboard/guide" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">See the guide →</a>
               </p>
             </>
           ) : (
             <div className="space-y-3">
               {jdEntries.map((entry, idx) => (
-                <div key={entry.id} className="rounded-lg border border-gray-200 p-4 space-y-3">
+                <div key={entry.id} className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-gray-400">JD {jdEntries.length > 1 ? `#${idx + 1}` : ''}</span>
-                    {jdEntries.length > 1 && <button onClick={() => removeJdEntry(entry.id)} className="text-gray-400 hover:text-red-500 transition-colors" title="Remove"><X size={14} /></button>}
+                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500">JD {jdEntries.length > 1 ? `#${idx + 1}` : ''}</span>
+                    {jdEntries.length > 1 && <button onClick={() => removeJdEntry(entry.id)} className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors" title="Remove"><X size={14} /></button>}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input type="text" placeholder="Job title (optional)" value={entry.job_title} onChange={(e) => updateJdEntry(entry.id, 'job_title', e.target.value)}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     <input type="text" placeholder="Company (optional)" value={entry.company} onChange={(e) => updateJdEntry(entry.id, 'company', e.target.value)}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <textarea value={entry.jd_text} onChange={(e) => { updateJdEntry(entry.id, 'jd_text', e.target.value); setScreenError(null) }} rows={6}
                     placeholder="Paste the full job description here..."
-                    className="w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    className="w-full resize-none rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                 </div>
               ))}
               {jdEntries.length < 10 && (
-                <button onClick={addJdEntry} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 border-dashed border-gray-300 text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors">
+                <button onClick={addJdEntry} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
                   <Plus size={14} /> Add another JD
                 </button>
               )}
-              <p className="text-xs text-gray-400">Use this tab when the URL scraper can&apos;t reach the page</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Use this tab when the URL scraper can&apos;t reach the page</p>
             </div>
           )}
 
           {screenError && (
-            <div className={`rounded-lg px-4 py-3 text-sm flex items-start gap-3 ${screenError.type === 'invalid_key' ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
+            <div className={`rounded-lg px-4 py-3 text-sm flex items-start gap-3 ${screenError.type === 'invalid_key' ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300' : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300'}`}>
               {screenError.type === 'network' ? <WifiOff size={15} className="shrink-0 mt-0.5" /> : <AlertTriangle size={15} className="shrink-0 mt-0.5" />}
               <div className="flex-1 space-y-2">
                 {screenError.type === 'no_api_key' && (<><p>⚠️ No API key saved. Add your Anthropic or OpenAI key in Profile settings.</p><a href="/profile" className="inline-block font-semibold underline text-xs">→ Go to Profile</a></>)}
@@ -754,7 +754,7 @@ export default function DashboardPage() {
                         : results.length > 0 ? 'Continuing where it left off.' : 'Retrying now.'}
                     </p>
                     <button onClick={() => { setScreenError(null); handleScreen() }} disabled={rateLimitCountdown > 0}
-                      className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors">
+                      className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 dark:bg-amber-700 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors">
                       {rateLimitCountdown > 0 ? `Retry in ${rateLimitCountdown}s` : 'Retry now'}
                     </button>
                   </div>
@@ -762,13 +762,13 @@ export default function DashboardPage() {
                 {screenError.type === 'network' && (
                   <div className="flex items-center justify-between gap-4">
                     <p>{screenError.message ?? 'Connection error — check your internet connection.'}</p>
-                    <button onClick={() => { setScreenError(null); handleScreen() }} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-700 text-white hover:bg-gray-800 transition-colors">Retry</button>
+                    <button onClick={() => { setScreenError(null); handleScreen() }} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-700 dark:bg-gray-300 text-white hover:bg-gray-800 transition-colors">Retry</button>
                   </div>
                 )}
                 {screenError.type === 'service_error' && (
                   <div className="flex items-center justify-between gap-4">
                     <p>{screenError.message ?? 'Screening service error.'} This isn&apos;t a problem with your connection.</p>
-                    <button onClick={() => { setScreenError(null); handleScreen() }} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-700 text-white hover:bg-gray-800 transition-colors">Retry</button>
+                    <button onClick={() => { setScreenError(null); handleScreen() }} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-700 dark:bg-gray-300 text-white hover:bg-gray-800 transition-colors">Retry</button>
                   </div>
                 )}
               </div>
@@ -796,36 +796,36 @@ export default function DashboardPage() {
 
       {/* Active dealbreakers strip */}
       {activeRules.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500 px-1">
-          <span className="font-medium text-gray-600">Active dealbreakers:</span>
+        <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500 dark:text-gray-400 px-1">
+          <span className="font-medium text-gray-600 dark:text-gray-300">Active dealbreakers:</span>
           {activeRules.map((rule) => (
-            <span key={rule} className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 rounded-full font-medium">{rule}</span>
+            <span key={rule} className="px-2 py-0.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-full font-medium">{rule}</span>
           ))}
-          <a href="/profile" className="text-blue-500 hover:underline ml-1">Edit →</a>
+          <a href="/profile" className="text-blue-500 dark:text-blue-400 hover:underline ml-1">Edit →</a>
         </div>
       )}
 
       {/* Empty state */}
       {!hasAnyResults ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <FileSearch size={48} className="text-gray-300 mb-4" />
-          <p className="text-gray-700 font-semibold text-lg">Nothing rejected yet.</p>
-          <p className="text-gray-400 text-sm mt-1">Paste your job list below — we&apos;ll tell you which ones to skip.</p>
+          <FileSearch size={48} className="text-gray-300 dark:text-gray-600 mb-4" />
+          <p className="text-gray-700 dark:text-gray-300 font-semibold text-lg">Nothing rejected yet.</p>
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Paste your job list below — we&apos;ll tell you which ones to skip.</p>
           <div className="mt-6 flex flex-col items-center gap-2">
             <button onClick={loadSampleData}
               className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors hover:opacity-90"
               style={{ backgroundColor: '#1B3A5C' }}>
               See a sample batch →
             </button>
-            <p className="text-xs text-gray-400">No API key needed — see how auto-reject works</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">No API key needed — see how auto-reject works</p>
           </div>
         </div>
       ) : (
         <div className="space-y-4">
           {/* Sample data banner */}
           {isSampleData && (
-            <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg bg-blue-50 border border-blue-200 text-sm">
-              <p className="text-blue-800">👆 Sample batch — showing how auto-reject and verdicts work.</p>
+            <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-sm">
+              <p className="text-blue-800 dark:text-blue-300">👆 Sample batch — showing how auto-reject and verdicts work.</p>
               <a href="/profile?onboarding=true" className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors hover:opacity-90" style={{ backgroundColor: '#1B3A5C' }}>
                 Set up your dealbreakers →
               </a>
@@ -836,47 +836,47 @@ export default function DashboardPage() {
           {batchDone && !isSampleData && verdictCounts.REJECT > 0 && (
             <div style={{ backgroundColor: '#1B3A5C' }} className="rounded-xl px-6 py-6 text-white">
               <p className="text-5xl font-bold tracking-tight leading-none">{calculateTimeSaved(verdictCounts.REJECT)}</p>
-              <p className="text-blue-200 mt-3 text-base">
+              <p className="text-blue-200 dark:text-blue-300 mt-3 text-base">
                 saved — by skipping {verdictCounts.REJECT} job{verdictCounts.REJECT !== 1 ? 's' : ''} that weren&apos;t worth your time
               </p>
             </div>
           )}
           {batchDone && !isSampleData && verdictCounts.REJECT === 0 && goodResults.length > 0 && (
             <div style={{ backgroundColor: '#1B3A5C' }} className="rounded-xl px-6 py-4 text-white flex items-center gap-3">
-              <span className="text-green-400 text-xl font-bold">✓</span>
+              <span className="text-green-400 dark:text-green-500 text-xl font-bold">✓</span>
               <p>All {goodResults.length} jobs cleared your dealbreakers — no time-wasters in this batch.</p>
             </div>
           )}
 
           {/* Results table */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100">
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-gray-800">
               <div>
-                <h2 className="font-semibold text-gray-900">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100">
                   Results
-                  {errorResults.length > 0 && <span className="ml-2 text-xs font-normal text-amber-600">({errorResults.length} failed to scrape)</span>}
+                  {errorResults.length > 0 && <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400">({errorResults.length} failed to scrape)</span>}
                 </h2>
                 {goodResults.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    <span className="font-medium text-gray-700">{goodResults.length} JD{goodResults.length !== 1 ? 's' : ''} screened</span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{goodResults.length} JD{goodResults.length !== 1 ? 's' : ''} screened</span>
                     {verdictCounts.REJECT > 0 && (
-                      <span className="ml-1">— <span className="text-green-600 font-medium">{worthALook} worth your time</span> · {verdictCounts.REJECT} you can skip</span>
+                      <span className="ml-1">— <span className="text-green-600 dark:text-green-400 font-medium">{worthALook} worth your time</span> · {verdictCounts.REJECT} you can skip</span>
                     )}
                     {verdictCounts.REJECT === 0 && worthALook > 0 && (
-                      <span className="ml-1">— <span className="text-green-600 font-medium">{worthALook} worth your time</span></span>
+                      <span className="ml-1">— <span className="text-green-600 dark:text-green-400 font-medium">{worthALook} worth your time</span></span>
                     )}
-                    {skeletonCount > 0 && <span className="text-gray-400 italic ml-1">{skeletonCount} in progress…</span>}
+                    {skeletonCount > 0 && <span className="text-gray-400 dark:text-gray-500 italic ml-1">{skeletonCount} in progress…</span>}
                   </p>
                 )}
                 {batchTime && skeletonCount === 0 && goodResults.length > 0 && (
-                  <p className="text-xs text-gray-400 mt-0.5">Screened {timeAgo(batchTime)}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Screened {timeAgo(batchTime)}</p>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-xs text-gray-400 mr-1">Sort:</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 mr-1">Sort:</span>
                 {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
                   <button key={k} onClick={() => setSortKey(k)}
-                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${sortKey === k ? 'bg-gray-900 text-white' : 'hover:bg-gray-100 text-gray-500'}`}>
+                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${sortKey === k ? 'bg-gray-900 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
                     {SORT_LABELS[k]}
                   </button>
                 ))}
@@ -886,11 +886,11 @@ export default function DashboardPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <th className="text-left px-4 sm:px-6 py-3 font-medium text-gray-500 whitespace-nowrap">Company</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Job title</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-500 whitespace-nowrap">Verdict</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-400 whitespace-nowrap text-xs hidden md:table-cell">Scores</th>
+                  <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                    <th className="text-left px-4 sm:px-6 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Company</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Job title</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Verdict</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-400 dark:text-gray-500 whitespace-nowrap text-xs hidden md:table-cell">Scores</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
@@ -905,18 +905,18 @@ export default function DashboardPage() {
 
             {/* Collapsible reject section */}
             {rejectResults.length > 0 && (
-              <div className="border-t border-gray-100">
+              <div className="border-t border-gray-100 dark:border-gray-800">
                 <button
                   onClick={() => setRejectedCollapsed((v) => !v)}
-                  className="w-full flex items-center justify-between px-4 sm:px-6 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                  className="w-full flex items-center justify-between px-4 sm:px-6 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
+                    <span className="w-2 h-2 rounded-full bg-red-400 dark:bg-red-500 inline-block" />
                     Skip These ({rejectResults.length}) — click to see why
                   </span>
                   {rejectedCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                 </button>
                 {!rejectedCollapsed && (
-                  <div className="overflow-x-auto border-t border-gray-100">
+                  <div className="overflow-x-auto border-t border-gray-100 dark:border-gray-800">
                     <table className="w-full text-sm">
                       <tbody>
                         {rejectResults.map(renderResultRow)}
@@ -929,19 +929,19 @@ export default function DashboardPage() {
 
             {/* Confidence disclaimer */}
             {goodResults.length > 0 && (
-              <div className="px-4 sm:px-6 py-3 border-t border-gray-100 bg-gray-50">
-                <p className="text-xs text-gray-400 leading-relaxed">
+              <div className="px-4 sm:px-6 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                <p className="text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
                   Scores reflect resume-to-JD fit, not a guarantee of callbacks. Use them to prioritize, not to predict.
                 </p>
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 px-4 sm:px-6 py-4 border-t border-gray-100">
-              <button onClick={exportCSV} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-gray-800">
+              <button onClick={exportCSV} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <Download size={15} /> Export CSV
               </button>
               {!isSampleData && (
-                <button onClick={handleShare} disabled={shareLoading} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
+                <button onClick={handleShare} disabled={shareLoading} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors disabled:opacity-50">
                   <Share2 size={15} /> {shareLoading ? 'Sharing...' : 'Share results'}
                 </button>
               )}
@@ -961,15 +961,15 @@ export default function DashboardPage() {
       {PRICING_ENABLED && showTierModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowTierModal(false)} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h2 className="text-xl font-bold text-gray-900">Screening limit reached</h2>
-            <p className="text-gray-500 text-sm">{tierModalMessage || "You've hit your screening limit. Upgrade once for unlimited rejections — no monthly subscription."}</p>
+          <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Screening limit reached</h2>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">{tierModalMessage || "You've hit your screening limit. Upgrade once for unlimited rejections — no monthly subscription."}</p>
             <div className="flex flex-col gap-2 pt-1">
               <button onClick={() => { setShowTierModal(false); setShowPaymentModal(true) }}
                 className="w-full py-3 rounded-xl font-semibold text-sm text-white hover:opacity-90 transition-opacity" style={{ backgroundColor: '#1B3A5C' }}>
                 Unlock unlimited rejections — ₹499 one-time
               </button>
-              <button onClick={() => setShowTierModal(false)} className="w-full text-center text-xs text-gray-400 hover:text-gray-600 transition-colors py-2">Maybe later</button>
+              <button onClick={() => setShowTierModal(false)} className="w-full text-center text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors py-2">Maybe later</button>
             </div>
           </div>
         </div>

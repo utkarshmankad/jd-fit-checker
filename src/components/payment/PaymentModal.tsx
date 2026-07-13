@@ -121,16 +121,16 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-5">
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-5">
         <div className="text-center">
-          <h2 className="text-xl font-bold text-gray-900">Keep rejecting unlimited jobs</h2>
-          <p className="text-gray-500 text-sm mt-1">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Keep rejecting unlimited jobs</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
             Upgrade once for unlimited rejections — no monthly subscription.
           </p>
         </div>
 
         {/* Feature list */}
-        <ul className="space-y-2 text-sm text-gray-700">
+        <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
           {[
             'Unlimited batch screenings, forever',
             'Full gap analysis + requirements check',
@@ -138,16 +138,16 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
             'Priority support',
           ].map((f) => (
             <li key={f} className="flex items-center gap-2">
-              <span className="text-green-500 font-bold">✓</span>
+              <span className="text-green-500 dark:text-green-400 font-bold">✓</span>
               {f}
             </li>
           ))}
         </ul>
 
         {/* Price */}
-        <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 text-center">
-          <span className="text-3xl font-bold text-gray-900">₹499</span>
-          <span className="text-gray-500 text-sm"> one-time</span>
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 p-4 text-center">
+          <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">₹499</span>
+          <span className="text-gray-500 dark:text-gray-400 text-sm"> one-time</span>
         </div>
 
         <button
@@ -161,7 +161,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
 
         <button
           onClick={onClose}
-          className="w-full text-center text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          className="w-full text-center text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
         >
           Cancel
         </button>
