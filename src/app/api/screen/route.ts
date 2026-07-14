@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { decrypt } from '@/lib/utils/crypto'
 import { normalizeJobUrl, isSafeJobUrl } from '@/lib/utils/url'
 import { checkScreenLimit } from '@/lib/utils/screen-limits'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile } from '@/types'
@@ -56,20 +55,8 @@ async function finalizeBatch(
     return NextResponse.json({ batch_intelligence: null })
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('api_key_encrypted, api_provider')
-    .eq('id', userId)
-    .single()
-
-  if (!profile?.api_key_encrypted) {
-    return NextResponse.json({ batch_intelligence: null })
-  }
-
-  let apiKey: string
-  try {
-    apiKey = decrypt(profile.api_key_encrypted as string)
-  } catch {
+  const APP_OPENAI_KEY = process.env.APP_OPENAI_API_KEY || null
+  if (!APP_OPENAI_KEY) {
     return NextResponse.json({ batch_intelligence: null })
   }
 
@@ -82,8 +69,8 @@ async function finalizeBatch(
         jd_texts: batchRows.map((r) => r.jd_text ?? ''),
         job_titles: batchRows.map((r) => r.job_title ?? ''),
         verdicts: batchRows.map((r) => r.verdict),
-        api_key: apiKey,
-        api_provider: profile.api_provider ?? 'anthropic',
+        api_key: APP_OPENAI_KEY,
+        api_provider: 'openai',
       }),
     })
     if (!res.ok) {
@@ -235,38 +222,24 @@ export async function POST(request: NextRequest) {
   const weeklyLimitValue = WEEKLY_LIMIT + bonus
 
   const APP_OPENAI_KEY = process.env.APP_OPENAI_API_KEY || null
-  // Running local counter (seeded from the DB snapshot, incremented after
-  // each successful reservation) rather than re-querying per item — correct
-  // as long as this single request is the only writer in flight, which is
-  // the common case since the client only ever sends one item per call.
-  let usedSoFar = (profile.screens_used_total as number) || 0
 
-  let userApiKey: string | null | undefined // undefined = not yet resolved
-  function getUserApiKey(): string | null {
-    if (userApiKey !== undefined) return userApiKey
-    if (!profile!.api_key_encrypted) {
-      userApiKey = null
-      return null
-    }
-    try {
-      userApiKey = decrypt(profile!.api_key_encrypted as string)
-    } catch {
-      userApiKey = null
-    }
-    return userApiKey
-  }
-
-  // Resolves the key/provider for one item AND performs whatever quota
-  // reservation actually applies to that choice, atomically per item (see
-  // the crash-safety note above reserve_screens' original introduction) —
-  // reservation only happens against the counter that's actually relevant:
-  // the app-key allotment while using the app key, or the weekly limit for
-  // regular free-tier users using their own key. A beta user on their own
-  // key past the app-key allotment reserves nothing and is never blocked.
-  type PreparedItem = { apiKey: string; provider: string; source: 'app' | 'own'; reserved: boolean; useWeekly: boolean }
+  // Every scan runs on the app's own key now — there is no BYOK fallback.
+  // Quota reservation is still the real gate (reserve_screens, atomic per
+  // item — see the crash-safety note above): beta/launch users draw against
+  // the flat beta allotment, everyone else against the weekly cap. Paid
+  // tier is unlimited (no reservation at all).
+  type PreparedItem = { apiKey: string; provider: string; source: 'app'; reserved: boolean; useWeekly: boolean }
 
   async function prepareItem(): Promise<PreparedItem | { error: string; code?: 'no_api_key' }> {
-    if (isBetaOrLaunch && usedSoFar < betaLimitValue && APP_OPENAI_KEY) {
+    if (!APP_OPENAI_KEY) {
+      return { error: 'Screening is temporarily unavailable. Try again shortly.', code: 'no_api_key' }
+    }
+
+    if (profile!.tier === 'paid') {
+      return { apiKey: APP_OPENAI_KEY, provider: 'openai', source: 'app', reserved: false, useWeekly: false }
+    }
+
+    if (isBetaOrLaunch) {
       const { data: ok, error } = await supabase.rpc('reserve_screens', {
         p_user_id: user!.id,
         p_amount: 1,
@@ -274,30 +247,16 @@ export async function POST(request: NextRequest) {
         p_limit: betaLimitValue,
       })
       if (error) {
-        console.error('reserve_screens (app-key allotment) failed:', error)
+        console.error('reserve_screens (beta allotment) failed:', error)
         return { error: 'Failed to check screen limit' }
       }
-      if (ok) {
-        usedSoFar++
-        return { apiKey: APP_OPENAI_KEY, provider: 'openai', source: 'app', reserved: true, useWeekly: false }
+      if (!ok) {
+        return { error: `You've used your ${betaLimitValue} free judgments. More opens up next week — check back then.` }
       }
-      // Exhausted (e.g. a concurrent request used the last one) — fall through to own key.
+      return { apiKey: APP_OPENAI_KEY, provider: 'openai', source: 'app', reserved: true, useWeekly: false }
     }
 
-    const own = getUserApiKey()
-
-    if (isBetaOrLaunch) {
-      if (!own) {
-        return { error: `You've used your ${betaLimitValue} free judgments. Add your own OpenAI or Anthropic API key in Profile settings to keep going.`, code: 'no_api_key' }
-      }
-      // Own key past the app-key allotment reserves nothing — nothing to refund either.
-      return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic', source: 'own', reserved: false, useWeekly: false }
-    }
-
-    // Regular free tier: always weekly-capped, own key required from the start.
-    if (!own) {
-      return { error: 'No API key configured. Set up your profile first.', code: 'no_api_key' }
-    }
+    // Regular free tier: always weekly-capped.
     const { data: ok, error } = await supabase.rpc('reserve_screens', {
       p_user_id: user!.id,
       p_amount: 1,
@@ -312,7 +271,7 @@ export async function POST(request: NextRequest) {
       const limitCheck = await checkScreenLimit(profile as unknown as UserProfile, 1)
       return { error: limitCheck.upgrade_prompt ?? "You've used this week's free judgments." }
     }
-    return { apiKey: own, provider: (profile!.api_provider as string) ?? 'anthropic', source: 'own', reserved: true, useWeekly: true }
+    return { apiKey: APP_OPENAI_KEY, provider: 'openai', source: 'app', reserved: true, useWeekly: true }
   }
 
   // A scan that never produced a real result (scrape/LLM/service failure)
@@ -324,9 +283,7 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase.rpc('refund_screens', { p_user_id: user!.id, p_amount: 1, p_use_weekly: item.useWeekly })
     if (error) {
       console.error('refund_screens failed:', error)
-      return
     }
-    usedSoFar--
   }
 
   // Use stored resume_text if available; otherwise synthesize from saved preferences so
@@ -451,12 +408,9 @@ export async function POST(request: NextRequest) {
   // up to 100 x FASTAPI_TIMEOUT_MS (~75 minutes) worst case, well past any
   // serverless function time limit. A bounded chunk size keeps this from
   // hammering the screening backend all at once while still cutting
-  // worst-case wall-clock by roughly the concurrency factor. `usedSoFar`
-  // and `fatalError` are safe to share across concurrently-running items:
-  // usedSoFar is only ever a heuristic for which key to try first (the DB's
-  // atomic reserve_screens call is the real gate — see prepareItem), and
-  // fatalError only needs "some item in this chunk hit one" semantics, not
-  // a specific ordering.
+  // worst-case wall-clock by roughly the concurrency factor. `fatalError` is
+  // safe to share across concurrently-running items — it only needs "some
+  // item in this chunk hit one" semantics, not a specific ordering.
   const CONCURRENCY = 5
   async function processInChunks<T>(items: T[], worker: (item: T) => Promise<boolean>): Promise<void> {
     for (let i = 0; i < items.length; i += CONCURRENCY) {

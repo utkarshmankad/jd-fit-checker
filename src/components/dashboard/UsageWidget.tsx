@@ -76,9 +76,9 @@ export default function UsageWidget({
               Keep judging →
             </button>
           ) : (
-            <a href="/profile" className="text-xs font-semibold text-red-600 dark:text-red-400 underline">
-              Add your own API key to keep going →
-            </a>
+            <span className="text-xs font-semibold text-red-600 dark:text-red-400">
+              More free judgments next week
+            </span>
           )
         )}
       </div>

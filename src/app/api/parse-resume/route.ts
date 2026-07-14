@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { decrypt } from '@/lib/utils/crypto'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024        // 5 MB
 const MAX_TEXT_CHARS = 50_000                  // ~25 pages of text
@@ -124,43 +123,12 @@ export async function POST(request: NextRequest) {
   const textError = validateTextContent(resumeText)
   if (textError) return NextResponse.json({ error: textError }, { status: 400 })
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('api_key_encrypted, api_provider, tier, is_beta_user')
-    .eq('id', user.id)
-    .single()
-
-  const LAUNCH_MODE = process.env.LAUNCH_MODE === 'true'
+  // Every AI call — resume parsing included — runs on the app's own key.
   const APP_OPENAI_KEY = process.env.APP_OPENAI_API_KEY || null
-  // Same beta-trial fallback as /api/screen — resume parsing is a one-time
-  // setup action, not a metered "screen", so it draws on the app key
-  // unconditionally for beta/launch users with no key of their own yet
-  // (no quota check here, unlike screening).
-  const eligibleForAppKey = !!profile
-    && profile.tier !== 'paid'
-    && (!!profile.is_beta_user || LAUNCH_MODE)
-    && !profile.api_key_encrypted
-    && !!APP_OPENAI_KEY
-
-  let apiKey: string
-  let provider: string
-  if (eligibleForAppKey) {
-    apiKey = APP_OPENAI_KEY!
-    provider = 'openai'
-  } else if (profile?.api_key_encrypted) {
-    try {
-      apiKey = decrypt(profile.api_key_encrypted as string)
-    } catch {
-      return NextResponse.json({ error: 'Failed to decrypt API key' }, { status: 500 })
-    }
-    provider = profile.api_provider ?? 'anthropic'
-  } else {
-    return NextResponse.json(
-      { error: 'No API key configured. Add your AI provider key in the AI provider section first.' },
-      { status: 400 }
-    )
+  if (!APP_OPENAI_KEY) {
+    return NextResponse.json({ error: 'Resume parsing is temporarily unavailable. Try again shortly.' }, { status: 503 })
   }
-  let rawText: string
+  const apiKey = APP_OPENAI_KEY
 
   function aiErrorMessage(status: number): string {
     if (status === 401) return 'Invalid key — check you copied it correctly'
@@ -168,71 +136,34 @@ export async function POST(request: NextRequest) {
     return `API error (${status})`
   }
 
-  if (provider === 'anthropic') {
-    let res: Response
-    try {
-      res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-opus-4-8',
-          max_tokens: 1024,
-          messages: [{ role: 'user', content: `${PARSE_PROMPT}\n\nResume:\n${resumeText}` }],
-        }),
-      })
-    } catch {
-      return NextResponse.json({ error: 'Could not reach the API provider' }, { status: 503 })
-    }
-
-    if (!res.ok) {
-      return NextResponse.json({ error: aiErrorMessage(res.status) }, { status: res.status })
-    }
-
-    const data = (await res.json()) as { content: Array<{ type: string; text: string }> }
-    rawText = data.content.find((b) => b.type === 'text')?.text ?? ''
-  } else {
-    // OpenAI and OpenAI-compatible providers (Groq, DeepSeek) all speak the
-    // same chat-completions shape — just a different base URL and model.
-    const OPENAI_COMPAT: Record<string, { baseUrl: string; model: string }> = {
-      openai: { baseUrl: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o' },
-      groq: { baseUrl: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile' },
-      deepseek: { baseUrl: 'https://api.deepseek.com/chat/completions', model: 'deepseek-chat' },
-    }
-    const { baseUrl, model } = OPENAI_COMPAT[provider] ?? OPENAI_COMPAT.openai
-
-    let res: Response
-    try {
-      res = await fetch(baseUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 1024,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: PARSE_PROMPT },
-            { role: 'user', content: `Resume:\n${resumeText}` },
-          ],
-        }),
-      })
-    } catch {
-      return NextResponse.json({ error: 'Could not reach the API provider' }, { status: 503 })
-    }
-
-    if (!res.ok) {
-      return NextResponse.json({ error: aiErrorMessage(res.status) }, { status: res.status })
-    }
-
-    const data = (await res.json()) as { choices: Array<{ message: { content: string } }> }
-    rawText = data.choices[0]?.message?.content ?? ''
+  let res: Response
+  try {
+    res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_tokens: 1024,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: PARSE_PROMPT },
+          { role: 'user', content: `Resume:\n${resumeText}` },
+        ],
+      }),
+    })
+  } catch {
+    return NextResponse.json({ error: 'Could not reach the API provider' }, { status: 503 })
   }
+
+  if (!res.ok) {
+    return NextResponse.json({ error: aiErrorMessage(res.status) }, { status: res.status })
+  }
+
+  const data = (await res.json()) as { choices: Array<{ message: { content: string } }> }
+  let rawText = data.choices[0]?.message?.content ?? ''
 
   rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
 

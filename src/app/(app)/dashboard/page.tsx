@@ -111,9 +111,9 @@ export default function DashboardPage() {
   const [isSampleData, setIsSampleData] = useState(false)
   const [lifetimeRejectCount, setLifetimeRejectCount] = useState<number | null>(null)
 
-  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null)
   const [hasPreferences, setHasPreferences] = useState(false)
-  const [apiProvider, setApiProvider] = useState<string>('anthropic')
+  // Every scan runs on the app's own OpenAI key now — no per-user provider choice.
+  const apiProvider = 'openai'
   const [usage, setUsage] = useState<{
     tier: 'free' | 'paid'
     effective_is_beta: boolean
@@ -231,12 +231,10 @@ export default function DashboardPage() {
       if (!user) return
       const { data: profile } = await supabase
         .from('profiles')
-        .select('tier, api_key_encrypted, api_provider, preferences, hard_reject_filters')
+        .select('tier, preferences, hard_reject_filters')
         .eq('id', user.id)
         .single()
-      if (!profile) { setHasApiKey(false); return }
-      setApiProvider((profile.api_provider as string) ?? 'anthropic')
-      setHasApiKey(!!(profile.api_key_encrypted as string | null))
+      if (!profile) return
       const prefs = (profile.preferences ?? {}) as { preferred_tech_stack?: string[]; target_industries?: string[] }
       const hrf = (profile.hard_reject_filters ?? {}) as HardRejectFilters
       setHardRejectFilters(hrf)
@@ -557,7 +555,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      {!profileBannerDismissed && hasApiKey === true && !hasPreferences && (
+      {!profileBannerDismissed && !hasPreferences && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm">
           <AlertTriangle size={16} className="shrink-0 mt-0.5" />
           <span className="flex-1">
@@ -661,8 +659,8 @@ export default function DashboardPage() {
             <div className={`rounded-lg px-4 py-3 text-sm flex items-start gap-3 ${screenError.type === 'invalid_key' ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300' : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300'}`}>
               {screenError.type === 'network' ? <WifiOff size={15} className="shrink-0 mt-0.5" /> : <AlertTriangle size={15} className="shrink-0 mt-0.5" />}
               <div className="flex-1 space-y-2">
-                {screenError.type === 'no_api_key' && (<><p>⚠️ No API key saved. Add your Anthropic or OpenAI key in Profile settings.</p><a href="/profile" className="inline-block font-semibold underline text-xs">→ Go to Profile</a></>)}
-                {screenError.type === 'invalid_key' && (<><p>✕ API key rejected by {({ openai: 'OpenAI', anthropic: 'Anthropic', groq: 'Groq', deepseek: 'DeepSeek' } as Record<string, string>)[screenError.provider] ?? screenError.provider}.</p><a href="/profile" className="inline-block font-semibold underline text-xs">→ Update your API key</a></>)}
+                {screenError.type === 'no_api_key' && (<p>⚠️ Screening is temporarily unavailable. Try again shortly.</p>)}
+                {screenError.type === 'invalid_key' && (<p>✕ Screening service error — the scanning key was rejected. Try again shortly; if this keeps happening, contact support.</p>)}
                 {screenError.type === 'rate_limit' && (
                   <div className="flex items-center justify-between gap-4">
                     <p>

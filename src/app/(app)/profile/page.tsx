@@ -3,15 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Upload, CheckCircle2, AlertCircle, Loader2, X, ArrowRight } from 'lucide-react'
-import type { HardRejectFilters, UserPreferences, ApiProvider } from '@/types'
+import type { HardRejectFilters, UserPreferences } from '@/types'
 
 interface ProfileData {
   full_name: string | null
   resume_text: string | null
   hard_reject_filters: HardRejectFilters
   preferences: UserPreferences
-  api_provider: ApiProvider | null
-  has_api_key: boolean
   tier: 'free' | 'paid'
   screens_used_this_month: number
   is_beta_user: boolean
@@ -290,12 +288,6 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState('')
   const [basicSave, setBasicSave] = useState<SaveState>('idle')
 
-  // API key
-  const [apiKey, setApiKey] = useState('')
-  const [apiProvider] = useState<ApiProvider>('openai')
-  const [hasExistingApiKey, setHasExistingApiKey] = useState(false)
-  const [apiSave, setApiSave] = useState<SaveState>('idle')
-
   // Hard reject filters
   const [techDealbreakerTags, setTechDealbreakerTags] = useState<string[]>([])
   const [titleFloor, setTitleFloor] = useState('')
@@ -366,7 +358,6 @@ export default function ProfilePage() {
       const { profile } = (await res.json()) as { profile: ProfileData }
 
       setFullName(profile.full_name ?? '')
-      setHasExistingApiKey(profile.has_api_key)
       setTier(profile.tier)
       setScreensUsed(profile.screens_used_this_month)
       setIsBetaUser(profile.is_beta_user)
@@ -417,7 +408,6 @@ export default function ProfilePage() {
   }
 
   const setBasicSaved = useSaveTimer(setBasicSave)
-  const setApiSaved = useSaveTimer(setApiSave)
   const setFiltersSaved = useSaveTimer(setFilterSave)
   const setPrefsSaved = useSaveTimer(setPrefsSave)
 
@@ -444,18 +434,6 @@ export default function ProfilePage() {
 
   async function handleSaveBasic() {
     await savePatch({ full_name: fullName }, setBasicSave, setBasicSaved)
-  }
-
-  async function handleSaveApi() {
-    // api_provider is only sent alongside a new key — otherwise a no-op
-    // save would silently relabel an existing (e.g. Groq/DeepSeek) key as
-    // 'openai' in storage while leaving the actual key bytes untouched,
-    // causing that key to later be sent to the wrong provider's API.
-    await savePatch(
-      apiKey ? { api_provider: apiProvider, api_key: apiKey } : {},
-      setApiSave,
-      () => { setApiSaved(); if (apiKey) { setApiKey(''); setHasExistingApiKey(true) } },
-    )
   }
 
   async function handleSaveFilters() {
@@ -503,7 +481,6 @@ export default function ProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: fullName,
-          ...(apiKey ? { api_provider: apiProvider, api_key: apiKey } : {}),
           hard_reject_filters: {
             tech_stack_dealbreakers: techDealbreakerTags,
             title_floor: titleFloor,
@@ -524,7 +501,6 @@ export default function ProfilePage() {
       setSaveAllState('saved')
       setIsDirty(false)
       if (isOnboarding) setOnboardingCompleted(true)
-      if (apiKey) { setApiKey(''); setHasExistingApiKey(true) }
       setTimeout(() => setSaveAllState('idle'), 2000)
     } catch {
       setSaveAllState('error')
@@ -596,26 +572,24 @@ export default function ProfilePage() {
     }
   }
 
-  // Completion scoring
+  // Completion scoring — no API key step anymore, every scan runs on the
+  // app's own key. Just preferences + dealbreakers.
   const prefFilled = !!(prefTech.trim() || prefIndustries.trim() || minSize || maxSize)
   const filtersFilled = !!(techDealbreakerTags.length || titleFloor.trim() || geoAllowed.trim() || companyExcluded.trim() || roleExcluded.trim())
-  const apiKeyFilled = hasExistingApiKey || !!apiKey.trim()
-  const completionScore = (prefFilled ? 40 : 0) + (filtersFilled ? 30 : 0) + (apiKeyFilled ? 30 : 0)
+  const completionScore = (prefFilled ? 50 : 0) + (filtersFilled ? 50 : 0)
   const completionColor = completionScore >= 80 ? 'bg-green-500 dark:bg-green-600' : completionScore >= 50 ? 'bg-amber-500 dark:bg-amber-600' : 'bg-red-500 dark:bg-red-600'
   const completionTextColor = completionScore >= 80 ? 'text-green-700 dark:text-green-400' : completionScore >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
   const nextAction =
     completionScore === 100 ? null :
     !prefFilled ? 'Show us what you\'re looking for, or upload a resume' :
-    !filtersFilled ? 'Tell us your hard nos' :
-    !apiKeyFilled ? 'Plug in your AI key to start judging' : null
+    !filtersFilled ? 'Tell us your hard nos' : null
 
   // Onboarding checklist
   const step1Done = prefFilled
   const step2Done = filtersFilled
-  const step3Done = apiKeyFilled
-  const allStepsDone = step1Done && step2Done && step3Done
-  // 70% is enough to start scanning — full completion isn't required.
-  const readyToScan = completionScore >= 70
+  const allStepsDone = step1Done && step2Done
+  // Either one is enough to start scanning — full completion isn't required.
+  const readyToScan = completionScore >= 50
 
   if (loading) {
     return (
@@ -677,7 +651,6 @@ export default function ProfilePage() {
             {([
               { done: step1Done, label: 'Show us what you\'re looking for — tech stack, industries, company size' },
               { done: step2Done, label: 'Tell us your hard nos' },
-              { done: step3Done, label: 'Plug in your AI key' },
             ] as { done: boolean; label: string }[]).map((step, i) => (
               <li key={i} className="flex items-start gap-2.5 text-sm">
                 <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold mt-0.5 ${step.done ? 'bg-green-500 dark:bg-green-600 text-white' : 'bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-400'}`}>
@@ -737,32 +710,6 @@ export default function ProfilePage() {
             {resumeWordCount != null && <span className="text-blue-400 dark:text-blue-300 ml-1">· {resumeWordCount.toLocaleString()} words</span>}
           </div>
         )}
-      </Section>
-
-      {/* AI provider */}
-      <Section title="The brain." subtitle="Your key. Your AI. We use it to judge. We never see your money." action={<SectionSaveButton state={apiSave} onClick={handleSaveApi} />}>
-        <Field label="Provider">
-          <input type="text" value="OpenAI (GPT)" readOnly disabled className={`${inputCls} cursor-not-allowed opacity-70`} />
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5 leading-relaxed">
-            OpenAI&apos;s default (free/low-spend) tier caps at 20 requests/minute — large batches
-            will screen more slowly to stay under that, and pause-and-resume automatically if
-            you hit it. To go faster: spend $5+ on your OpenAI account to unlock a higher tier,
-            or request a rate-limit increase.
-          </p>
-        </Field>
-        <Field label="API key">
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => { setApiKey(e.target.value); markDirty() }}
-            placeholder={hasExistingApiKey ? 'Key saved — paste new key to replace' : 'Paste your API key'}
-            className={inputCls}
-            autoComplete="new-password"
-          />
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {hasExistingApiKey ? '✓ Key on file. Leave blank to keep it.' : 'Stored encrypted. Never shown again.'}
-          </p>
-        </Field>
       </Section>
 
       {/* Dealbreakers */}
