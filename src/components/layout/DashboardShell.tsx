@@ -130,7 +130,7 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
           <ThemeToggle />
         </header>
 
-        <main className="flex-1 bg-surface p-4 md:p-6 lg:p-8">{children}</main>
+        <main className="flex-1 bg-surface p-4 pb-20 md:p-6 md:pb-6 lg:p-8">{children}</main>
       </div>
 
       <FeedbackWidget />

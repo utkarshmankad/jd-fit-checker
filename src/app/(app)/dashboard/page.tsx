@@ -567,12 +567,12 @@ export default function DashboardPage() {
 
       {/* Input card */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="px-6 pt-6 pb-0">
-          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
-            <div className="flex">
+        <div className="px-4 sm:px-6 pt-6 pb-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex -mb-px">
               {(['urls', 'text'] as InputTab[]).map((t) => (
                 <button key={t} onClick={() => { setTab(t); setResults([]); setBatchTime(null); setScreenError(null); setIsSampleData(false) }}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === t ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                  className={`whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === t ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
                   {t === 'urls' ? 'Job URLs' : 'Paste JD text'}
                 </button>
               ))}
@@ -580,7 +580,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setShowChatGptModal(true)}
-              className="mb-2 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline underline-offset-2 transition-colors shrink-0"
+              className="self-start sm:self-auto sm:mb-2 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline underline-offset-2 transition-colors shrink-0"
             >
               How is this different from ChatGPT?
             </button>

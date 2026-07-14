@@ -36,13 +36,16 @@ export default function FeedbackWidget() {
 
   return (
     <>
+      {/* Icon-only on mobile — the full pill was wide enough to sit on top of
+          page content (e.g. the "See the guide" link) on narrow screens. */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full text-white text-sm font-semibold shadow-lg hover:opacity-90 transition-opacity"
+        className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-40 flex items-center gap-2 p-3 sm:px-4 sm:py-2.5 rounded-full text-white text-sm font-semibold shadow-lg hover:opacity-90 transition-opacity"
         style={{ backgroundColor: '#1B3A5C' }}
+        aria-label="Send feedback"
       >
         <MessageSquarePlus size={16} />
-        Feedback
+        <span className="hidden sm:inline">Feedback</span>
       </button>
 
       {open && (
