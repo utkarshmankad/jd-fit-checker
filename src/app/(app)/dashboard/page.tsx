@@ -180,7 +180,21 @@ export default function DashboardPage() {
     if (count !== null) setLifetimeRejectCount(count)
   }
 
+  function refreshUsage() {
+    return fetch('/api/profile')
+      .then((r) => r.json())
+      .then((data: { profile?: typeof usage }) => {
+        if (data.profile) setUsage(data.profile)
+      })
+      .catch(() => {})
+  }
+
   useEffect(() => {
+    // Fired immediately, in parallel with the profile/lifetime-count query
+    // below instead of after it — the beta badge shouldn't wait on unrelated
+    // queries to finish before it can show a number.
+    refreshUsage()
+
     async function loadProfile() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -198,13 +212,6 @@ export default function DashboardPage() {
       setHardRejectFilters(hrf)
       setHasPreferences(!!(prefs.preferred_tech_stack?.length || prefs.target_industries?.length || hrf.title_floor?.trim() || hrf.geography_allowed?.length))
       await fetchLifetimeCount(user.id)
-
-      fetch('/api/profile')
-        .then((r) => r.json())
-        .then((data: { profile?: typeof usage }) => {
-          if (data.profile) setUsage(data.profile)
-        })
-        .catch(() => {})
     }
     loadProfile()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -417,6 +424,11 @@ export default function DashboardPage() {
         setResults((prev) => [...prev, ...data.results])
         setSkeletonCount((prev) => Math.max(0, prev - 1))
         inProgressBatchRef.current?.screenedKeys.add(itemKey(item))
+        // Re-pull real usage from the server (not a local +1 guess) after
+        // every completed item — quota reservation/refund happens server-side
+        // per item, so the badge should reflect that immediately, not just
+        // once the whole batch finishes.
+        refreshUsage()
 
         if (data.fatalError) {
           if (data.fatalError.type === 'invalid_key') setScreenError({ type: 'invalid_key', provider: data.fatalError.provider })
