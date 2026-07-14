@@ -98,6 +98,11 @@ export default function DashboardPage() {
   const [screening, setScreening] = useState(false)
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0)
   const [skeletonCount, setSkeletonCount] = useState(0)
+  // Submission-order labels for the current batch — drives the single
+  // ordered scan list below (each row is either still-loading or resolved
+  // to its own card, never both a placeholder and a separate result row).
+  const [scanLabels, setScanLabels] = useState<string[]>([])
+  const [scanBaseline, setScanBaseline] = useState(0)
   const [results, setResults] = useState<ScreeningResult[]>([])
   const [batchTime, setBatchTime] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -342,6 +347,13 @@ export default function DashboardPage() {
 
     setScreening(true)
     setSkeletonCount(itemsToScreen.length)
+    // On resume, `results` still holds the prior partial batch's completed
+    // rows — offset the scan list past those so it lines up with the newly
+    // appended results instead of reading stale indices as loading rows.
+    setScanBaseline(isResume ? results.length : 0)
+    setScanLabels(itemsToScreen.map((item) =>
+      item.kind === 'url' ? item.value : (item.entry.job_title || item.entry.company || 'Pasted JD')
+    ))
     setRejectedCollapsed(true)
 
     // OpenAI's default tier caps at 20 requests/minute — space calls out to stay
@@ -728,29 +740,56 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-400 dark:text-gray-500 px-1 -mt-2">Judged {timeAgo(batchTime)}</p>
           )}
 
-          {/* Zone 1 — everything that isn't dismissed, plus scrape failures */}
-          <div className="space-y-3">
-            {mainResults.map((result) => (
-              result.id === '' ? (
-                <ErrorCard
-                  key={result.job_url || result.created_at}
-                  result={result}
-                  onOpen={result.job_url ? () => window.open(result.job_url!, '_blank', 'noopener,noreferrer') : undefined}
-                  onEdit={result.job_url ? () => handlePasteManually(result.job_url!) : undefined}
-                />
-              ) : (
-                <VerdictCard
-                  key={result.id}
-                  result={result}
-                  isExpanded={expandedId === result.id}
-                  onToggle={() => setExpandedId(expandedId === result.id ? null : result.id)}
-                />
-              )
-            ))}
-            {Array.from({ length: skeletonCount }).map((_, i) => (
-              <LoadingCard key={`skel-${i}`} message={LOADING_MESSAGES[loadingMsgIndex]} />
-            ))}
-          </div>
+          {/* Scanning phase — one row per submitted job, in submission order.
+              Each row starts as a loading placeholder and resolves into its
+              own card in place, instead of a separate skeleton strip that's
+              disconnected from where the finished card ends up. */}
+          {screening ? (
+            <div className="space-y-3">
+              {scanLabels.map((label, i) => {
+                const result = results[scanBaseline + i]
+                if (!result) {
+                  return <LoadingCard key={`scan-${i}`} label={label} message={LOADING_MESSAGES[loadingMsgIndex]} />
+                }
+                return result.id === '' ? (
+                  <ErrorCard
+                    key={result.job_url || result.created_at}
+                    result={result}
+                    onOpen={result.job_url ? () => window.open(result.job_url!, '_blank', 'noopener,noreferrer') : undefined}
+                    onEdit={result.job_url ? () => handlePasteManually(result.job_url!) : undefined}
+                  />
+                ) : (
+                  <VerdictCard
+                    key={result.id}
+                    result={result}
+                    isExpanded={expandedId === result.id}
+                    onToggle={() => setExpandedId(expandedId === result.id ? null : result.id)}
+                  />
+                )
+              })}
+            </div>
+          ) : (
+            /* Zone 1 — everything that isn't dismissed, plus scrape failures */
+            <div className="space-y-3">
+              {mainResults.map((result) => (
+                result.id === '' ? (
+                  <ErrorCard
+                    key={result.job_url || result.created_at}
+                    result={result}
+                    onOpen={result.job_url ? () => window.open(result.job_url!, '_blank', 'noopener,noreferrer') : undefined}
+                    onEdit={result.job_url ? () => handlePasteManually(result.job_url!) : undefined}
+                  />
+                ) : (
+                  <VerdictCard
+                    key={result.id}
+                    result={result}
+                    isExpanded={expandedId === result.id}
+                    onToggle={() => setExpandedId(expandedId === result.id ? null : result.id)}
+                  />
+                )
+              ))}
+            </div>
+          )}
 
           {/* Zone 2 — dismissed, grouped under a divider, smaller cards */}
           {rejectResults.length > 0 && (
