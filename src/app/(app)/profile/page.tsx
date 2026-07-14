@@ -490,6 +490,47 @@ export default function ProfilePage() {
     )
   }
 
+  const [saveAllState, setSaveAllState] = useState<SaveState>('idle')
+
+  // Bundles every section into one PUT instead of chaining the individual
+  // per-section save handlers — a single round trip so "Save changes" at
+  // the bottom of the page reflects one atomic save, not four separate ones.
+  async function handleSaveAll() {
+    setSaveAllState('saving')
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: fullName,
+          ...(apiKey ? { api_provider: apiProvider, api_key: apiKey } : {}),
+          hard_reject_filters: {
+            tech_stack_dealbreakers: techDealbreakerTags,
+            title_floor: titleFloor,
+            geography_allowed: parseList(geoAllowed),
+            company_type_excluded: parseList(companyExcluded),
+            role_type_excluded: parseList(roleExcluded),
+          } satisfies HardRejectFilters,
+          preferences: {
+            preferred_tech_stack: parseList(prefTech),
+            target_industries: parseList(prefIndustries),
+            min_company_size: minSize ? parseInt(minSize, 10) : null,
+            max_company_size: maxSize ? parseInt(maxSize, 10) : null,
+            ...(isOnboarding ? { onboarding_completed: true } : {}),
+          } satisfies UserPreferences,
+        }),
+      })
+      if (!res.ok) { setSaveAllState('error'); return }
+      setSaveAllState('saved')
+      setIsDirty(false)
+      if (isOnboarding) setOnboardingCompleted(true)
+      if (apiKey) { setApiKey(''); setHasExistingApiKey(true) }
+      setTimeout(() => setSaveAllState('idle'), 2000)
+    } catch {
+      setSaveAllState('error')
+    }
+  }
+
   async function handleApplyInvite() {
     if (!inviteCode.trim()) return
     setInviteStatus('loading')
@@ -573,6 +614,8 @@ export default function ProfilePage() {
   const step2Done = filtersFilled
   const step3Done = apiKeyFilled
   const allStepsDone = step1Done && step2Done && step3Done
+  // 70% is enough to start scanning — full completion isn't required.
+  const readyToScan = completionScore >= 70
 
   if (loading) {
     return (
@@ -648,13 +691,17 @@ export default function ProfilePage() {
       )}
 
       {/* Completion banner */}
-      {allStepsDone && (
+      {readyToScan && (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <CheckCircle2 size={20} className="text-green-600 dark:text-green-400 shrink-0" />
             <div>
-              <p className="font-medium text-green-900 dark:text-green-200 text-sm">Standards set. Ready to judge.</p>
-              <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">All sections saved.</p>
+              <p className="font-medium text-green-900 dark:text-green-200 text-sm">
+                {allStepsDone ? 'Standards set. Ready to judge.' : `${completionScore}% complete — enough to start judging.`}
+              </p>
+              <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">
+                {allStepsDone ? 'All sections saved.' : 'You can fill in the rest later.'}
+              </p>
             </div>
           </div>
           <Link
@@ -924,6 +971,34 @@ export default function ProfilePage() {
           </div>
         )}
       </Section>
+
+      {/* Bottom-of-page save-all + continue */}
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+        {readyToScan && (
+          <Link
+            href="/dashboard"
+            className="w-full sm:w-auto text-center px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            Continue to job scanning →
+          </Link>
+        )}
+        <button
+          type="button"
+          onClick={handleSaveAll}
+          disabled={saveAllState === 'saving'}
+          className={`w-full sm:w-auto px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:cursor-not-allowed ${
+            saveAllState === 'saving' ? 'bg-gray-400 dark:bg-gray-500 text-white cursor-not-allowed' :
+            saveAllState === 'saved'  ? 'bg-green-600 dark:bg-green-700 text-white' :
+            saveAllState === 'error'  ? 'bg-red-600 dark:bg-red-700 text-white' : 'text-white'
+          }`}
+          style={saveAllState === 'idle' ? { backgroundColor: '#1B3A5C' } : {}}
+        >
+          {saveAllState === 'saving' ? (
+            <span className="flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> Saving all changes…</span>
+          ) : saveAllState === 'saved' ? 'All changes saved ✓' :
+             saveAllState === 'error' ? 'Save failed — try again' : 'Save changes'}
+        </button>
+      </div>
     </div>
   )
 }
