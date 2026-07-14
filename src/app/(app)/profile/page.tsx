@@ -447,8 +447,12 @@ export default function ProfilePage() {
   }
 
   async function handleSaveApi() {
+    // api_provider is only sent alongside a new key — otherwise a no-op
+    // save would silently relabel an existing (e.g. Groq/DeepSeek) key as
+    // 'openai' in storage while leaving the actual key bytes untouched,
+    // causing that key to later be sent to the wrong provider's API.
     await savePatch(
-      { api_provider: apiProvider, ...(apiKey ? { api_key: apiKey } : {}) },
+      apiKey ? { api_provider: apiProvider, api_key: apiKey } : {},
       setApiSave,
       () => { setApiSaved(); if (apiKey) { setApiKey(''); setHasExistingApiKey(true) } },
     )
