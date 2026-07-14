@@ -160,6 +160,36 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [screening])
 
+  // Closing/reloading the tab mid-scan kills the in-flight fetch outright —
+  // unlike a background tab (still runs, just throttled), there's no
+  // resuming from that. Warn before it happens.
+  useEffect(() => {
+    if (!screening) return
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault()
+      return (e.returnValue = 'A scan is still running. Leaving now will stop it partway through.')
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [screening])
+
+  // Backgrounding the tab (switching apps, other tabs) doesn't kill the scan,
+  // but browsers throttle timers in hidden tabs — the OpenAI request pacing
+  // below can stretch from ~3s to up to a minute between items, which reads
+  // as "stuck" with zero indication why. Say so once per scan.
+  useEffect(() => {
+    if (!screening) return
+    let warned = false
+    function handleVisibilityChange() {
+      if (document.hidden && !warned) {
+        warned = true
+        toast('Still scanning in the background — switching apps/tabs can slow it down (browser throttling). Keep this tab open for full speed.', { icon: '🐢', duration: 6000 })
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [screening])
+
   // Job Tracker — feature disabled, kept for later.
   // useEffect(() => {
   //   fetch('/api/tracker')
@@ -844,11 +874,19 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {batchIntelligence && (
+          {batchIntelligence ? (
             <BatchIntelligencePanel
               intelligence={batchIntelligence}
               matchingSkills={Array.from(new Set(goodResults.flatMap((r) => r.analysis_json?.matching_skills ?? [])))}
             />
+          ) : (
+            !screening && skeletonCount === 0 && goodResults.length > 0 && (goodResults.length < 3 || screenError) && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 px-1">
+                {goodResults.length < 3
+                  ? `📊 Market intel needs 3+ jobs judged in one batch — this batch had ${goodResults.length}.`
+                  : '📊 Market intel skipped — batch was interrupted before it finished.'}
+              </p>
+            )
           )}
         </div>
       )}
