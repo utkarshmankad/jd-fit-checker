@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider, THEME_INIT_SCRIPT } from '@/components/theme/ThemeProvider'
+import { DevBanner } from '@/components/DevBanner'
 import './globals.css'
 
 const inter = Inter({
@@ -31,6 +32,7 @@ export default function RootLayout({
           {children}
           <Toaster position="top-right" />
         </ThemeProvider>
+        <DevBanner />
       </body>
     </html>
   )
