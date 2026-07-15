@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider, THEME_INIT_SCRIPT } from '@/components/theme/ThemeProvider'
 import { DevBanner } from '@/components/DevBanner'
@@ -33,6 +34,7 @@ export default function RootLayout({
           <Toaster position="top-right" />
         </ThemeProvider>
         <DevBanner />
+        <Analytics />
       </body>
     </html>
   )
