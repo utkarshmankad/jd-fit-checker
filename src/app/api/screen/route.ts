@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { normalizeJobUrl, isSafeJobUrl } from '@/lib/utils/url'
@@ -61,6 +61,8 @@ async function finalizeBatch(
   }
 
   const apiUrl = process.env.NEXT_PUBLIC_SCREENING_API_URL!
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FASTAPI_TIMEOUT_MS)
   try {
     const res = await fetch(`${apiUrl}/analyze-batch`, {
       method: 'POST',
@@ -72,6 +74,7 @@ async function finalizeBatch(
         api_key: APP_OPENAI_KEY,
         api_provider: 'openai',
       }),
+      signal: controller.signal,
     })
     if (!res.ok) {
       console.error('analyze-batch failed:', res.status, await res.text().catch(() => ''))
@@ -80,8 +83,14 @@ async function finalizeBatch(
     const batch_intelligence = (await res.json()) as BatchIntelligence
     return NextResponse.json({ batch_intelligence })
   } catch (e) {
-    console.error('analyze-batch fetch failed:', e)
+    if (e instanceof Error && e.name === 'AbortError') {
+      console.error(`analyze-batch timed out after ${FASTAPI_TIMEOUT_MS}ms`)
+    } else {
+      console.error('analyze-batch fetch failed:', e)
+    }
     return NextResponse.json({ batch_intelligence: null })
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -172,17 +181,16 @@ export async function POST(request: NextRequest) {
 
   const LAUNCH_MODE = process.env.LAUNCH_MODE === 'true'
   if (!profile.is_beta_user && !LAUNCH_MODE) {
+    // Fire the reset without blocking on a re-fetch of the same row: the
+    // RPC itself resets counts atomically server-side, and reserve_screens
+    // (called per-item below) re-checks the limit fresh against the DB
+    // regardless of what's cached in `profile` here. The only consumer of
+    // profile.screens_used_this_week/week_reset_at is the fallback error
+    // message text (checkScreenLimit, below) when a reservation is denied —
+    // stale values there just mean a slightly stale message, not a wrong
+    // enforcement decision, so it's safe to skip the round-trip on the
+    // common (limit-not-hit) path.
     await supabase.rpc('reset_weekly_screens_if_needed', { user_id: user.id })
-    // Re-fetch after a possible reset so the limit check below sees fresh counts.
-    const { data: refreshed } = await supabase
-      .from('profiles')
-      .select('screens_used_this_week, week_reset_at')
-      .eq('id', user.id)
-      .single()
-    if (refreshed) {
-      profile.screens_used_this_week = refreshed.screens_used_this_week
-      profile.week_reset_at = refreshed.week_reset_at
-    }
   }
 
   // No upfront hard-block here (deliberately) — a beta/launch user who has
@@ -268,6 +276,18 @@ export async function POST(request: NextRequest) {
       return { error: 'Failed to check screen limit' }
     }
     if (!ok) {
+      // Only refetch the fresh weekly counts here, on the rare denied path —
+      // needed for accurate message text now that the reset above no longer
+      // unconditionally re-fetches on every request.
+      const { data: refreshed } = await supabase
+        .from('profiles')
+        .select('screens_used_this_week, week_reset_at')
+        .eq('id', user!.id)
+        .single()
+      if (refreshed) {
+        profile!.screens_used_this_week = refreshed.screens_used_this_week
+        profile!.week_reset_at = refreshed.week_reset_at
+      }
       const limitCheck = await checkScreenLimit(profile as unknown as UserProfile, 1)
       return { error: limitCheck.upgrade_prompt ?? "You've used this week's free judgments." }
     }
@@ -518,12 +538,19 @@ export async function POST(request: NextRequest) {
 
   if (count > 0) {
     // Legacy display-only field (profile page "screens used"), not
-    // limit-enforcing — fine as a plain increment, no atomicity needed.
-    const service = createServiceClient()
-    await service
-      .from('profiles')
-      .update({ screens_used_this_month: (profile.screens_used_this_month as number) + count })
-      .eq('id', user.id)
+    // limit-enforcing — doesn't gate the response, so it runs after the
+    // response is sent instead of adding a DB round-trip to the critical path.
+    const monthCount = (profile.screens_used_this_month as number) + count
+    after(async () => {
+      const service = createServiceClient()
+      const { error: updateError } = await service
+        .from('profiles')
+        .update({ screens_used_this_month: monthCount })
+        .eq('id', user.id)
+      if (updateError) {
+        console.error('screens_used_this_month update failed:', updateError)
+      }
+    })
   }
 
   return NextResponse.json({ results, ...(fatalError ? { fatalError } : {}) })

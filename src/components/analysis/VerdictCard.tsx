@@ -45,8 +45,8 @@ function CardChrome({
   const display = getVerdictDisplay(result.verdict)
   return (
     <div
-      className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden"
-      style={{ borderLeft: `4px solid ${display.barColor}` }}
+      className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-card-in"
+      style={{ borderLeft: `4px solid ${display.barColor}`, transition: 'border-color 200ms ease-in-out' }}
     >
       <div className="px-4 sm:px-6 py-4">
         <div className="flex items-start justify-between gap-3">
@@ -141,8 +141,8 @@ export function DismissedCard({ result }: { result: ScreeningResult }) {
 
   return (
     <div
-      className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 px-4 py-3"
-      style={{ borderLeft: `4px solid ${display.barColor}` }}
+      className="bg-white dark:bg-gray-900 rounded-lg border border-gray-100 dark:border-gray-800 px-4 py-3 animate-card-in"
+      style={{ borderLeft: `4px solid ${display.barColor}`, transition: 'border-color 200ms ease-in-out' }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -170,7 +170,7 @@ export function DismissedCard({ result }: { result: ScreeningResult }) {
 export function ErrorCard({ result, onOpen, onEdit }: { result: ScreeningResult; onOpen?: () => void; onEdit?: () => void }) {
   const errorMsg = result.hard_reject_reasons?.[0] ?? 'Could not scrape this URL'
   return (
-    <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 px-4 sm:px-6 py-4">
+    <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 px-4 sm:px-6 py-4 animate-card-in">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm">Couldn&apos;t judge this one</p>
@@ -205,8 +205,8 @@ export function LoadingCard({ label, message }: { label?: string; message: strin
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-4" style={{ borderLeft: '4px solid #E5E7EB' }}>
       {label && <p className="font-medium text-gray-700 dark:text-gray-300 text-sm truncate">{label}</p>}
-      <div className="mt-2 h-5 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-      <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{message}</p>
+      <div className="mt-2 h-5 w-40 rounded animate-shimmer" />
+      <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 italic">{message}</p>
     </div>
   )
 }
