@@ -43,12 +43,16 @@ const PROFILE_BANNER_KEY = 'jobsnob-profile-banner-dismissed'
 const PRICING_ENABLED = process.env.NEXT_PUBLIC_PRICING_ENABLED === 'true'
 
 const LOADING_MESSAGES = [
+  'Reading your job list…',
   "Reading the fine print you'd skip…",
   'Checking if this is actually EM or just tech lead…',
   'Seeing if .NET is buried in requirements…',
-  'Applying your standards…',
+  'Applying your standards ruthlessly…',
+  'Looking for fake EM roles…',
   'Almost done judging…',
 ]
+
+const AVG_SCREEN_TIME_KEY = 'jobsnob-avg-screen-time-ms'
 
 
 const VERDICT_ORDER: Record<'STRONG' | 'DECENT' | 'WEAK' | 'REJECT', number> = {
@@ -103,6 +107,8 @@ export default function DashboardPage() {
   // to its own card, never both a placeholder and a separate result row).
   const [scanLabels, setScanLabels] = useState<string[]>([])
   const [scanBaseline, setScanBaseline] = useState(0)
+  const [avgScreenTimeMs, setAvgScreenTimeMs] = useState<number | null>(null)
+  const batchStartedAtRef = useRef(0)
   const [results, setResults] = useState<ScreeningResult[]>([])
   const [batchTime, setBatchTime] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -156,7 +162,7 @@ export default function DashboardPage() {
     setLoadingMsgIndex(0)
     const interval = setInterval(() => {
       setLoadingMsgIndex((i) => (i + 1) % LOADING_MESSAGES.length)
-    }, 2000)
+    }, 3000)
     return () => clearInterval(interval)
   }, [screening])
 
@@ -319,6 +325,9 @@ export default function DashboardPage() {
 
   const inputEmpty = tab === 'urls' ? !urlInput.trim() : jdEntries.every((e) => !e.jd_text.trim())
   const urlCount = countValidUrls(urlInput)
+  const estimatedTimeLabel = avgScreenTimeMs && scanLabels.length > 0
+    ? `Judging ${scanLabels.length} job${scanLabels.length !== 1 ? 's' : ''} — usually takes about ${Math.max(1, Math.round((avgScreenTimeMs * scanLabels.length) / 1000))} seconds`
+    : null
 
   async function handleScreen() {
     setScreenError(null)
@@ -379,6 +388,10 @@ export default function DashboardPage() {
       setBatchTime(null)
       setBatchIntelligence(null)
     }
+
+    const storedAvg = parseFloat(localStorage.getItem(AVG_SCREEN_TIME_KEY) ?? '')
+    setAvgScreenTimeMs(Number.isFinite(storedAvg) && storedAvg > 0 ? storedAvg : null)
+    batchStartedAtRef.current = Date.now()
 
     setScreening(true)
     setSkeletonCount(itemsToScreen.length)
@@ -476,6 +489,20 @@ export default function DashboardPage() {
 
       if (completedFully) {
         inProgressBatchRef.current = null
+
+        // Update the running per-JD time estimate — only on a clean completion
+        // (not an interrupted batch, where rate-limit/network stalls would
+        // badly skew it). Blend with any prior stored average rather than
+        // overwriting outright, so one unusually slow/fast batch doesn't
+        // swing the next estimate too hard.
+        if (itemsToScreen.length > 0) {
+          const elapsedMs = Date.now() - batchStartedAtRef.current
+          const thisBatchAvg = elapsedMs / itemsToScreen.length
+          const prevAvg = parseFloat(localStorage.getItem(AVG_SCREEN_TIME_KEY) ?? '')
+          const nextAvg = Number.isFinite(prevAvg) && prevAvg > 0 ? prevAvg * 0.7 + thisBatchAvg * 0.3 : thisBatchAvg
+          localStorage.setItem(AVG_SCREEN_TIME_KEY, String(nextAvg))
+        }
+
         // Ask for market intelligence across the batch just screened — cheap no-op
         // server-side if fewer than 3 results were actually saved. Only do this once
         // the batch is actually done, not on every interrupted partial attempt.
@@ -700,7 +727,7 @@ export default function DashboardPage() {
           )}
 
           <button onClick={handleScreen} disabled={screening || inputEmpty || (screenError?.type === 'rate_limit' && rateLimitCountdown > 0)}
-            className="w-full py-3 rounded-lg font-medium text-sm text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`w-full py-3 rounded-lg font-medium text-sm text-white transition-colors disabled:cursor-not-allowed ${screening ? 'animate-button-pulse' : 'disabled:opacity-50'}`}
             style={{ backgroundColor: '#1B3A5C' }}>
             {screening ? (
               <span className="flex items-center justify-center gap-2">
@@ -712,6 +739,23 @@ export default function DashboardPage() {
               </span>
             ) : 'Judge these jobs'}
           </button>
+          {screening && scanLabels.length > 0 && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                <span>Judging {scanLabels.length} job{scanLabels.length !== 1 ? 's' : ''}…</span>
+                <span>{Math.max(0, results.length - scanBaseline)} of {scanLabels.length} complete</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-[width] duration-300 ease-out"
+                  style={{ backgroundColor: '#1B3A5C', width: `${(Math.max(0, results.length - scanBaseline) / scanLabels.length) * 100}%` }}
+                />
+              </div>
+              {estimatedTimeLabel && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{estimatedTimeLabel}</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

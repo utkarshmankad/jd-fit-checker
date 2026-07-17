@@ -1,6 +1,11 @@
 -- ============================================================
--- JD Fit Checker — Supabase Database Schema
--- Run this in Supabase SQL Editor (Project > SQL Editor > New Query)
+-- schema.sql — jd-fit-checker
+-- Complete current schema — reflects everything applied so far,
+-- including changes with no numbered migration file yet (see
+-- supabase/migrations/README.md "Note on history").
+-- Last updated: 2026-07-16
+-- To use: run this on a fresh Supabase project to create all
+-- tables, indexes, RLS policies, and functions.
 -- ============================================================
 
 -- ──────────────────────────────────────────────────────────
@@ -465,3 +470,27 @@ create policy "feedback_insert_own" on public.feedback for insert with check (au
 -- marks rows sent via the service-role client, which bypasses RLS
 -- entirely (same pattern as other service-role-only operations in
 -- this schema), so no policy is needed for that path either.
+
+-- ──────────────────────────────────────────────────────────
+-- 12. _environment
+--    Single-row-per-key table read by /api/health (anon client) to
+--    report which database an environment is actually pointed at.
+--    Needs a public select policy — it's read before any user is
+--    authenticated.
+-- ──────────────────────────────────────────────────────────
+create table if not exists public._environment (
+  key   text primary key,
+  value text not null
+);
+
+-- Seed value is environment-specific — use 'development' on dev,
+-- 'production' on prod.
+insert into public._environment (key, value)
+values ('name', 'development')
+on conflict (key) do nothing;
+
+alter table public._environment enable row level security;
+
+drop policy if exists "environment_select_all" on public._environment;
+create policy "environment_select_all" on public._environment
+  for select using (true);
