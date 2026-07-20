@@ -75,10 +75,14 @@ export async function PUT(request: NextRequest) {
   // branch. Service role bypasses RLS by design — id is still pinned to the
   // authenticated user's own id (never client-supplied), so this can't be
   // used to write another user's row.
+  // id/email placed after the spread so they always win regardless of what
+  // `updates` contains — defense in depth against a future change to the
+  // whitelist above accidentally letting a client-supplied id/email through
+  // to a service-role write that bypasses RLS.
   const service = createServiceClient()
   const { error } = await service
     .from('profiles')
-    .upsert({ id: user.id, email: user.email ?? '', ...updates }, { onConflict: 'id' })
+    .upsert({ ...updates, id: user.id, email: user.email ?? '' }, { onConflict: 'id' })
 
   if (error) {
     console.error('Profile update failed:', error)
