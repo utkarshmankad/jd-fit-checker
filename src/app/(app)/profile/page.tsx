@@ -37,6 +37,7 @@ const DEFAULT_PREFS: UserPreferences = {
 const DEALBREAKER_SUGGESTIONS = ['C#', '.NET', 'PHP', 'Ruby', 'COBOL', 'VB.NET', 'Perl', 'Delphi']
 
 type ParsedProfile = {
+  full_name?: string | null
   preferred_tech_stack?: string[]
   target_industries?: string[]
   title_floor?: string
@@ -144,27 +145,30 @@ function TagInput({
   )
 }
 
-// ── SectionSaveButton ─────────────────────────────────────────────────────────
-function SectionSaveButton({ state, onClick, idleLabel = 'Save changes', savedLabel = 'Saved ✓' }: { state: SaveState; onClick: () => void; idleLabel?: string; savedLabel?: string }) {
-  const isIdle = state === 'idle'
-  const bgStyle = isIdle ? { backgroundColor: '#1B3A5C', color: '#fff' } : {}
-  const bgClass =
-    state === 'saving' ? 'bg-gray-400 dark:bg-gray-500 text-white cursor-not-allowed' :
-    state === 'saved'  ? 'bg-green-600 dark:bg-green-700 text-white' :
-    state === 'error'  ? 'bg-red-600 dark:bg-red-700 text-white' : ''
-
+// ── AutosaveIndicator ─────────────────────────────────────────────────────────
+// Replaces the old per-section + bottom-of-page manual Save buttons. Purely
+// a status readout — there's nothing to click, autosave (below) fires on
+// its own shortly after the user stops editing.
+function AutosaveIndicator({ state }: { state: SaveState }) {
+  if (state === 'idle') return null
+  if (state === 'saving') {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+        <Loader2 size={12} className="animate-spin" /> Saving…
+      </span>
+    )
+  }
+  if (state === 'saved') {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400">
+        <CheckCircle2 size={12} /> Saved
+      </span>
+    )
+  }
   return (
-    <button
-      onClick={onClick}
-      disabled={state === 'saving'}
-      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:cursor-not-allowed ${bgClass}`}
-      style={isIdle ? bgStyle : {}}
-    >
-      {state === 'saving' ? (
-        <span className="flex items-center gap-2"><Loader2 size={13} className="animate-spin" /> Saving…</span>
-      ) : state === 'saved' ? savedLabel :
-         state === 'error' ? 'Save failed — try again' : idleLabel}
-    </button>
+    <span className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+      <AlertCircle size={12} /> Save failed
+    </span>
   )
 }
 
@@ -286,7 +290,6 @@ export default function ProfilePage() {
 
   // Basic
   const [fullName, setFullName] = useState('')
-  const [basicSave, setBasicSave] = useState<SaveState>('idle')
 
   // Hard reject filters — default to the suggested breadcrumbs (below) so a
   // brand-new profile (including one with no `profiles` row at all yet, where
@@ -299,14 +302,12 @@ export default function ProfilePage() {
   const [geoAllowed, setGeoAllowed] = useState('')
   const [companyExcluded, setCompanyExcluded] = useState('')
   const [roleExcluded, setRoleExcluded] = useState('')
-  const [filterSave, setFilterSave] = useState<SaveState>('idle')
 
   // Preferences
   const [prefTech, setPrefTech] = useState('')
   const [prefIndustries, setPrefIndustries] = useState('')
   const [minSize, setMinSize] = useState('')
   const [maxSize, setMaxSize] = useState('')
-  const [prefsSave, setPrefsSave] = useState<SaveState>('idle')
 
   // Tier / meta
   const [tier, setTier] = useState<'free' | 'paid'>('free')
@@ -397,6 +398,7 @@ export default function ProfilePage() {
   }, [])
 
   function applyParsed(parsed: ParsedProfile, wordCount: number) {
+    if (parsed.full_name) setFullName(parsed.full_name)
     if (parsed.preferred_tech_stack?.length) setPrefTech(joinList(parsed.preferred_tech_stack))
     if (parsed.target_industries?.length) setPrefIndustries(joinList(parsed.target_industries))
     if (parsed.title_floor) setTitleFloor(parsed.title_floor)
@@ -411,81 +413,15 @@ export default function ProfilePage() {
     markDirty()
   }
 
-  function useSaveTimer(setState: (s: SaveState) => void) {
-    return function setSavedWithReset() {
-      setState('saved')
-      setTimeout(() => setState('idle'), 2000)
-    }
-  }
+  // Autosave — replaces the old per-section + bottom-of-page manual Save
+  // buttons. Every field's onChange already calls markDirty(); a single
+  // debounced effect (below, keyed on all tracked field values) calls this
+  // once editing pauses, instead of on every keystroke — the "throttling"
+  // the save-on-every-change approach would otherwise need.
+  const [autosaveState, setAutosaveState] = useState<SaveState>('idle')
 
-  const setBasicSaved = useSaveTimer(setBasicSave)
-  const setFiltersSaved = useSaveTimer(setFilterSave)
-  const setPrefsSaved = useSaveTimer(setPrefsSave)
-
-  async function savePatch(
-    body: Record<string, unknown>,
-    setState: (s: SaveState) => void,
-    setSaved: () => void,
-  ) {
-    setState('saving')
-    try {
-      const res = await fetch('/api/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) { setState('error'); return }
-      setSaved()
-      setIsDirty(false)
-      if (isOnboarding) setOnboardingCompleted(true)
-    } catch {
-      setState('error')
-    }
-  }
-
-  async function handleSaveBasic() {
-    await savePatch({ full_name: fullName }, setBasicSave, setBasicSaved)
-  }
-
-  async function handleSaveFilters() {
-    await savePatch(
-      {
-        hard_reject_filters: {
-          tech_stack_dealbreakers: techDealbreakerTags,
-          title_floor: titleFloor,
-          geography_allowed: parseList(geoAllowed),
-          company_type_excluded: parseList(companyExcluded),
-          role_type_excluded: parseList(roleExcluded),
-        } satisfies HardRejectFilters,
-      },
-      setFilterSave,
-      setFiltersSaved,
-    )
-  }
-
-  async function handleSavePrefs() {
-    await savePatch(
-      {
-        preferences: {
-          preferred_tech_stack: parseList(prefTech),
-          target_industries: parseList(prefIndustries),
-          min_company_size: minSize ? parseInt(minSize, 10) : null,
-          max_company_size: maxSize ? parseInt(maxSize, 10) : null,
-          ...(isOnboarding ? { onboarding_completed: true } : {}),
-        } satisfies UserPreferences,
-      },
-      setPrefsSave,
-      setPrefsSaved,
-    )
-  }
-
-  const [saveAllState, setSaveAllState] = useState<SaveState>('idle')
-
-  // Bundles every section into one PUT instead of chaining the individual
-  // per-section save handlers — a single round trip so "Save changes" at
-  // the bottom of the page reflects one atomic save, not four separate ones.
-  async function handleSaveAll() {
-    setSaveAllState('saving')
+  async function autosave() {
+    setAutosaveState('saving')
     try {
       const res = await fetch('/api/profile', {
         method: 'PUT',
@@ -508,15 +444,29 @@ export default function ProfilePage() {
           } satisfies UserPreferences,
         }),
       })
-      if (!res.ok) { setSaveAllState('error'); return }
-      setSaveAllState('saved')
+      if (!res.ok) { setAutosaveState('error'); return }
+      setAutosaveState('saved')
       setIsDirty(false)
       if (isOnboarding) setOnboardingCompleted(true)
-      setTimeout(() => setSaveAllState('idle'), 2000)
+      setTimeout(() => setAutosaveState((s) => (s === 'saved' ? 'idle' : s)), 2000)
     } catch {
-      setSaveAllState('error')
+      setAutosaveState('error')
     }
   }
+
+  // Debounced autosave: waits until 1.5s after the last edit before saving,
+  // instead of firing a request per keystroke/tag-add. Resets the timer on
+  // every dependency change; only the last one in a burst actually fires.
+  const AUTOSAVE_DEBOUNCE_MS = 1500
+  useEffect(() => {
+    if (loading || !isDirty) return
+    const timer = setTimeout(() => { autosave() }, AUTOSAVE_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    loading, isDirty, fullName, techDealbreakerTags, titleFloor, geoAllowed,
+    companyExcluded, roleExcluded, prefTech, prefIndustries, minSize, maxSize,
+  ])
 
   async function handleApplyInvite() {
     if (!inviteCode.trim()) return
@@ -619,6 +569,7 @@ export default function ProfilePage() {
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Set these once. Jobsnob applies them to everything, forever.</p>
         </div>
         <div className="flex items-center gap-2">
+          <AutosaveIndicator state={autosaveState} />
           <span className="px-3 py-1 rounded-full text-xs font-bold tracking-wide text-white" style={{ backgroundColor: '#1B3A5C' }}>
             {tier === 'paid' ? 'PAID' : 'FREE'}
           </span>
@@ -699,7 +650,7 @@ export default function ProfilePage() {
       )}
 
       {/* Basic info */}
-      <Section title="Basic info" action={<SectionSaveButton state={basicSave} onClick={handleSaveBasic} />}>
+      <Section title="Basic info">
         <Field label="Full name">
           <input
             type="text"
@@ -727,7 +678,6 @@ export default function ProfilePage() {
       <Section
         title="Your hard nos."
         subtitle="Cross any of these and the job is dismissed before you ever see it. No explanation. No second chances."
-        action={<SectionSaveButton state={filterSave} onClick={handleSaveFilters} idleLabel="Apply these standards" savedLabel="Standards saved." />}
       >
         <Field label="Won't touch these. Ever.">
           <TagInput
@@ -777,7 +727,7 @@ export default function ProfilePage() {
       </Section>
 
       {/* Preferences */}
-      <Section title="Preferences" action={<SectionSaveButton state={prefsSave} onClick={handleSavePrefs} />}>
+      <Section title="Preferences">
         <Field label="Tech stack I enjoy (comma-separated)">
           <input
             type="text"
@@ -930,32 +880,26 @@ export default function ProfilePage() {
         )}
       </Section>
 
-      {/* Bottom-of-page save-all + continue */}
+      {/* Bottom-of-page continue + manual retry (autosave normally handles saving) */}
       <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+        {autosaveState === 'error' && (
+          <button
+            type="button"
+            onClick={autosave}
+            className="w-full sm:w-auto px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-red-600 dark:bg-red-700 hover:bg-red-700 transition-colors"
+          >
+            Save failed — retry
+          </button>
+        )}
         {readyToScan && (
           <Link
             href="/dashboard"
-            className="w-full sm:w-auto text-center px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="w-full sm:w-auto text-center px-4 py-2.5 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: '#1B3A5C' }}
           >
             Continue to job scanning →
           </Link>
         )}
-        <button
-          type="button"
-          onClick={handleSaveAll}
-          disabled={saveAllState === 'saving'}
-          className={`w-full sm:w-auto px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:cursor-not-allowed ${
-            saveAllState === 'saving' ? 'bg-gray-400 dark:bg-gray-500 text-white cursor-not-allowed' :
-            saveAllState === 'saved'  ? 'bg-green-600 dark:bg-green-700 text-white' :
-            saveAllState === 'error'  ? 'bg-red-600 dark:bg-red-700 text-white' : 'text-white'
-          }`}
-          style={saveAllState === 'idle' ? { backgroundColor: '#1B3A5C' } : {}}
-        >
-          {saveAllState === 'saving' ? (
-            <span className="flex items-center justify-center gap-2"><Loader2 size={14} className="animate-spin" /> Saving all changes…</span>
-          ) : saveAllState === 'saved' ? 'All changes saved ✓' :
-             saveAllState === 'error' ? 'Save failed — try again' : 'Save changes'}
-        </button>
       </div>
     </div>
   )

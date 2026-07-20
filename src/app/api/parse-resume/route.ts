@@ -5,6 +5,7 @@ const MAX_FILE_BYTES = 5 * 1024 * 1024        // 5 MB
 const MAX_TEXT_CHARS = 50_000                  // ~25 pages of text
 
 const PARSE_PROMPT = `Extract structured information from this resume. Return ONLY a valid JSON object with these exact keys:
+- full_name: string | null (the candidate's full name, exactly as it appears at the top of the resume; null if you can't confidently identify one)
 - preferred_tech_stack: string[] (programming languages, frameworks, tools used in jobs or listed as skills)
 - target_industries: string[] (industries the candidate has worked in, e.g. fintech, SaaS, healthtech, e-commerce)
 - title_floor: string (their current/highest seniority level: Junior, Mid, Senior, Lead, Staff, Principal, Manager, Director, VP, etc. — pick one word)
@@ -18,6 +19,7 @@ const PARSE_PROMPT = `Extract structured information from this resume. Return ON
 Return only the raw JSON object. No markdown, no code fences, no explanation.`
 
 type ParsedProfile = {
+  full_name: string | null
   preferred_tech_stack: string[]
   target_industries: string[]
   title_floor: string

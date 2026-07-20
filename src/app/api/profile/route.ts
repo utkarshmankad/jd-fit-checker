@@ -59,7 +59,16 @@ export async function PUT(request: NextRequest) {
 
   updates.updated_at = new Date().toISOString()
 
-  const { error } = await supabase.from('profiles').update(updates).eq('id', user.id)
+  // Upsert, not update: a plain .update() against a missing row matches zero
+  // rows and returns no error — the client sees "saved" while nothing
+  // persisted. Accounts can end up without a profiles row (signup trigger
+  // gap, timing, etc.), and a silent no-op save here is exactly what put
+  // users in a "saved, but still incomplete on reload" loop. `email` is
+  // NOT NULL on the table, so it must be included for the insert branch of
+  // the upsert; on the update branch it just re-sets the same value.
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({ id: user.id, email: user.email ?? '', ...updates }, { onConflict: 'id' })
 
   if (error) {
     console.error('Profile update failed:', error)
