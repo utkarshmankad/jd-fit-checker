@@ -366,7 +366,13 @@ export default function ProfilePage() {
       if (profile.resume_text) setResumeDate(profile.updated_at)
 
       const hrf: HardRejectFilters = profile.hard_reject_filters ?? DEFAULT_HARD_REJECT
-      setTechDealbreakerTags(hrf.tech_stack_dealbreakers ?? [])
+      // A profile that's never been saved has no `tech_stack_dealbreakers` key at
+      // all (DB default is bare `{}`) — default those to the suggested
+      // breadcrumbs so new users start with them pre-applied instead of an
+      // empty list. Once a user has saved at all, the key exists (even as `[]`
+      // if they deliberately removed every suggestion) — that deliberate choice
+      // must stick, not get silently re-populated on the next load.
+      setTechDealbreakerTags(hrf.tech_stack_dealbreakers !== undefined ? hrf.tech_stack_dealbreakers : DEALBREAKER_SUGGESTIONS)
       setTitleFloor(hrf.title_floor ?? '')
       setGeoAllowed(joinList(hrf.geography_allowed))
       setCompanyExcluded(joinList(hrf.company_type_excluded))

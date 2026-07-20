@@ -12,8 +12,8 @@ const PARSE_PROMPT = `Extract structured information from this resume. Return ON
 - tech_stack_dealbreakers: string[] (always [])
 - company_type_excluded: string[] (always [])
 - role_type_excluded: string[] (always [])
-- min_company_size: null
-- max_company_size: null
+- min_company_size: number | null (smallest employee headcount among companies on this resume — infer from context: "startup"/"seed stage" ≈ 10, "Series A/B" ≈ 50, "Series C+/scale-up" ≈ 200, named large/public companies ≈ 1000+. Use null only if nothing on the resume gives any size signal.)
+- max_company_size: number | null (largest employee headcount among companies on this resume, same inference rules. Use null only if nothing on the resume gives any size signal.)
 
 Return only the raw JSON object. No markdown, no code fences, no explanation.`
 
