@@ -30,7 +30,10 @@ export async function GET() {
     .eq('id', user.id)
     .single()
 
-  if (error || !data) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+  if (error || !data) {
+    console.error('DIAGNOSTIC GET profile lookup failed:', JSON.stringify({ userId: user.id, error }))
+    return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+  }
 
   const LAUNCH_MODE = process.env.LAUNCH_MODE === 'true'
   const BETA_LIMIT = parseInt(process.env.BETA_TOTAL_LIMIT || '25')
