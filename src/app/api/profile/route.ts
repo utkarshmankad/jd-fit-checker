@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import type { HardRejectFilters, UserPreferences } from '@/types'
 
 export async function GET() {
@@ -66,7 +67,16 @@ export async function PUT(request: NextRequest) {
   // users in a "saved, but still incomplete on reload" loop. `email` is
   // NOT NULL on the table, so it must be included for the insert branch of
   // the upsert; on the update branch it just re-sets the same value.
-  const { error } = await supabase
+  //
+  // Uses the service-role client rather than the request-scoped one: the
+  // profiles_insert_own RLS policy (auth.uid() = id) is defined in the
+  // migration files but isn't in effect against the live database, so an
+  // upsert through the authenticated user's own client 42501s on the insert
+  // branch. Service role bypasses RLS by design — id is still pinned to the
+  // authenticated user's own id (never client-supplied), so this can't be
+  // used to write another user's row.
+  const service = createServiceClient()
+  const { error } = await service
     .from('profiles')
     .upsert({ id: user.id, email: user.email ?? '', ...updates }, { onConflict: 'id' })
 
