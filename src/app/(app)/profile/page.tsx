@@ -288,8 +288,13 @@ export default function ProfilePage() {
   const [fullName, setFullName] = useState('')
   const [basicSave, setBasicSave] = useState<SaveState>('idle')
 
-  // Hard reject filters
-  const [techDealbreakerTags, setTechDealbreakerTags] = useState<string[]>([])
+  // Hard reject filters — default to the suggested breadcrumbs (below) so a
+  // brand-new profile (including one with no `profiles` row at all yet, where
+  // /api/profile 404s and the load() effect below never runs to override
+  // this) starts pre-populated instead of empty. Freely removable/addable;
+  // the load() effect still overrides this once a real saved value comes
+  // back, including a deliberately-emptied `[]`.
+  const [techDealbreakerTags, setTechDealbreakerTags] = useState<string[]>(DEALBREAKER_SUGGESTIONS)
   const [titleFloor, setTitleFloor] = useState('')
   const [geoAllowed, setGeoAllowed] = useState('')
   const [companyExcluded, setCompanyExcluded] = useState('')
