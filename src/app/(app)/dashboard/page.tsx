@@ -235,11 +235,14 @@ export default function DashboardPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('tier, preferences, hard_reject_filters')
-        .eq('id', user.id)
-        .single()
+      // Routed through /api/profile (server-side, service-role read) rather
+      // than a direct client-side Supabase query — the profiles table's
+      // request-scoped/RLS-bound SELECT was confirmed broken against the
+      // live database (returns nothing even for the user's own row), which
+      // made this silently no-op forever: hasPreferences stayed false no
+      // matter what was actually saved, keeping the "finish your profile"
+      // banner up and making it look like profile edits never took.
+      const { profile } = await fetch('/api/profile').then((r) => r.json()) as { profile?: { preferences?: unknown; hard_reject_filters?: unknown } }
       if (!profile) return
       const prefs = (profile.preferences ?? {}) as { preferred_tech_stack?: string[]; target_industries?: string[] }
       const hrf = (profile.hard_reject_filters ?? {}) as HardRejectFilters
