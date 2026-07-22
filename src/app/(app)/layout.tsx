@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import DashboardShell from '@/components/layout/DashboardShell'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -12,7 +13,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/auth/login')
   }
 
-  const { data: profile } = await supabase
+  // Service-role read, not the request-scoped client — same reason as
+  // /api/profile: a request-scoped SELECT run immediately after a
+  // service-role write can hit a lagging read replica and miss the row.
+  // That was intermittently forcing isNewUser to true right after a save,
+  // sending "Judge jobs" clicks straight back to /profile?onboarding=true
+  // even though onboarding had actually been completed.
+  const service = createServiceClient()
+  const { data: profile } = await service
     .from('profiles')
     .select('preferences')
     .eq('id', user.id)
