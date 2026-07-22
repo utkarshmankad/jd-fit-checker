@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import DashboardShell from '@/components/layout/DashboardShell'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -12,7 +13,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect('/auth/login')
   }
 
-  const { data: profile } = await supabase
+  // Service-role read, not the request-scoped client — same reason as
+  // /api/profile: the profiles_select_own RLS policy is broken on the live
+  // DB, so a request-scoped SELECT here always comes back empty. That was
+  // silently forcing isNewUser to true on every load, sending "Judge jobs"
+  // clicks straight back to /profile?onboarding=true regardless of whether
+  // onboarding had actually been completed.
+  const service = createServiceClient()
+  const { data: profile } = await service
     .from('profiles')
     .select('preferences')
     .eq('id', user.id)

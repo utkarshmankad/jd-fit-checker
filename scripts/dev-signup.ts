@@ -139,8 +139,29 @@ async function main() {
     if (onboardingCompleted !== true) {
       console.error('\nFAIL — onboarding_completed did not persist; user would be stuck in the /auth/register redirect loop.')
       process.exitCode = 1
+      return
+    }
+    console.log('5. onboarding_completed persisted via /api/profile')
+
+    // (app)/layout.tsx reads `profiles` server-side to compute isNewUser —
+    // a *separate* code path from /api/profile, and one that broke silently
+    // when it used the request-scoped client against RLS that doesn't
+    // actually work on the live DB. Request /dashboard directly (no
+    // redirect-follow) to check the server component's own read, not just
+    // the API's.
+    const dashRes = await fetch(`${APP_URL}/dashboard`, {
+      headers: { Cookie: cookieHeader },
+      redirect: 'manual',
+    })
+    const bouncedToProfile = dashRes.status >= 300 && dashRes.status < 400 &&
+      (dashRes.headers.get('location') ?? '').includes('/profile')
+    console.log(`6. GET /dashboard -> status ${dashRes.status}${bouncedToProfile ? `, redirected to ${dashRes.headers.get('location')}` : ''}`)
+
+    if (bouncedToProfile) {
+      console.error('\nFAIL — /dashboard bounced back to /profile even though onboarding_completed is true (layout.tsx isNewUser check is stale).')
+      process.exitCode = 1
     } else {
-      console.log('\nPASS — signup -> register -> profile save -> onboarding flag all consistent.')
+      console.log('\nPASS — signup -> register -> profile save -> onboarding flag -> /dashboard access all consistent.')
     }
   } finally {
     if (!keep) {
