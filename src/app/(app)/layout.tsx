@@ -14,11 +14,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   // Service-role read, not the request-scoped client — same reason as
-  // /api/profile: the profiles_select_own RLS policy is broken on the live
-  // DB, so a request-scoped SELECT here always comes back empty. That was
-  // silently forcing isNewUser to true on every load, sending "Judge jobs"
-  // clicks straight back to /profile?onboarding=true regardless of whether
-  // onboarding had actually been completed.
+  // /api/profile: a request-scoped SELECT run immediately after a
+  // service-role write can hit a lagging read replica and miss the row.
+  // That was intermittently forcing isNewUser to true right after a save,
+  // sending "Judge jobs" clicks straight back to /profile?onboarding=true
+  // even though onboarding had actually been completed.
   const service = createServiceClient()
   const { data: profile } = await service
     .from('profiles')
