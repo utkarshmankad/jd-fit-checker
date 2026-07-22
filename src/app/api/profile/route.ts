@@ -31,7 +31,6 @@ export async function GET() {
     .single()
 
   if (error || !data) {
-    console.error('DIAGNOSTIC GET profile lookup failed:', JSON.stringify({ userId: user.id, error }))
     return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
   }
 
