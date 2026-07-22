@@ -340,8 +340,15 @@ export default function ProfilePage() {
 
   // Dirty tracking
   const [isDirty, setIsDirty] = useState(false)
+  // Ref mirror of isDirty for the initial-load effect below: that effect's
+  // closure captures isDirty at mount time (always false), so it can't see
+  // a resume parse that completed and called markDirty() while the GET
+  // /api/profile fetch was still in flight — the late-resolving load() would
+  // then stomp the parsed full_name back to '' (or blank). The ref reads
+  // current state at the moment load() resolves instead.
+  const isDirtyRef = useRef(false)
 
-  function markDirty() { setIsDirty(true) }
+  function markDirty() { setIsDirty(true); isDirtyRef.current = true }
 
   // Warn before navigate away if dirty
   useEffect(() => {
@@ -362,6 +369,11 @@ export default function ProfilePage() {
       const res = await fetch('/api/profile')
       if (!res.ok) { setLoading(false); return }
       const { profile } = (await res.json()) as { profile: ProfileData }
+
+      // A resume parse (or any edit) may have already landed and called
+      // markDirty() while this fetch was in flight — don't clobber it with
+      // the stale pre-edit DB values.
+      if (isDirtyRef.current) { setLoading(false); return }
 
       setFullName(profile.full_name ?? '')
       setTier(profile.tier)
@@ -440,7 +452,11 @@ export default function ProfilePage() {
             target_industries: parseList(prefIndustries),
             min_company_size: minSize ? parseInt(minSize, 10) : null,
             max_company_size: maxSize ? parseInt(maxSize, 10) : null,
-            ...(isOnboarding ? { onboarding_completed: true } : {}),
+            // Any successful save marks onboarding done — not just saves made
+            // via the ?onboarding=true redirect link. Otherwise a user who
+            // reaches /profile any other way never clears the server-side
+            // isNewUser flag and stays stuck in the redirect loop forever.
+            onboarding_completed: true,
           } satisfies UserPreferences,
         }),
       })

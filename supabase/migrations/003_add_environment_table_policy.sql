@@ -5,8 +5,8 @@
 --   anon-key client used by /api/health silently failed every read and
 --   fell back to the "no _environment table" message even though the
 --   table was there.
--- Applied to dev:  [fill in date]
--- Applied to prod: [fill in date]
+-- Applied to dev:  July 16 2026
+-- Applied to prod: 
 
 create table if not exists public._environment (
   key   text primary key,

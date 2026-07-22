@@ -14,15 +14,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('resume_text, preferences')
+    .select('preferences')
     .eq('id', user.id)
     .single()
 
+  // `resume_text` is intentionally never persisted (see profile page — resume
+  // is parsed client-side then discarded), so it can't be used as a
+  // completeness signal. `onboarding_completed` is the single flag the
+  // profile page sets once autosave has run at least once; use it as the
+  // only source of truth here to avoid a second, inconsistent "is done" check.
   const prefs = (profile?.preferences ?? {}) as Record<string, unknown>
-  const isNewUser =
-    !profile?.resume_text &&
-    (!profile?.preferences ||
-      Object.values(prefs).every((v) => !v || (Array.isArray(v) && v.length === 0)))
+  const isNewUser = !prefs.onboarding_completed
 
   return (
     <DashboardShell userEmail={user.email ?? ''} isNewUser={isNewUser}>
