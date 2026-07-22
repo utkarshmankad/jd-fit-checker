@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import type { HardRejectFilters, UserPreferences } from '@/types'
 
+// Reads and writes both go through the service-role client rather than the
+// request-scoped one. Confirmed by direct testing: the profiles_select_own
+// and profiles_insert_own RLS policies (auth.uid() = id) are defined in the
+// migration files but are not actually in effect against the live
+// database — a service-role upsert would write a row, and the very next
+// request-scoped SELECT for that same session/user still couldn't see it,
+// producing a permanent "Profile not found" / re-enter-everything loop.
+// auth.getUser() (via the request-scoped client, which only needs a valid
+// session — not table RLS) still gates both handlers, and id is always
+// pinned to that authenticated user's own id, so this can't be used to
+// read/write another user's row despite bypassing RLS.
 export async function GET() {
   const supabase = await createClient()
   const {
@@ -9,7 +21,8 @@ export async function GET() {
   } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
+  const service = createServiceClient()
+  const { data, error } = await service
     .from('profiles')
     .select(
       'id, email, full_name, resume_text, hard_reject_filters, preferences, tier, screens_used_this_month, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_code, referred_by, referral_bonus_screens, invite_code_used, created_at, updated_at'
@@ -17,7 +30,9 @@ export async function GET() {
     .eq('id', user.id)
     .single()
 
-  if (error || !data) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+  if (error || !data) {
+    return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+  }
 
   const LAUNCH_MODE = process.env.LAUNCH_MODE === 'true'
   const BETA_LIMIT = parseInt(process.env.BETA_TOTAL_LIMIT || '25')
@@ -59,7 +74,18 @@ export async function PUT(request: NextRequest) {
 
   updates.updated_at = new Date().toISOString()
 
-  const { error } = await supabase.from('profiles').update(updates).eq('id', user.id)
+  // Upsert, not update: a plain .update() against a missing row matches zero
+  // rows and returns no error — the client sees "saved" while nothing
+  // persisted. `email` is NOT NULL on the table, so it must be included for
+  // the insert branch of the upsert; on the update branch it just re-sets
+  // the same value. id/email placed after the spread so they always win
+  // regardless of what `updates` contains — defense in depth against a
+  // future change to the whitelist above accidentally letting a
+  // client-supplied id/email through to a service-role write.
+  const service = createServiceClient()
+  const { error } = await service
+    .from('profiles')
+    .upsert({ ...updates, id: user.id, email: user.email ?? '' }, { onConflict: 'id' })
 
   if (error) {
     console.error('Profile update failed:', error)
