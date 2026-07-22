@@ -431,8 +431,21 @@ export default function ProfilePage() {
   // once editing pauses, instead of on every keystroke — the "throttling"
   // the save-on-every-change approach would otherwise need.
   const [autosaveState, setAutosaveState] = useState<SaveState>('idle')
+  // Two in-flight PUTs can resolve out of order (e.g. an earlier save is
+  // slow and completes after a later one that already captured more recent
+  // edits) — since each PUT is a full-row upsert, the stale response landing
+  // last would silently overwrite newer data with older data. Serialize: never
+  // have more than one PUT in flight, and if edits land while one is
+  // in-flight, queue exactly one follow-up that re-reads state via the ref
+  // (always pointed at the latest render's closure) once the current PUT
+  // settles — so writes always land in the order they were made.
+  const isSavingRef = useRef(false)
+  const pendingSaveRef = useRef(false)
+  const autosaveRef = useRef<() => Promise<void>>(async () => {})
 
   async function autosave() {
+    if (isSavingRef.current) { pendingSaveRef.current = true; return }
+    isSavingRef.current = true
     setAutosaveState('saving')
     try {
       const res = await fetch('/api/profile', {
@@ -467,8 +480,15 @@ export default function ProfilePage() {
       setTimeout(() => setAutosaveState((s) => (s === 'saved' ? 'idle' : s)), 2000)
     } catch {
       setAutosaveState('error')
+    } finally {
+      isSavingRef.current = false
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false
+        autosaveRef.current()
+      }
     }
   }
+  autosaveRef.current = autosave
 
   // Debounced autosave: waits until 1.5s after the last edit before saving,
   // instead of firing a request per keystroke/tag-add. Resets the timer on
