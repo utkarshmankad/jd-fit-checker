@@ -6,7 +6,12 @@
 // points at the dev project ref.
 //
 // Usage:
-//   npx tsx scripts/dev-signup.ts [--email you@test.com] [--keep]
+//   npx tsx scripts/dev-signup.ts [--email=you@test.com] [--password=Something123!] [--keep]
+//
+// --keep leaves the user in place instead of deleting it at the end, and
+// prints its email/password so you can sign in through the real /auth/login
+// form manually — useful for reproducing UI-only bugs (e.g. client-side
+// redirects) that a pure HTTP round trip can't catch.
 //
 // What it does, end to end, against a running `next dev` on localhost:3000:
 //   1. admin.createUser(email, password, email_confirm: true)   — signup
@@ -55,7 +60,12 @@ if (!SUPABASE_URL.includes(DEV_REF) && !SUPABASE_URL.includes(PROD_REF)) {
 const args = process.argv.slice(2)
 const keep = args.includes('--keep')
 const emailArg = args.find((a) => a.startsWith('--email='))?.split('=')[1]
+const passwordArg = args.find((a) => a.startsWith('--password='))?.split('=')[1]
 
+// A fresh random email + password every run (unless overridden) — each
+// invocation is meant to exercise a genuine first-time user, not reuse
+// state from a previous test that might already have onboarding_completed
+// set from an earlier run.
 const email = emailArg ?? `dev-signup-${randomUUID().slice(0, 8)}@test.com`
 // Two distinct passwords: real signups arrive via magic link with no
 // password set yet, so /auth/register's updateUser() call is setting a
@@ -64,7 +74,7 @@ const email = emailArg ?? `dev-signup-${randomUUID().slice(0, 8)}@test.com`
 // value or Supabase rejects it as "New password should be different from
 // the old password" (which is a quirk of this script, not the app).
 const initialPassword = `DevSignupInit-${randomUUID()}!`
-const password = `DevSignup-${randomUUID()}!`
+const password = passwordArg ?? `DevSignup-${randomUUID()}!`
 const fullName = 'Dev Signup Test'
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
@@ -168,7 +178,9 @@ async function main() {
       await admin.auth.admin.deleteUser(userId)
       console.log(`\ncleaned up user ${userId}`)
     } else {
-      console.log(`\n--keep passed, left user ${userId} (${email}) in place`)
+      console.log(`\n--keep passed, left user ${userId} in place — login credentials:`)
+      console.log(`  email:    ${email}`)
+      console.log(`  password: ${password}`)
     }
   }
 }

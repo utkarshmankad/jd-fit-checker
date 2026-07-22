@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Upload, CheckCircle2, AlertCircle, Loader2, X, ArrowRight } from 'lucide-react'
 import type { HardRejectFilters, UserPreferences } from '@/types'
 
@@ -286,6 +287,7 @@ function ResumeUploader({
 
 // ── ProfilePage ───────────────────────────────────────────────────────────────
 export default function ProfilePage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
 
   // Basic
@@ -477,6 +479,14 @@ export default function ProfilePage() {
       setAutosaveState('saved')
       setIsDirty(false)
       if (isOnboarding) setOnboardingCompleted(true)
+      // (app)/layout.tsx computes isNewUser once per server render, and that
+      // render is cached across client-side navigations within the (app)
+      // route group — it doesn't re-run just because /profile saved. Without
+      // this, a first-time user who saves then clicks "Judge jobs"/"Continue
+      // to job scanning" gets bounced straight back here: the cached layout
+      // still thinks onboarding_completed is false. router.refresh()
+      // invalidates that cache so the next navigation picks up the fresh value.
+      router.refresh()
       setTimeout(() => setAutosaveState((s) => (s === 'saved' ? 'idle' : s)), 2000)
     } catch {
       setAutosaveState('error')
