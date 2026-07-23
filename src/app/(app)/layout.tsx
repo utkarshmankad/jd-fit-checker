@@ -22,17 +22,42 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const service = createServiceClient()
   const { data: profile } = await service
     .from('profiles')
-    .select('preferences')
+    .select('preferences, hard_reject_filters')
     .eq('id', user.id)
     .single()
 
   // `resume_text` is intentionally never persisted (see profile page — resume
   // is parsed client-side then discarded), so it can't be used as a
-  // completeness signal. `onboarding_completed` is the single flag the
-  // profile page sets once autosave has run at least once; use it as the
-  // only source of truth here to avoid a second, inconsistent "is done" check.
-  const prefs = (profile?.preferences ?? {}) as Record<string, unknown>
-  const isNewUser = !prefs.onboarding_completed
+  // completeness signal. `onboarding_completed` is the flag the profile page
+  // sets once autosave has run at least once, but pre-existing users whose
+  // profile was filled out before that flag existed never trigger an
+  // autosave (nothing to edit, nothing dirty) — leaving them isNewUser=true
+  // forever and stuck bouncing /dashboard -> /profile -> /dashboard even
+  // though their profile already has real data. Treat a profile with actual
+  // preferences/dealbreakers saved as equivalent to onboarding_completed,
+  // mirroring the same completeness check the profile page itself uses
+  // (prefFilled / filtersFilled) so legacy data counts.
+  const prefs = (profile?.preferences ?? {}) as Record<string, unknown> & {
+    preferred_tech_stack?: string[]
+    target_industries?: string[]
+  }
+  const hrf = (profile?.hard_reject_filters ?? {}) as Record<string, unknown> & {
+    title_floor?: string
+    geography_allowed?: string[]
+    tech_stack_dealbreakers?: string[]
+    company_type_excluded?: string[]
+    role_type_excluded?: string[]
+  }
+  const hasLegacyProfileData = !!(
+    prefs.preferred_tech_stack?.length ||
+    prefs.target_industries?.length ||
+    hrf.title_floor?.trim() ||
+    hrf.geography_allowed?.length ||
+    hrf.tech_stack_dealbreakers?.length ||
+    hrf.company_type_excluded?.length ||
+    hrf.role_type_excluded?.length
+  )
+  const isNewUser = !prefs.onboarding_completed && !hasLegacyProfileData
 
   return (
     <DashboardShell userEmail={user.email ?? ''} isNewUser={isNewUser}>
