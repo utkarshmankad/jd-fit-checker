@@ -7,6 +7,7 @@ import { FileSearch, History, User, LogOut, Menu, X, BookOpen /*, Briefcase */ }
 import { LogoMark } from '@/components/Logo'
 import FeedbackWidget from '@/components/feedback/FeedbackWidget'
 import ThemeToggle from '@/components/theme/ThemeToggle'
+import { posthog } from '@/lib/posthog'
 
 const navLinks = [
   { href: '/dashboard', label: 'Judge jobs', icon: FileSearch },
@@ -17,13 +18,22 @@ const navLinks = [
   { href: '/profile', label: 'My standards', icon: User },
 ]
 
+interface DashboardIdentity {
+  userId: string
+  fullName: string | null
+  tier: 'free' | 'paid'
+  isBetaUser: boolean
+  createdAt: string | null
+}
+
 interface DashboardShellProps {
   children: React.ReactNode
   userEmail: string
   isNewUser?: boolean
+  identity?: DashboardIdentity
 }
 
-export default function DashboardShell({ children, userEmail, isNewUser }: DashboardShellProps) {
+export default function DashboardShell({ children, userEmail, isNewUser, identity }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
@@ -33,6 +43,23 @@ export default function DashboardShell({ children, userEmail, isNewUser }: Dashb
       router.replace('/profile?onboarding=true')
     }
   }, [isNewUser, pathname, router])
+
+  // Runs on every (app) route mount, not just once globally — posthog.identify
+  // is idempotent (calling it again with the same distinct_id + traits is a
+  // no-op beyond a small property-diff check), so this just keeps identity
+  // traits fresh as tier/beta status change across a session, e.g. right
+  // after the "unlimited scans" admin update in scripts, or an in-app
+  // upgrade — without needing a dedicated event bus to know when that happens.
+  useEffect(() => {
+    if (!identity) return
+    posthog.identify(identity.userId, {
+      email: userEmail,
+      name: identity.fullName,
+      tier: identity.tier,
+      is_beta_user: identity.isBetaUser,
+      created_at: identity.createdAt,
+    })
+  }, [identity, userEmail])
 
   return (
     <div className="min-h-screen flex">

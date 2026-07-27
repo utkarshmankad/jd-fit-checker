@@ -28,6 +28,7 @@ import { calculateTimeSaved } from '@/lib/utils/time-saved'
 import { VerdictCard, DismissedCard, ErrorCard, LoadingCard } from '@/components/analysis/VerdictCard'
 import { normalizeJobUrl } from '@/lib/utils/url'
 import { sanitizeCsvField } from '@/lib/utils/csv'
+import { track } from '@/lib/analytics'
 import Papa from 'papaparse'
 
 type InputTab = 'urls' | 'text'
@@ -261,7 +262,7 @@ export default function DashboardPage() {
         // made this silently no-op forever: hasPreferences stayed false no
         // matter what was actually saved, keeping the "finish your profile"
         // banner up and making it look like profile edits never took.
-        fetch('/api/profile').then((r) => r.json()) as Promise<{ profile?: { preferences?: unknown; hard_reject_filters?: unknown } }>,
+        fetch('/api/profile').then((r) => r.json()) as Promise<{ profile?: { preferences?: unknown; hard_reject_filters?: unknown; screens_used_total?: number } }>,
         supabase.auth.getUser(),
       ])
       const { profile } = profileRes
@@ -272,6 +273,7 @@ export default function DashboardPage() {
       setHardRejectFilters(hrf)
       setHasPreferences(!!(prefs.preferred_tech_stack?.length || prefs.target_industries?.length || hrf.title_floor?.trim() || hrf.geography_allowed?.length))
       setProfileLoaded(true)
+      track.dashboardViewed((profile.screens_used_total ?? 0) > 0)
       if (user) await fetchLifetimeCount(user.id)
     }
     loadProfile()
@@ -414,6 +416,9 @@ export default function DashboardPage() {
       setResults([])
       setBatchTime(null)
       setBatchIntelligence(null)
+      // Only a genuinely new batch counts as "started" — a resume (above)
+      // is a continuation of one already-tracked start, not a second one.
+      track.screeningStarted(itemsToScreen.length, tab === 'urls' ? 'url' : 'paste')
     }
 
     const storedAvg = parseFloat(localStorage.getItem(AVG_SCREEN_TIME_KEY) ?? '')
@@ -437,6 +442,11 @@ export default function DashboardPage() {
     const MIN_INTERVAL_MS = apiProvider === 'openai' ? 3100 : 0
 
     let completedFully = true
+    // Local to this call, not derived from the `results` state (which also
+    // holds any prior partial batch's rows on a resume) — this is what
+    // screeningCompleted below reports, so it should count only what this
+    // invocation actually processed.
+    let rejectedThisRun = 0
 
     try {
       for (const item of itemsToScreen) {
@@ -456,6 +466,7 @@ export default function DashboardPage() {
           res = await fetch('/api/screen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         } catch {
           setScreenError({ type: 'network', message: 'Connection error — check your internet connection and try again.' })
+          track.screeningFailed('network', itemsToScreen.length)
           completedFully = false
           break
         }
@@ -469,6 +480,7 @@ export default function DashboardPage() {
           if (json.upgrade_required || json.limit_check) {
             setTierModalMessage(json.limit_check?.upgrade_prompt ?? json.error ?? "You've used your free judgments.")
             setShowTierModal(true)
+            track.upgradeModalOpened('screening_limit')
             completedFully = false
             break
           }
@@ -478,17 +490,20 @@ export default function DashboardPage() {
           const json = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
           if (json.code === 'no_api_key') {
             setScreenError({ type: 'no_api_key' })
+            track.screeningFailed('no_api_key', itemsToScreen.length)
           } else {
             // Server responded (this isn't a connectivity problem on the
             // user's end) but with an error — distinct from the fetch-throw
             // 'network' case above, which really is the user's own connection.
             setScreenError({ type: 'service_error', message: json.error ?? `Screening failed (${res.status})` })
+            track.screeningFailed(json.error ?? 'service_error', itemsToScreen.length)
           }
           completedFully = false
           break
         }
 
         const data = (await res.json()) as { results: ScreeningResult[]; fatalError?: FatalScreenError }
+        rejectedThisRun += data.results.filter((r) => r.verdict === 'REJECT').length
         setResults((prev) => [...prev, ...data.results])
         setSkeletonCount((prev) => Math.max(0, prev - 1))
         inProgressBatchRef.current?.screenedKeys.add(itemKey(item))
@@ -516,6 +531,7 @@ export default function DashboardPage() {
 
       if (completedFully) {
         inProgressBatchRef.current = null
+        track.screeningCompleted(itemsToScreen.length, rejectedThisRun, Date.now() - batchStartedAtRef.current)
 
         // Update the running per-JD time estimate — only on a clean completion
         // (not an interrupted batch, where rate-limit/network stalls would
@@ -548,6 +564,7 @@ export default function DashboardPage() {
   }
 
   function exportCSV() {
+    track.csvExported(results.length)
     const rows = results.map((r) => ({
       Company: sanitizeCsvField(r.company ?? ''),
       'Job Title': sanitizeCsvField(r.job_title ?? ''),
@@ -573,6 +590,7 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error('Share failed')
       const { url } = (await res.json()) as { url: string }
       await navigator.clipboard.writeText(url)
+      track.shareCreated()
       toast.success("Link copied. Go show someone how many jobs you didn't apply to.")
     } catch {
       toast.error('Could not create share link')
@@ -640,7 +658,7 @@ export default function DashboardPage() {
             beta_limit={usage.beta_limit}
             weekly_limit={usage.weekly_limit}
             pricingEnabled={PRICING_ENABLED}
-            onUpgradeClick={() => setShowTierModal(true)}
+            onUpgradeClick={() => { setShowTierModal(true); track.upgradeModalOpened('usage_widget') }}
           />
         )}
       </div>
@@ -672,7 +690,17 @@ export default function DashboardPage() {
         <div className="px-6 py-5 space-y-3">
           {tab === 'urls' ? (
             <>
-              <textarea value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setScreenError(null) }} rows={5}
+              <textarea value={urlInput} onChange={(e) => { setUrlInput(e.target.value); setScreenError(null) }}
+                // Fired on paste specifically, not on every keystroke via
+                // onChange — "urls pasted" is meant to capture the paste
+                // action itself; tracking on every character typed would
+                // flood this event and make the funnel unreadable.
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData('text')
+                  const count = countValidUrls(pasted)
+                  if (count > 0) track.urlsPasted(count)
+                }}
+                rows={5}
                 placeholder="Paste job URLs here. One per line. LinkedIn, Naukri, Greenhouse — anywhere. We'll read them so you don't have to."
                 className="w-full resize-none rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
               {urlInput.trim() && <p className="text-xs text-gray-400 dark:text-gray-500">{urlCount} URL{urlCount !== 1 ? 's' : ''} detected</p>}
@@ -874,7 +902,11 @@ export default function DashboardPage() {
                     key={result.id}
                     result={result}
                     isExpanded={expandedId === result.id}
-                    onToggle={() => setExpandedId(expandedId === result.id ? null : result.id)}
+                    onToggle={() => {
+                      const opening = expandedId !== result.id
+                      setExpandedId(opening ? result.id : null)
+                      if (opening) track.resultExpanded(result.verdict, result.company ?? '')
+                    }}
                   />
                 )
               })}
@@ -895,7 +927,11 @@ export default function DashboardPage() {
                     key={result.id}
                     result={result}
                     isExpanded={expandedId === result.id}
-                    onToggle={() => setExpandedId(expandedId === result.id ? null : result.id)}
+                    onToggle={() => {
+                      const opening = expandedId !== result.id
+                      setExpandedId(opening ? result.id : null)
+                      if (opening) track.resultExpanded(result.verdict, result.company ?? '')
+                    }}
                   />
                 )
               ))}
