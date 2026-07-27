@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import {
   FileSearch, Download, Share2, Plus, X,
@@ -9,11 +10,17 @@ import {
 import toast from 'react-hot-toast'
 import type { ScreeningResult, HardRejectFilters, BatchIntelligence } from '@/types'
 import type { FatalScreenError } from '@/app/api/screen/route'
-import BatchIntelligencePanel from '@/components/analysis/BatchIntelligencePanel'
-import WhyNotChatGptModal from '@/components/dashboard/WhyNotChatGptModal'
 import UsageWidget from '@/components/dashboard/UsageWidget'
 import ReferralCard from '@/components/dashboard/ReferralCard'
-import PaymentModal from '@/components/payment/PaymentModal'
+// These four are only ever needed after some user action (a finished batch,
+// an explicit "why not ChatGPT" click, or hitting the tier limit) — never on
+// first paint. Loading them eagerly meant every dashboard visit shipped and
+// parsed their JS (plus, for PaymentModal, pulling in the Razorpay checkout
+// script tag machinery) whether or not they were ever used. next/dynamic
+// defers all four out of the initial dashboard bundle.
+const BatchIntelligencePanel = dynamic(() => import('@/components/analysis/BatchIntelligencePanel'))
+const WhyNotChatGptModal = dynamic(() => import('@/components/dashboard/WhyNotChatGptModal'))
+const PaymentModal = dynamic(() => import('@/components/payment/PaymentModal'))
 // Job Tracker — feature disabled, kept for later.
 // import TrackButton from '@/components/tracker/TrackButton'
 import { SAMPLE_RESULTS } from '@/lib/sample-data'
@@ -118,6 +125,14 @@ export default function DashboardPage() {
   const [lifetimeRejectCount, setLifetimeRejectCount] = useState<number | null>(null)
 
   const [hasPreferences, setHasPreferences] = useState(false)
+  // Distinct from hasPreferences itself: without this, the "standards not
+  // filled" banner used hasPreferences' initial `false` as if it meant
+  // "confirmed empty" and rendered immediately, then vanished a beat later
+  // once /api/profile actually resolved and (for a user who'd already
+  // filled things in) flipped hasPreferences to true — a visible flash on
+  // every fresh page load. Gate the banner on this instead so it only
+  // renders once we actually know the answer.
+  const [profileLoaded, setProfileLoaded] = useState(false)
   // Every scan runs on the app's own OpenAI key now — no per-user provider choice.
   const apiProvider = 'openai'
   const [usage, setUsage] = useState<{
@@ -232,23 +247,32 @@ export default function DashboardPage() {
     refreshUsage()
 
     async function loadProfile() {
+      // /api/profile and auth.getUser() below don't depend on each other —
+      // both used to run one after another (getUser() first, purely to get
+      // user.id for fetchLifetimeCount), adding a full extra client-side
+      // round trip in front of the profile fetch before the banner's real
+      // state could even be known. Fire them together instead.
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      // Routed through /api/profile (server-side, service-role read) rather
-      // than a direct client-side Supabase query — the profiles table's
-      // request-scoped/RLS-bound SELECT was confirmed broken against the
-      // live database (returns nothing even for the user's own row), which
-      // made this silently no-op forever: hasPreferences stayed false no
-      // matter what was actually saved, keeping the "finish your profile"
-      // banner up and making it look like profile edits never took.
-      const { profile } = await fetch('/api/profile').then((r) => r.json()) as { profile?: { preferences?: unknown; hard_reject_filters?: unknown } }
-      if (!profile) return
+      const [profileRes, userRes] = await Promise.all([
+        // Routed through /api/profile (server-side, service-role read) rather
+        // than a direct client-side Supabase query — the profiles table's
+        // request-scoped/RLS-bound SELECT was confirmed broken against the
+        // live database (returns nothing even for the user's own row), which
+        // made this silently no-op forever: hasPreferences stayed false no
+        // matter what was actually saved, keeping the "finish your profile"
+        // banner up and making it look like profile edits never took.
+        fetch('/api/profile').then((r) => r.json()) as Promise<{ profile?: { preferences?: unknown; hard_reject_filters?: unknown } }>,
+        supabase.auth.getUser(),
+      ])
+      const { profile } = profileRes
+      const user = userRes.data.user
+      if (!profile) { setProfileLoaded(true); return }
       const prefs = (profile.preferences ?? {}) as { preferred_tech_stack?: string[]; target_industries?: string[] }
       const hrf = (profile.hard_reject_filters ?? {}) as HardRejectFilters
       setHardRejectFilters(hrf)
       setHasPreferences(!!(prefs.preferred_tech_stack?.length || prefs.target_industries?.length || hrf.title_floor?.trim() || hrf.geography_allowed?.length))
-      await fetchLifetimeCount(user.id)
+      setProfileLoaded(true)
+      if (user) await fetchLifetimeCount(user.id)
     }
     loadProfile()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -585,7 +609,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
-      {!profileBannerDismissed && !hasPreferences && (
+      {profileLoaded && !profileBannerDismissed && !hasPreferences && (
         <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm">
           <AlertTriangle size={16} className="shrink-0 mt-0.5" />
           <span className="flex-1">
