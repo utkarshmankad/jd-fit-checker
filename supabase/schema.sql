@@ -494,3 +494,19 @@ alter table public._environment enable row level security;
 drop policy if exists "environment_select_all" on public._environment;
 create policy "environment_select_all" on public._environment
   for select using (true);
+
+-- ──────────────────────────────────────────────────────────
+-- 13. get_screening_counts_per_user()
+--    Lifetime per-user screening counts for /admin. SECURITY DEFINER,
+--    called only from server code via the service-role client — never
+--    exposed to anon/authenticated roles.
+-- ──────────────────────────────────────────────────────────
+create or replace function public.get_screening_counts_per_user()
+returns table(user_id uuid, count bigint)
+language sql security definer as $$
+  select user_id, count(*) as count
+  from public.screening_results
+  group by user_id;
+$$;
+
+revoke all on function public.get_screening_counts_per_user() from public, anon, authenticated;
