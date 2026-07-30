@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 
 const MAX_ATTEMPTS = 5
 const WINDOW_MS = 15 * 60 * 1000 // 15 minutes
@@ -38,7 +39,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: 'Invalid invite code' })
   }
 
-  const { error } = await supabase
+  // Service-role write — consistent with the rest of the profiles write
+  // paths in this codebase, and defensive against a silent-success failure
+  // mode: if this update ever affects 0 rows for any reason, we'd still
+  // return success:true "Beta access unlocked" without actually granting
+  // beta access, which is worse than an error.
+  const service = createServiceClient()
+  const { error } = await service
     .from('profiles')
     .update({ is_beta_user: true, invite_code_used: invite_code, invite_attempt_count: 0 })
     .eq('id', user.id)
