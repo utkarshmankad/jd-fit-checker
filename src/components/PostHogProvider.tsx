@@ -26,7 +26,6 @@ function PageviewTracker() {
     // still a dependency here — a search-param-only navigation (e.g.
     // /profile -> /profile?onboarding=true) doesn't change pathname, and
     // without this the pageview for that navigation would never fire.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, searchParams])
 
   return null

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 import { Resend } from 'resend'
 
 const MAX_MESSAGE_CHARS = 5000
@@ -28,7 +29,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Feedback is too long' }, { status: 400 })
   }
 
-  const { data: inserted, error } = await supabase
+  // Service-role insert, not the request-scoped client — the
+  // feedback_insert_own RLS policy (auth.uid() = user_id) is defined in the
+  // migration but, like profiles_insert_own, is not actually in effect
+  // against the live database, so a request-scoped insert 500s outright.
+  // auth.getUser() above still gates this on a valid session, and user_id
+  // is pinned server-side to that authenticated user, so this can't write
+  // feedback under someone else's identity despite bypassing RLS.
+  const service = createServiceClient()
+  const { data: inserted, error } = await service
     .from('feedback')
     .insert({
       user_id: user.id,
@@ -78,7 +87,10 @@ export async function POST(request: NextRequest) {
       return
     }
 
-    const { error: updateError } = await supabase.from('feedback').update({ sent_at: new Date().toISOString() }).eq('id', inserted.id)
+    // Service-role update — schema.sql deliberately defines no update policy
+    // for regular users on this table (feedback is write-only from the
+    // client), so the request-scoped client can never perform this write.
+    const { error: updateError } = await service.from('feedback').update({ sent_at: new Date().toISOString() }).eq('id', inserted.id)
     if (updateError) {
       console.error('feedback: failed to mark row sent after successful immediate email:', updateError)
     }
