@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 
 const MAX_ATTEMPTS = 5
 const WINDOW_MS = 15 * 60 * 1000 // 15 minutes
@@ -38,7 +39,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: 'Invalid invite code' })
   }
 
-  const { error } = await supabase
+  // Service-role write — profiles RLS isn't actually in effect against the
+  // live database, so a request-scoped update here silently affects 0 rows
+  // and the route would report success without actually granting beta
+  // access (same bug class as the feedback insert fix).
+  const service = createServiceClient()
+  const { error } = await service
     .from('profiles')
     .update({ is_beta_user: true, invite_code_used: invite_code, invite_attempt_count: 0 })
     .eq('id', user.id)
