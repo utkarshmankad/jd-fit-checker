@@ -15,6 +15,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: 'Referral code is required' }, { status: 400 })
   }
 
-  const result = await applyReferralCode(supabase, createServiceClient(), user.id, referral_code)
+  const result = await applyReferralCode(createServiceClient(), user.id, referral_code)
   return NextResponse.json(result)
 }

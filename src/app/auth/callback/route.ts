@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
       if (refCode) {
         try {
-          await applyReferralCode(supabase, createServiceClient(), user.id, refCode)
+          await applyReferralCode(createServiceClient(), user.id, refCode)
         } catch (e) {
           console.error('referral apply on signup failed:', e)
         }

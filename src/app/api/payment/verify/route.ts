@@ -18,7 +18,11 @@ export async function POST(request: NextRequest) {
 
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = body
 
-  const { data: profile } = await supabase
+  // Service-role read — profiles RLS isn't actually in effect against the
+  // live database, so a request-scoped select here returns null and every
+  // verification would 403 (same bug class as the feedback insert fix).
+  const service = createServiceClient()
+  const { data: profile } = await service
     .from('profiles')
     .select('pending_order_id')
     .eq('id', user.id)
@@ -37,7 +41,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 })
   }
 
-  const service = createServiceClient()
   await service.from('profiles').update({ tier: 'paid', pending_order_id: null }).eq('id', user.id)
 
   return NextResponse.json({ success: true })
