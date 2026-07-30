@@ -3,7 +3,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 const REFERRAL_BONUS = 10
 
 export async function applyReferralCode(
-  supabase: SupabaseClient,
   service: SupabaseClient,
   userId: string,
   rawCode: string
@@ -11,7 +10,11 @@ export async function applyReferralCode(
   const code = rawCode.trim().toUpperCase()
   if (!code) return { success: false, message: 'Referral code is required' }
 
-  const { data: current, error: currentError } = await supabase
+  // Service-role reads/writes on profiles below — its RLS isn't actually in
+  // effect against the live database, so the request-scoped client would
+  // silently return/affect nothing here (same bug class as the feedback
+  // insert fix).
+  const { data: current, error: currentError } = await service
     .from('profiles')
     .select('referred_by, referral_code')
     .eq('id', userId)
@@ -32,7 +35,7 @@ export async function applyReferralCode(
   // Atomic, conditional on referred_by still being null — if two requests for
   // this same user race (e.g. a double-click or a retried request), only one
   // can win this UPDATE, so the referrer is never credited twice for one signup.
-  const { data: claimed, error: claimError } = await supabase
+  const { data: claimed, error: claimError } = await service
     .from('profiles')
     .update({ referred_by: code })
     .eq('id', userId)
