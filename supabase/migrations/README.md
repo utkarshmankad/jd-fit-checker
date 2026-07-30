@@ -46,13 +46,10 @@ Every migration file must include a commented rollback section at the bottom:
 ## Note on history
 `001` and `002` cover the schema through the beta/referral/limits system.
 `003` adds the `_environment` table + its public select policy.
-
-Two earlier changes already live in `supabase/schema.sql` but predate this
-migration-file convention and still have no numbered file:
-- race-condition-hardened `reserve_screens` / `refund_screens` /
-  `increment_referral_bonus` / `check_and_increment_invite_attempts`
-- the `feedback` table
-
-Back-fill these as `004`/`005` if you need the numbered history; until then,
-`schema.sql` is the source of truth for current state, not the sum of the
-numbered migrations.
+`004` adds the `get_screening_counts_per_user` admin RPC.
+`005` and `006` back-fill the pricing/limits/referral/invite system and the
+`feedback` table respectively — both were already live in `schema.sql` but
+predated the numbered-migration convention (see git history prior to
+2026-07-31 for context). All migrations through `006` are now the sum of
+`schema.sql`'s current state; keep them in sync going forward per rule 4
+above.
