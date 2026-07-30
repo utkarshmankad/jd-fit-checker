@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Upload, CheckCircle2, AlertCircle, Loader2, X, ArrowRight } from 'lucide-react'
 import type { HardRejectFilters, UserPreferences } from '@/types'
+import { track } from '@/lib/analytics'
 
 interface ProfileData {
   full_name: string | null
@@ -350,6 +351,13 @@ export default function ProfilePage() {
   // current state at the moment load() resolves instead.
   const isDirtyRef = useRef(false)
 
+  // Fire filtersConfigured/profileCompleted once, on the transition into
+  // "filled"/"complete" — not on every autosave while already there, which
+  // would fire on every keystroke-triggered save once a user has any
+  // dealbreaker set.
+  const filtersConfiguredFiredRef = useRef(false)
+  const profileCompletedFiredRef = useRef(false)
+
   function markDirty() { setIsDirty(true); isDirtyRef.current = true }
 
   // Warn before navigate away if dirty
@@ -362,6 +370,10 @@ export default function ProfilePage() {
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [isDirty])
+
+  useEffect(() => {
+    track.profilePageViewed()
+  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -424,6 +436,7 @@ export default function ProfilePage() {
     if (parsed.max_company_size != null) setMaxSize(String(parsed.max_company_size))
     setDetectedSkills((parsed.preferred_tech_stack ?? []).slice(0, 3))
     setResumeWordCount(wordCount)
+    track.resumeUploaded(wordCount)
     markDirty()
   }
 
@@ -479,6 +492,14 @@ export default function ProfilePage() {
       setAutosaveState('saved')
       setIsDirty(false)
       if (isOnboarding) setOnboardingCompleted(true)
+      if (filtersFilled && !filtersConfiguredFiredRef.current) {
+        filtersConfiguredFiredRef.current = true
+        track.filtersConfigured(techDealbreakerTags.length)
+      }
+      if (allStepsDone && !profileCompletedFiredRef.current) {
+        profileCompletedFiredRef.current = true
+        track.profileCompleted()
+      }
       // (app)/layout.tsx computes isNewUser once per server render, and that
       // render is cached across client-side navigations within the (app)
       // route group — it doesn't re-run just because /profile saved. Without

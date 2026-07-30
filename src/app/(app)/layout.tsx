@@ -22,7 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const service = createServiceClient()
   const { data: profile } = await service
     .from('profiles')
-    .select('preferences, hard_reject_filters')
+    .select('preferences, hard_reject_filters, tier, is_beta_user, created_at')
     .eq('id', user.id)
     .single()
 
@@ -60,7 +60,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const isNewUser = !prefs.onboarding_completed && !hasLegacyProfileData
 
   return (
-    <DashboardShell userEmail={user.email ?? ''} isNewUser={isNewUser}>
+    <DashboardShell
+      userEmail={user.email ?? ''}
+      isNewUser={isNewUser}
+      identity={{
+        userId: user.id,
+        fullName: (user.user_metadata?.full_name as string | undefined) ?? null,
+        tier: (profile?.tier as 'free' | 'paid' | undefined) ?? 'free',
+        isBetaUser: !!profile?.is_beta_user,
+        createdAt: profile?.created_at ?? null,
+      }}
+    >
       {children}
     </DashboardShell>
   )

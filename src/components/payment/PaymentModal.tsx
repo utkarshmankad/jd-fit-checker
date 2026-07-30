@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
+import { track } from '@/lib/analytics'
 
 interface Props {
   isOpen: boolean
@@ -48,6 +49,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
 
   const handlePay = useCallback(async () => {
     setLoading(true)
+    track.paymentStarted()
     try {
       const loaded = await loadCheckoutScript()
       if (!loaded) {
@@ -89,6 +91,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess }: Props) {
               body: JSON.stringify(response),
             })
             if (verify.ok) {
+              track.paymentCompleted()
               onSuccess()
               onClose()
               toast.success('Unlocked. Judge unlimited jobs, forever.')
