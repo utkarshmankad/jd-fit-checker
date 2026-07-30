@@ -39,10 +39,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: 'Invalid invite code' })
   }
 
-  // Service-role write — profiles RLS isn't actually in effect against the
-  // live database, so a request-scoped update here silently affects 0 rows
-  // and the route would report success without actually granting beta
-  // access (same bug class as the feedback insert fix).
+  // Service-role write — consistent with the rest of the profiles write
+  // paths in this codebase, and defensive against a silent-success failure
+  // mode: if this update ever affects 0 rows for any reason, we'd still
+  // return success:true "Beta access unlocked" without actually granting
+  // beta access, which is worse than an error.
   const service = createServiceClient()
   const { error } = await service
     .from('profiles')
