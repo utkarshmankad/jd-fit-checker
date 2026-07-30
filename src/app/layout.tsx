@@ -5,6 +5,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider, THEME_INIT_SCRIPT } from '@/components/theme/ThemeProvider'
 import { DevBanner } from '@/components/DevBanner'
+import { PostHogProvider } from '@/components/PostHogProvider'
 import './globals.css'
 
 const inter = Inter({
@@ -31,8 +32,10 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-surface text-foreground">
         <ThemeProvider>
-          {children}
-          <Toaster position="top-right" />
+          <PostHogProvider>
+            {children}
+            <Toaster position="top-right" />
+          </PostHogProvider>
         </ThemeProvider>
         <DevBanner />
         <Analytics />
