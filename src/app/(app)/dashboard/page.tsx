@@ -163,11 +163,9 @@ export default function DashboardPage() {
   const inProgressBatchRef = useRef<{ batchId: string; allKeys: string[]; screenedKeys: Set<string> } | null>(null)
   const lastRequestAtRef = useRef(0)
 
-  const [profileBannerDismissed, setProfileBannerDismissed] = useState(true)
-
-  useEffect(() => {
-    setProfileBannerDismissed(localStorage.getItem(PROFILE_BANNER_KEY) === '1')
-  }, [])
+  const [profileBannerDismissed, setProfileBannerDismissed] = useState(() =>
+    typeof window === 'undefined' ? true : localStorage.getItem(PROFILE_BANNER_KEY) === '1'
+  )
 
   useEffect(() => {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
@@ -175,6 +173,11 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!screening) return
+    // Reset to the first message each time a new scan starts, then let the
+    // interval below cycle it — this is initializing the timer subscription,
+    // not reacting to a state change, so the sync-with-external-system
+    // exception to the "no setState in effect body" rule applies.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingMsgIndex(0)
     const interval = setInterval(() => {
       setLoadingMsgIndex((i) => (i + 1) % LOADING_MESSAGES.length)

@@ -134,7 +134,7 @@ export default function HistoryPage() {
         <History size={48} className="text-gray-300 dark:text-gray-600 mb-4" />
         <p className="text-gray-500 dark:text-gray-400 font-medium">No judgments yet.</p>
         <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
-          Your past batches will show up here once you've judged something.
+          Your past batches will show up here once you&apos;ve judged something.
         </p>
         <a href="/dashboard" className="mt-4 text-sm text-blue-600 dark:text-blue-400 underline">
           Judge your first job →

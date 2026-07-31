@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { ScreeningResult } from '@/types'
 
 // Lightweight row — omits jd_text (full JD text not needed for the history view)
 type HistoryRow = Omit<ScreeningResult, 'jd_text'>
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   const supabase = await createClient()
   const {
     data: { user },

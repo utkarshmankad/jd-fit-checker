@@ -338,7 +338,8 @@ export default function ProfilePage() {
   const [resumeWordCount, setResumeWordCount] = useState<number | null>(null)
 
   // Onboarding
-  const [isOnboarding, setIsOnboarding] = useState(false)
+  const isOnboarding =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('onboarding') === 'true'
   const [onboardingCompleted, setOnboardingCompleted] = useState(false)
 
   // Dirty tracking
@@ -376,9 +377,6 @@ export default function ProfilePage() {
   }, [])
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    setIsOnboarding(params.get('onboarding') === 'true')
-
     async function load() {
       const res = await fetch('/api/profile')
       if (!res.ok) { setLoading(false); return }
@@ -458,6 +456,25 @@ export default function ProfilePage() {
   const pendingSaveRef = useRef(false)
   const autosaveRef = useRef<() => Promise<void>>(async () => {})
 
+  // Completion scoring — no API key step anymore, every scan runs on the
+  // app's own key. Just preferences + dealbreakers.
+  const prefFilled = !!(prefTech.trim() || prefIndustries.trim() || minSize || maxSize)
+  const filtersFilled = !!(techDealbreakerTags.length || titleFloor.trim() || geoAllowed.trim() || companyExcluded.trim() || roleExcluded.trim())
+  const completionScore = (prefFilled ? 50 : 0) + (filtersFilled ? 50 : 0)
+  const completionColor = completionScore >= 80 ? 'bg-green-500 dark:bg-green-600' : completionScore >= 50 ? 'bg-amber-500 dark:bg-amber-600' : 'bg-red-500 dark:bg-red-600'
+  const completionTextColor = completionScore >= 80 ? 'text-green-700 dark:text-green-400' : completionScore >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
+  const nextAction =
+    completionScore === 100 ? null :
+    !prefFilled ? 'Show us what you\'re looking for, or upload a resume' :
+    !filtersFilled ? 'Tell us your hard nos' : null
+
+  // Onboarding checklist
+  const step1Done = prefFilled
+  const step2Done = filtersFilled
+  const allStepsDone = step1Done && step2Done
+  // Either one is enough to start scanning — full completion isn't required.
+  const readyToScan = completionScore >= 50
+
   async function autosave() {
     if (isSavingRef.current) { pendingSaveRef.current = true; return }
     isSavingRef.current = true
@@ -519,7 +536,9 @@ export default function ProfilePage() {
       }
     }
   }
-  autosaveRef.current = autosave
+  useEffect(() => {
+    autosaveRef.current = autosave
+  })
 
   // Debounced autosave: waits until 1.5s after the last edit before saving,
   // instead of firing a request per keystroke/tag-add. Resets the timer on
@@ -599,25 +618,6 @@ export default function ProfilePage() {
       setDeleteError('Failed to delete account')
     }
   }
-
-  // Completion scoring — no API key step anymore, every scan runs on the
-  // app's own key. Just preferences + dealbreakers.
-  const prefFilled = !!(prefTech.trim() || prefIndustries.trim() || minSize || maxSize)
-  const filtersFilled = !!(techDealbreakerTags.length || titleFloor.trim() || geoAllowed.trim() || companyExcluded.trim() || roleExcluded.trim())
-  const completionScore = (prefFilled ? 50 : 0) + (filtersFilled ? 50 : 0)
-  const completionColor = completionScore >= 80 ? 'bg-green-500 dark:bg-green-600' : completionScore >= 50 ? 'bg-amber-500 dark:bg-amber-600' : 'bg-red-500 dark:bg-red-600'
-  const completionTextColor = completionScore >= 80 ? 'text-green-700 dark:text-green-400' : completionScore >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
-  const nextAction =
-    completionScore === 100 ? null :
-    !prefFilled ? 'Show us what you\'re looking for, or upload a resume' :
-    !filtersFilled ? 'Tell us your hard nos' : null
-
-  // Onboarding checklist
-  const step1Done = prefFilled
-  const step2Done = filtersFilled
-  const allStepsDone = step1Done && step2Done
-  // Either one is enough to start scanning — full completion isn't required.
-  const readyToScan = completionScore >= 50
 
   if (loading) {
     return (

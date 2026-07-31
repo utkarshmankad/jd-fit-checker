@@ -29,14 +29,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Initial value doesn't matter for the flash-of-wrong-theme problem — the
   // inline script in layout.tsx (ThemeScript) already set the class on
   // <html> before hydration. This just needs to agree with it once mounted.
-  const [mode, setModeState] = useState<ThemeMode>('system')
-  const [resolvedMode, setResolvedMode] = useState<'light' | 'dark'>('light')
-
-  useEffect(() => {
-    const stored = (localStorage.getItem(STORAGE_KEY) as ThemeMode | null) ?? 'system'
-    setModeState(stored)
-    setResolvedMode(resolveMode(stored))
-  }, [])
+  const [mode, setModeState] = useState<ThemeMode>(() => {
+    if (typeof window === 'undefined') return 'system'
+    return (localStorage.getItem(STORAGE_KEY) as ThemeMode | null) ?? 'system'
+  })
+  const [resolvedMode, setResolvedMode] = useState<'light' | 'dark'>(() =>
+    typeof window === 'undefined' ? 'light' : resolveMode(mode)
+  )
 
   useEffect(() => {
     if (mode !== 'system') return

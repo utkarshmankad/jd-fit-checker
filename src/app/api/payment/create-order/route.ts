@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import Razorpay from 'razorpay'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const PRICE_PAISE = 49900 // ₹499
 
-export async function POST(_request: NextRequest) {
+export async function POST() {
   const supabase = await createClient()
   const {
     data: { user },
