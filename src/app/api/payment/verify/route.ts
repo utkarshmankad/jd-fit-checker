@@ -37,7 +37,15 @@ export async function POST(request: NextRequest) {
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest('hex')
 
-  if (expectedSignature !== razorpay_signature) {
+  // Constant-time compare — a plain !== leaks how many leading hex
+  // characters matched via response timing, letting a signature be
+  // brute-forced incrementally instead of needing the whole thing at once.
+  const expected = Buffer.from(expectedSignature)
+  const provided = Buffer.from(razorpay_signature ?? '')
+  const validSignature =
+    expected.length === provided.length && crypto.timingSafeEqual(expected, provided)
+
+  if (!validSignature) {
     return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 })
   }
 
