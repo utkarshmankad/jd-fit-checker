@@ -6,6 +6,7 @@ const COOKIE_NAME = 'admin_session'
 const COOKIE_MAX_AGE = 60 * 60 * 12 // 12h
 const MAX_ATTEMPTS = 10
 const WINDOW_MS = 15 * 60 * 1000 // 15 minutes
+const MAX_TRACKED_IPS = 5000 // hard cap so a flood of spoofed keys can't grow this unboundedly
 
 // In-memory, per-instance limiter — no DB table backs this login endpoint,
 // unlike invite/apply's RPC-based one. Weaker under serverless (resets per
@@ -15,6 +16,19 @@ const attempts = new Map<string, { count: number; windowStart: number }>()
 
 function rateLimited(ip: string): boolean {
   const now = Date.now()
+
+  // Opportunistic sweep of expired entries before admitting a new key —
+  // keeps the map bounded under sustained traffic instead of only ever
+  // growing, without needing a separate timer.
+  if (attempts.size >= MAX_TRACKED_IPS) {
+    for (const [key, entry] of attempts) {
+      if (now - entry.windowStart > WINDOW_MS) attempts.delete(key)
+    }
+    // Still full after sweeping (all windows genuinely active) — fail closed
+    // rather than let the map grow past its cap.
+    if (attempts.size >= MAX_TRACKED_IPS && !attempts.has(ip)) return true
+  }
+
   const entry = attempts.get(ip)
   if (!entry || now - entry.windowStart > WINDOW_MS) {
     attempts.set(ip, { count: 1, windowStart: now })
@@ -40,7 +54,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Admin access is not configured' }, { status: 503 })
   }
 
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
+  // x-real-ip is set by Vercel's edge proxy itself, not forwarded from the
+  // client — unlike the first hop of x-forwarded-for, which a client can set
+  // to any value and have it pass straight through, making the "first entry"
+  // convention spoofable and the rate limit trivially bypassable per request.
+  const ip = request.headers.get('x-real-ip') || 'unknown'
   if (rateLimited(ip)) {
     const url = new URL('/admin', request.url)
     url.searchParams.set('error', '1')
