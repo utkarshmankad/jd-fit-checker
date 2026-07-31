@@ -3,7 +3,7 @@
 -- Complete current schema — reflects everything applied so far,
 -- including changes with no numbered migration file yet (see
 -- supabase/migrations/README.md "Note on history").
--- Last updated: 2026-07-16
+-- Last updated: 2026-07-31
 -- To use: run this on a fresh Supabase project to create all
 -- tables, indexes, RLS policies, and functions.
 -- ============================================================
