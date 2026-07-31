@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual } from 'node:crypto'
+import { sessionToken } from '@/lib/auth/admin-session'
 
 const COOKIE_NAME = 'admin_session'
 const COOKIE_MAX_AGE = 60 * 60 * 12 // 12h
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
   // browser history, server access logs, or Referer headers) — this is the
   // only place it's transmitted, once, over POST, then held as an httpOnly
   // cookie the client-side JS can never read.
-  response.cookies.set(COOKIE_NAME, validKey, {
+  response.cookies.set(COOKIE_NAME, sessionToken(validKey), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',

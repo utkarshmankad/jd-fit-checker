@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { cookies } from 'next/headers'
 import { timingSafeEqual } from 'node:crypto'
 import type { HardRejectFilters } from '@/types'
+import { sessionToken } from '@/lib/auth/admin-session'
 
 const COOKIE_NAME = 'admin_session'
 
@@ -18,7 +19,7 @@ async function isAuthed(): Promise<boolean> {
   const cookieStore = await cookies()
   const session = cookieStore.get(COOKIE_NAME)?.value
   if (!session) return false
-  return safeEqual(session, validKey)
+  return safeEqual(session, sessionToken(validKey))
 }
 
 function LoginForm({ error }: { error?: boolean }) {
