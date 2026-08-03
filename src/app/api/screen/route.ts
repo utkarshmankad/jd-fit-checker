@@ -354,12 +354,17 @@ export async function POST(request: NextRequest) {
       console.error('FastAPI /screen returned error:', res.status, rawMsg)
       // 401/429 are our own FastAPI service's fixed, controlled strings (see
       // _raise_for_provider_error there) — safe to show as-is, and callers
-      // special-case these statuses. Anything else is this route forwarding
-      // a message it doesn't control (could be a validation error, but could
-      // also be a stack-trace fragment from an unhandled exception in the
-      // scraper) — collapse to a generic, bounded client-facing message and
-      // keep the raw text server-side only.
-      const msg = res.status === 401 || res.status === 429
+      // special-case these statuses. The LinkedIn bot-block message is the
+      // same kind of fixed, controlled string (not attacker/scraper-derived
+      // free text) and is the single most common 400 by far — worth
+      // surfacing directly since it tells the user exactly what to do
+      // (paste the JD text instead) rather than the generic message below.
+      // Everything else on a 400 could be a validation error, but could
+      // also be a stack-trace fragment from an unhandled scraper exception —
+      // collapse those to a generic, bounded message and keep the raw text
+      // server-side only.
+      const isLinkedInBlock = res.status === 400 && rawMsg?.startsWith('LinkedIn blocks automated access')
+      const msg = res.status === 401 || res.status === 429 || isLinkedInBlock
         ? rawMsg
         : res.status === 400
           ? 'Could not process this job — check the URL or text and try again.'

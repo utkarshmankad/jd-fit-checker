@@ -46,7 +46,10 @@ function LoginForm() {
   const [signinLoading, setSigninLoading] = useState(false)
   const [signupLoading, setSignupLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(() => {
+    const err = searchParams.get('error')
+    return err ? decodeURIComponent(err) : null
+  })
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -56,11 +59,6 @@ function LoginForm() {
       router.replace(registered ? '/dashboard' : '/auth/register')
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const err = searchParams.get('error')
-    if (err) setError(decodeURIComponent(err))
-  }, [searchParams])
 
   // Forward ?ref= through the auth redirect so /auth/callback can apply it —
   // Supabase's redirect chain would otherwise drop the query param.

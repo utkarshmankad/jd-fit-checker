@@ -1,15 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-
 export function DevBanner() {
-  const [show, setShow] = useState(false)
-
-  useEffect(() => {
-    setShow(process.env.NEXT_PUBLIC_SHOW_DEV_BANNER === 'true')
-  }, [])
-
-  if (!show) return null
+  // NEXT_PUBLIC_ vars are inlined at build time — available identically on
+  // server and client, no need for state/effect to read them.
+  if (process.env.NEXT_PUBLIC_SHOW_DEV_BANNER !== 'true') return null
 
   return (
     <div

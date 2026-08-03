@@ -65,12 +65,22 @@ async function updateTierByNotes(
   const email = notes?.user_email
 
   if (userId) {
-    const { error } = await service.from('profiles').update({ tier }).eq('id', userId)
-    if (error) console.error(`razorpay webhook: tier update by user_id failed:`, error)
+    const { data, error } = await service.from('profiles').update({ tier }).eq('id', userId).select('id')
+    if (error) {
+      console.error(`razorpay webhook: tier update by user_id failed:`, error)
+    } else if (!data || data.length === 0) {
+      console.error(`razorpay webhook: tier update by user_id matched no profile (user_id=${userId})`)
+    }
     return
   }
   if (email) {
-    const { error } = await service.from('profiles').update({ tier }).eq('email', email)
-    if (error) console.error(`razorpay webhook: tier update by email fallback failed:`, error)
+    const { data, error } = await service.from('profiles').update({ tier }).eq('email', email).select('id')
+    if (error) {
+      console.error(`razorpay webhook: tier update by email fallback failed:`, error)
+    } else if (!data || data.length === 0) {
+      console.error(`razorpay webhook: tier update by email fallback matched no profile (email=${email})`)
+    }
+    return
   }
+  console.error('razorpay webhook: notes missing both user_id and user_email, cannot update tier')
 }

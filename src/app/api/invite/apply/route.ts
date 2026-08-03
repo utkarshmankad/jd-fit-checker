@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'node:crypto'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const MAX_ATTEMPTS = 5
 const WINDOW_MS = 15 * 60 * 1000 // 15 minutes
+
+// Constant-time compare — defense in depth alongside the attempt-rate-limit
+// above; a plain !== still leaks timing per character.
+function safeEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) return false
+  return timingSafeEqual(bufA, bufB)
+}
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -35,7 +45,7 @@ export async function POST(request: NextRequest) {
 
   const { invite_code } = (await request.json()) as { invite_code?: string }
 
-  if (!invite_code || invite_code !== process.env.BETA_INVITE_CODE) {
+  if (!invite_code || !safeEqual(invite_code, process.env.BETA_INVITE_CODE ?? '')) {
     return NextResponse.json({ success: false, message: 'Invalid invite code' })
   }
 
@@ -45,13 +55,18 @@ export async function POST(request: NextRequest) {
   // return success:true "Beta access unlocked" without actually granting
   // beta access, which is worse than an error.
   const service = createServiceClient()
-  const { error } = await service
+  const { data: updated, error } = await service
     .from('profiles')
     .update({ is_beta_user: true, invite_code_used: invite_code, invite_attempt_count: 0 })
     .eq('id', user.id)
+    .select('id')
 
   if (error) {
     console.error('invite code apply failed:', error)
+    return NextResponse.json({ success: false, message: 'Failed to apply invite code' }, { status: 500 })
+  }
+  if (!updated || updated.length === 0) {
+    console.error(`invite code apply matched no profile (user_id=${user.id})`)
     return NextResponse.json({ success: false, message: 'Failed to apply invite code' }, { status: 500 })
   }
 
