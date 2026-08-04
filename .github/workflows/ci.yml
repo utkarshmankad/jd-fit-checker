@@ -1,0 +1,51 @@
+name: CI
+
+# Gate for the branch flow in BRANCH_STRATEGY.md: every feature/bug branch
+# must pass this before merging into dev (test) or dev before merging into
+# main (production). Configured as a required status check on both branches
+# — see .github/BRANCH_STRATEGY.md for how that's wired up.
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - name: build
+        run: npm run build
+        env:
+          # Build-time-only placeholders so `next build` doesn't crash on
+          # missing NEXT_PUBLIC_* values — this job checks the code compiles
+          # and type-checks, not that it runs correctly against real infra.
+          # Vercel's own git integration does the actual deploy (dev branch
+          # -> test environment, main -> production) using its real env vars,
+          # configured separately in the Vercel project settings.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          SUPABASE_SERVICE_ROLE_KEY: placeholder
+          NEXT_PUBLIC_SCREENING_API_URL: http://localhost:8000
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          ENCRYPTION_SECRET: 0000000000000000000000000000000000000000000000000000000000000000
+          RAZORPAY_KEY_ID: placeholder
+          RAZORPAY_KEY_SECRET: placeholder
+          NEXT_PUBLIC_RAZORPAY_KEY_ID: placeholder
+          RAZORPAY_WEBHOOK_SECRET: placeholder
+          APP_OPENAI_API_KEY: ""
+          CRON_SECRET: placeholder
+          ADMIN_SECRET: ""
