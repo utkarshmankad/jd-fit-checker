@@ -134,8 +134,8 @@ export default function DashboardPage() {
   // every fresh page load. Gate the banner on this instead so it only
   // renders once we actually know the answer.
   const [profileLoaded, setProfileLoaded] = useState(false)
-  // Every scan runs on the app's own OpenAI key now — no per-user provider choice.
-  const apiProvider = 'openai'
+  // Every scan runs on the app's own Groq key now — no per-user provider choice.
+  const apiProvider = 'groq'
   const [usage, setUsage] = useState<{
     tier: 'free' | 'paid'
     effective_is_beta: boolean
@@ -439,10 +439,9 @@ export default function DashboardPage() {
     ))
     setRejectedCollapsed(true)
 
-    // OpenAI's default tier caps at 20 requests/minute — space calls out to stay
-    // under that instead of firing as fast as possible and hitting 429s. Anthropic
-    // isn't subject to this specific cap, so only pace OpenAI keys.
-    const MIN_INTERVAL_MS = apiProvider === 'openai' ? 3100 : 0
+    // The shared Groq key is rate-limited server-side. Do not add client-side
+    // pacing: it made every scan after the first take at least 3.1 seconds.
+    const MIN_INTERVAL_MS = 0
 
     let completedFully = true
     // Local to this call, not derived from the `results` state (which also
@@ -751,7 +750,7 @@ export default function DashboardPage() {
                     <p>
                       {screenError.keySource === 'app'
                         ? "We're hitting high demand on the free scanning key right now"
-                        : `Your ${providerLabel} key hit a rate limit${apiProvider === 'openai' ? " (OpenAI's default tier caps at 20 requests/minute)" : ''}`}
+                        : `The ${providerLabel} screening service hit a rate limit`}
                       .{' '}
                       {rateLimitCountdown > 0
                         ? results.length > 0

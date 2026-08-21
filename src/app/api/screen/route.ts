@@ -55,8 +55,8 @@ async function finalizeBatch(
     return NextResponse.json({ batch_intelligence: null })
   }
 
-  const APP_OPENAI_KEY = process.env.APP_OPENAI_API_KEY || null
-  if (!APP_OPENAI_KEY) {
+  const APP_GROQ_KEY = process.env.APP_GROQ_API_KEY || null
+  if (!APP_GROQ_KEY) {
     return NextResponse.json({ batch_intelligence: null })
   }
 
@@ -71,8 +71,8 @@ async function finalizeBatch(
         jd_texts: batchRows.map((r) => r.jd_text ?? ''),
         job_titles: batchRows.map((r) => r.job_title ?? ''),
         verdicts: batchRows.map((r) => r.verdict),
-        api_key: APP_OPENAI_KEY,
-        api_provider: 'openai',
+        api_key: APP_GROQ_KEY,
+        api_provider: 'groq',
       }),
       signal: controller.signal,
     })
@@ -229,9 +229,9 @@ export async function POST(request: NextRequest) {
   const betaLimitValue = BETA_LIMIT + bonus
   const weeklyLimitValue = WEEKLY_LIMIT + bonus
 
-  const APP_OPENAI_KEY = process.env.APP_OPENAI_API_KEY || null
+  const APP_GROQ_KEY = process.env.APP_GROQ_API_KEY || null
 
-  // Every scan runs on the app's own key now — there is no BYOK fallback.
+  // Every scan runs on the app's own Groq key now — there is no BYOK fallback.
   // Quota reservation is still the real gate (reserve_screens, atomic per
   // item — see the crash-safety note above): beta/launch users draw against
   // the flat beta allotment, everyone else against the weekly cap. Paid
@@ -239,12 +239,12 @@ export async function POST(request: NextRequest) {
   type PreparedItem = { apiKey: string; provider: string; source: 'app'; reserved: boolean; useWeekly: boolean }
 
   async function prepareItem(): Promise<PreparedItem | { error: string; code?: 'no_api_key' }> {
-    if (!APP_OPENAI_KEY) {
+    if (!APP_GROQ_KEY) {
       return { error: 'Screening is temporarily unavailable. Try again shortly.', code: 'no_api_key' }
     }
 
     if (profile!.tier === 'paid') {
-      return { apiKey: APP_OPENAI_KEY, provider: 'openai', source: 'app', reserved: false, useWeekly: false }
+      return { apiKey: APP_GROQ_KEY, provider: 'groq', source: 'app', reserved: false, useWeekly: false }
     }
 
     if (isBetaOrLaunch) {
@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
       if (!ok) {
         return { error: `You've used your ${betaLimitValue} free judgments. More opens up next week — check back then.` }
       }
-      return { apiKey: APP_OPENAI_KEY, provider: 'openai', source: 'app', reserved: true, useWeekly: false }
+      return { apiKey: APP_GROQ_KEY, provider: 'groq', source: 'app', reserved: true, useWeekly: false }
     }
 
     // Regular free tier: always weekly-capped.
@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
       const limitCheck = await checkScreenLimit(profile as unknown as UserProfile, 1)
       return { error: limitCheck.upgrade_prompt ?? "You've used this week's free judgments." }
     }
-    return { apiKey: APP_OPENAI_KEY, provider: 'openai', source: 'app', reserved: true, useWeekly: true }
+    return { apiKey: APP_GROQ_KEY, provider: 'groq', source: 'app', reserved: true, useWeekly: true }
   }
 
   // A scan that never produced a real result (scrape/LLM/service failure)
