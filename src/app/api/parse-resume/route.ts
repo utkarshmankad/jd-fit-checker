@@ -31,6 +31,35 @@ type ParsedProfile = {
   max_company_size: number | null
 }
 
+const PARSED_PROFILE_SCHEMA = {
+  type: 'object',
+  properties: {
+    full_name: { type: ['string', 'null'] },
+    preferred_tech_stack: { type: 'array', items: { type: 'string' } },
+    target_industries: { type: 'array', items: { type: 'string' } },
+    title_floor: { type: 'string' },
+    geography_allowed: { type: 'array', items: { type: 'string' } },
+    tech_stack_dealbreakers: { type: 'array', items: { type: 'string' } },
+    company_type_excluded: { type: 'array', items: { type: 'string' } },
+    role_type_excluded: { type: 'array', items: { type: 'string' } },
+    min_company_size: { type: ['integer', 'null'] },
+    max_company_size: { type: ['integer', 'null'] },
+  },
+  required: [
+    'full_name',
+    'preferred_tech_stack',
+    'target_industries',
+    'title_floor',
+    'geography_allowed',
+    'tech_stack_dealbreakers',
+    'company_type_excluded',
+    'role_type_excluded',
+    'min_company_size',
+    'max_company_size',
+  ],
+  additionalProperties: false,
+} as const
+
 function validatePdfBytes(buf: Buffer): string | null {
   // Must start with PDF magic bytes
   if (!buf.slice(0, 5).toString('ascii').startsWith('%PDF-')) {
@@ -148,8 +177,16 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model: 'openai/gpt-oss-20b',
-        max_tokens: 700,
-        response_format: { type: 'json_object' },
+        max_completion_tokens: 1_000,
+        reasoning_effort: 'low',
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'parsed_resume_profile',
+            strict: true,
+            schema: PARSED_PROFILE_SCHEMA,
+          },
+        },
         messages: [
           { role: 'system', content: PARSE_PROMPT },
           { role: 'user', content: `Resume:\n${resumeText}` },
@@ -161,6 +198,15 @@ export async function POST(request: NextRequest) {
   }
 
   if (!res.ok) {
+    const providerError = await res.json().catch(() => null) as {
+      error?: { code?: string; message?: string; type?: string }
+    } | null
+    console.error('Groq resume parsing failed', {
+      status: res.status,
+      code: providerError?.error?.code,
+      type: providerError?.error?.type,
+      message: providerError?.error?.message,
+    })
     return NextResponse.json({ error: aiErrorMessage(res.status) }, { status: res.status })
   }
 
