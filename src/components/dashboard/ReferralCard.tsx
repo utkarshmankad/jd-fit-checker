@@ -15,8 +15,15 @@ export default function ReferralCard() {
 
   useEffect(() => {
     fetch('/api/referral')
-      .then((r) => r.json())
-      .then((data: ReferralInfo) => setInfo(data))
+      .then(async (r) => {
+        if (!r.ok) throw new Error('Failed to load referral info')
+        const data = await r.json() as ReferralInfo
+        if (typeof data.code !== 'string' || !data.code.trim()) {
+          throw new Error('Referral code is missing')
+        }
+        return data
+      })
+      .then(setInfo)
       .catch(() => {})
   }, [])
 
