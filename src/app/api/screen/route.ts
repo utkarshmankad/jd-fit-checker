@@ -231,20 +231,19 @@ export async function POST(request: NextRequest) {
 
   const APP_GROQ_KEY = process.env.APP_GROQ_API_KEY || null
 
-  // Every scan runs on the app's own Groq key now — there is no BYOK fallback.
-  // Quota reservation is still the real gate (reserve_screens, atomic per
+  // Instant screening is local and does not need an API key. The app Groq key
+  // is used only by optional background/deep analysis. Quota reservation is
+  // still the real gate (reserve_screens, atomic per
   // item — see the crash-safety note above): beta/launch users draw against
   // the flat beta allotment, everyone else against the weekly cap. Paid
   // tier is unlimited (no reservation at all).
   type PreparedItem = { apiKey: string; provider: string; source: 'app'; reserved: boolean; useWeekly: boolean }
 
   async function prepareItem(): Promise<PreparedItem | { error: string; code?: 'no_api_key' }> {
-    if (!APP_GROQ_KEY) {
-      return { error: 'Screening is temporarily unavailable. Try again shortly.', code: 'no_api_key' }
-    }
+    const fastModePlaceholderKey = APP_GROQ_KEY || 'not-used-in-fast-mode'
 
     if (profile!.tier === 'paid') {
-      return { apiKey: APP_GROQ_KEY, provider: 'groq', source: 'app', reserved: false, useWeekly: false }
+      return { apiKey: fastModePlaceholderKey, provider: 'groq', source: 'app', reserved: false, useWeekly: false }
     }
 
     if (isBetaOrLaunch) {
@@ -261,7 +260,7 @@ export async function POST(request: NextRequest) {
       if (!ok) {
         return { error: `You've used your ${betaLimitValue} free judgments. More opens up next week — check back then.` }
       }
-      return { apiKey: APP_GROQ_KEY, provider: 'groq', source: 'app', reserved: true, useWeekly: false }
+      return { apiKey: fastModePlaceholderKey, provider: 'groq', source: 'app', reserved: true, useWeekly: false }
     }
 
     // Regular free tier: always weekly-capped.
@@ -291,7 +290,7 @@ export async function POST(request: NextRequest) {
       const limitCheck = await checkScreenLimit(profile as unknown as UserProfile, 1)
       return { error: limitCheck.upgrade_prompt ?? "You've used this week's free judgments." }
     }
-    return { apiKey: APP_GROQ_KEY, provider: 'groq', source: 'app', reserved: true, useWeekly: true }
+    return { apiKey: fastModePlaceholderKey, provider: 'groq', source: 'app', reserved: true, useWeekly: true }
   }
 
   // A scan that never produced a real result (scrape/LLM/service failure)
@@ -331,6 +330,7 @@ export async function POST(request: NextRequest) {
           hard_reject_filters: profile!.hard_reject_filters,
           api_key: apiKey,
           api_provider: apiProvider,
+          analysis_mode: 'fast',
           user_id: user!.id,
         }),
         signal: controller.signal,
@@ -436,7 +436,7 @@ export async function POST(request: NextRequest) {
   // worst-case wall-clock by roughly the concurrency factor. `fatalError` is
   // safe to share across concurrently-running items — it only needs "some
   // item in this chunk hit one" semantics, not a specific ordering.
-  const CONCURRENCY = 5
+  const CONCURRENCY = 25
   async function processInChunks<T>(items: T[], worker: (item: T) => Promise<boolean>): Promise<void> {
     for (let i = 0; i < items.length; i += CONCURRENCY) {
       const chunk = items.slice(i, i + CONCURRENCY)
@@ -494,7 +494,7 @@ export async function POST(request: NextRequest) {
         return false
       }
 
-      const result = await callFastAPI({ jd_text: entry.jd_text }, keyChoice.apiKey, keyChoice.provider)
+      const result = await callFastAPI({ jd_text: entry.jd_text, job_title: entry.job_title, company: entry.company }, keyChoice.apiKey, keyChoice.provider)
       if ('_error' in result) {
         await refundIfReserved(keyChoice)
         if (result._status === 401) {
@@ -522,7 +522,7 @@ export async function POST(request: NextRequest) {
     if ('error' in keyChoice) {
       return NextResponse.json({ error: keyChoice.error, code: keyChoice.code }, { status: 400 })
     }
-    const result = await callFastAPI({ jd_text }, keyChoice.apiKey, keyChoice.provider)
+    const result = await callFastAPI({ jd_text, job_title, company }, keyChoice.apiKey, keyChoice.provider)
     if ('_error' in result) {
       await refundIfReserved(keyChoice)
       if (result._status === 401) fatalError = { type: 'invalid_key', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
