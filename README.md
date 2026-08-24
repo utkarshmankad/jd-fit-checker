@@ -129,7 +129,7 @@ Body: {
   job_url?: string,
   hard_reject_filters: object,
   api_key: string,
-  api_provider: "openai" | "anthropic"
+  api_provider: "openai" | "anthropic" | "groq" | "deepseek"
 }
 ```
 

@@ -126,11 +126,11 @@ export async function POST(request: NextRequest) {
   if (textError) return NextResponse.json({ error: textError }, { status: 400 })
 
   // Every AI call — resume parsing included — runs on the app's own key.
-  const APP_OPENAI_KEY = process.env.APP_OPENAI_API_KEY || null
-  if (!APP_OPENAI_KEY) {
+  const APP_GROQ_KEY = process.env.APP_GROQ_API_KEY || null
+  if (!APP_GROQ_KEY) {
     return NextResponse.json({ error: 'Resume parsing is temporarily unavailable. Try again shortly.' }, { status: 503 })
   }
-  const apiKey = APP_OPENAI_KEY
+  const apiKey = APP_GROQ_KEY
 
   function aiErrorMessage(status: number): string {
     if (status === 401) return 'Invalid key — check you copied it correctly'
@@ -140,15 +140,15 @@ export async function POST(request: NextRequest) {
 
   let res: Response
   try {
-    res = await fetch('https://api.openai.com/v1/chat/completions', {
+    res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
-        max_tokens: 1024,
+        model: 'openai/gpt-oss-20b',
+        max_tokens: 700,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: PARSE_PROMPT },

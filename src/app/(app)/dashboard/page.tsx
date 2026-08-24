@@ -134,8 +134,8 @@ export default function DashboardPage() {
   // every fresh page load. Gate the banner on this instead so it only
   // renders once we actually know the answer.
   const [profileLoaded, setProfileLoaded] = useState(false)
-  // Every scan runs on the app's own OpenAI key now — no per-user provider choice.
-  const apiProvider = 'openai'
+  // Every scan runs on the app's own Groq key now — no per-user provider choice.
+  const apiProvider = 'groq'
   const [usage, setUsage] = useState<{
     tier: 'free' | 'paid'
     effective_is_beta: boolean
@@ -161,7 +161,6 @@ export default function DashboardPage() {
   // retrying continues from where it stopped instead of re-screening everything —
   // and re-burning API calls against the very rate limit that interrupted it.
   const inProgressBatchRef = useRef<{ batchId: string; allKeys: string[]; screenedKeys: Set<string> } | null>(null)
-  const lastRequestAtRef = useRef(0)
 
   const [profileBannerDismissed, setProfileBannerDismissed] = useState(() =>
     typeof window === 'undefined' ? true : localStorage.getItem(PROFILE_BANNER_KEY) === '1'
@@ -439,11 +438,6 @@ export default function DashboardPage() {
     ))
     setRejectedCollapsed(true)
 
-    // OpenAI's default tier caps at 20 requests/minute — space calls out to stay
-    // under that instead of firing as fast as possible and hitting 429s. Anthropic
-    // isn't subject to this specific cap, so only pace OpenAI keys.
-    const MIN_INTERVAL_MS = apiProvider === 'openai' ? 3100 : 0
-
     let completedFully = true
     // Local to this call, not derived from the `results` state (which also
     // holds any prior partial batch's rows on a resume) — this is what
@@ -452,21 +446,29 @@ export default function DashboardPage() {
     let rejectedThisRun = 0
 
     try {
-      for (const item of itemsToScreen) {
-        if (MIN_INTERVAL_MS > 0) {
-          const elapsed = Date.now() - lastRequestAtRef.current
-          if (elapsed < MIN_INTERVAL_MS) await new Promise((r) => setTimeout(r, MIN_INTERVAL_MS - elapsed))
-        }
-        lastRequestAtRef.current = Date.now()
+      // Submit each input type as one batch. The API scores pasted JDs locally
+      // and concurrently, so one browser round trip replaces N sequential ones.
+      const urlItems = itemsToScreen.filter((item): item is Extract<(typeof itemsToScreen)[number], { kind: 'url' }> => item.kind === 'url')
+      const jdItems = itemsToScreen.filter((item): item is Extract<(typeof itemsToScreen)[number], { kind: 'jd' }> => item.kind === 'jd')
+      const batches = [
+        ...(urlItems.length ? [{ items: urlItems, payload: { urls: urlItems.map((item) => item.value), batch_id } }] : []),
+        ...(jdItems.length ? [{
+          items: jdItems,
+          payload: {
+            jd_entries: jdItems.map((item) => ({
+              jd_text: item.entry.jd_text,
+              job_title: item.entry.job_title || undefined,
+              company: item.entry.company || undefined,
+            })),
+            batch_id,
+          },
+        }] : []),
+      ]
 
-        const payload =
-          item.kind === 'url'
-            ? { urls: [item.value], batch_id }
-            : { jd_entries: [{ jd_text: item.entry.jd_text, job_title: item.entry.job_title || undefined, company: item.entry.company || undefined }], batch_id }
-
+      for (const batch of batches) {
         let res: Response
         try {
-          res = await fetch('/api/screen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+          res = await fetch('/api/screen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(batch.payload) })
         } catch {
           setScreenError({ type: 'network', message: 'Connection error — check your internet connection and try again.' })
           track.screeningFailed('network', itemsToScreen.length)
@@ -508,12 +510,10 @@ export default function DashboardPage() {
         const data = (await res.json()) as { results: ScreeningResult[]; fatalError?: FatalScreenError }
         rejectedThisRun += data.results.filter((r) => r.verdict === 'REJECT').length
         setResults((prev) => [...prev, ...data.results])
-        setSkeletonCount((prev) => Math.max(0, prev - 1))
-        inProgressBatchRef.current?.screenedKeys.add(itemKey(item))
-        // Re-pull real usage from the server (not a local +1 guess) after
-        // every completed item — quota reservation/refund happens server-side
-        // per item, so the badge should reflect that immediately, not just
-        // once the whole batch finishes.
+        setSkeletonCount((prev) => Math.max(0, prev - batch.items.length))
+        batch.items.forEach((item) => inProgressBatchRef.current?.screenedKeys.add(itemKey(item)))
+        // Quota is still reserved atomically per item server-side; refresh once
+        // after the batch response instead of adding another N network calls.
         refreshUsage()
 
         if (data.fatalError) {
@@ -751,7 +751,7 @@ export default function DashboardPage() {
                     <p>
                       {screenError.keySource === 'app'
                         ? "We're hitting high demand on the free scanning key right now"
-                        : `Your ${providerLabel} key hit a rate limit${apiProvider === 'openai' ? " (OpenAI's default tier caps at 20 requests/minute)" : ''}`}
+                        : `The ${providerLabel} screening service hit a rate limit`}
                       .{' '}
                       {rateLimitCountdown > 0
                         ? results.length > 0
