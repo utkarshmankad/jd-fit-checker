@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import DashboardShell from '@/components/layout/DashboardShell'
+import RenderWakeManager from '@/components/RenderWakeManager'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -71,6 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         createdAt: profile?.created_at ?? null,
       }}
     >
+      <RenderWakeManager />
       {children}
     </DashboardShell>
   )

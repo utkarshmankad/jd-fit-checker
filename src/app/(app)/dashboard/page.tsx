@@ -450,22 +450,26 @@ export default function DashboardPage() {
       // and concurrently, so one browser round trip replaces N sequential ones.
       const urlItems = itemsToScreen.filter((item): item is Extract<(typeof itemsToScreen)[number], { kind: 'url' }> => item.kind === 'url')
       const jdItems = itemsToScreen.filter((item): item is Extract<(typeof itemsToScreen)[number], { kind: 'jd' }> => item.kind === 'jd')
+      const chunk = <T,>(values: T[], size: number): T[][] => Array.from({ length: Math.ceil(values.length / size) }, (_, index) => values.slice(index * size, (index + 1) * size))
+      // Independent chunks run concurrently and update the page as each one
+      // completes. A single slow or blocked URL can hold at most four nearby
+      // placeholders rather than the user's entire batch.
       const batches = [
-        ...(urlItems.length ? [{ items: urlItems, payload: { urls: urlItems.map((item) => item.value), batch_id } }] : []),
-        ...(jdItems.length ? [{
-          items: jdItems,
+        ...chunk(urlItems, 5).map((items) => ({ items, payload: { urls: items.map((item) => item.value), batch_id } })),
+        ...chunk(jdItems, 10).map((items) => ({
+          items,
           payload: {
-            jd_entries: jdItems.map((item) => ({
+            jd_entries: items.map((item) => ({
               jd_text: item.entry.jd_text,
               job_title: item.entry.job_title || undefined,
               company: item.entry.company || undefined,
             })),
             batch_id,
           },
-        }] : []),
+        })),
       ]
 
-      for (const batch of batches) {
+      await Promise.all(batches.map(async (batch) => {
         let res: Response
         try {
           res = await fetch('/api/screen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(batch.payload) })
@@ -473,7 +477,7 @@ export default function DashboardPage() {
           setScreenError({ type: 'network', message: 'Connection error — check your internet connection and try again.' })
           track.screeningFailed('network', itemsToScreen.length)
           completedFully = false
-          break
+          return
         }
 
         if (res.status === 403) {
@@ -487,7 +491,7 @@ export default function DashboardPage() {
             setShowTierModal(true)
             track.upgradeModalOpened('screening_limit')
             completedFully = false
-            break
+            return
           }
         }
 
@@ -504,7 +508,7 @@ export default function DashboardPage() {
             track.screeningFailed(json.error ?? 'service_error', itemsToScreen.length)
           }
           completedFully = false
-          break
+          return
         }
 
         const data = (await res.json()) as { results: ScreeningResult[]; fatalError?: FatalScreenError }
@@ -520,9 +524,9 @@ export default function DashboardPage() {
           if (data.fatalError.type === 'invalid_key') setScreenError({ type: 'invalid_key', provider: data.fatalError.provider })
           else if (data.fatalError.type === 'rate_limit') { setScreenError({ type: 'rate_limit', keySource: data.fatalError.keySource }); startCountdown() }
           completedFully = false
-          break
+          return
         }
-      }
+      }))
     } finally {
       setBatchTime(new Date().toISOString())
       setSkeletonCount(0)
