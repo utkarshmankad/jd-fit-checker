@@ -25,11 +25,12 @@ async function boundedFetch(url: string, accept = 'text/html,application/json'):
     const parsed = new URL(current); const address = await publicAddress(current)
     const response = await new Promise<{ status: number; headers: http.IncomingHttpHeaders; text: string }>((resolve, reject) => {
       const transport = parsed.protocol === 'https:' ? https : http
-      const req = transport.request(parsed, {
-        headers: { Accept: accept, 'User-Agent': 'Mozilla/5.0 (compatible; JobSnob/1.0; +https://jobsnob.fyi)' },
-        // Pin the TCP connection to the address validated above. This avoids a
-        // second DNS lookup and closes the DNS-rebinding gap.
-        lookup: (_hostname, _options, callback) => callback(null, address, address.includes(':') ? 6 : 4),
+      const req = transport.request({
+        protocol: parsed.protocol, hostname: address, port: parsed.port || undefined,
+        path: `${parsed.pathname}${parsed.search}`, method: 'GET',
+        headers: { Host: parsed.host, Accept: accept, 'User-Agent': 'Mozilla/5.0 (compatible; JobSnob/1.0; +https://jobsnob.fyi)' },
+        // Connect directly to the address validated above while retaining the
+        // original host for TLS and virtual hosting. No second DNS lookup occurs.
         servername: parsed.hostname,
       }, (res) => {
         const chunks: Buffer[] = []; let size = 0
