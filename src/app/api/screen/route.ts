@@ -38,7 +38,7 @@ export type FatalScreenError = {
 }
 
 // Called once by the client after its per-item screening loop finishes for a
-// batch_id. Not a new screen — doesn't touch screens_used_this_month or the
+// batch_id. Not a new screen — doesn't touch screening usage counters or the
 // free-tier limit. Reuses already-persisted screening_results rows rather than
 // requiring the client to accumulate jd_texts separately.
 async function finalizeBatch(

@@ -13,7 +13,7 @@ interface ProfileData {
   hard_reject_filters: HardRejectFilters
   preferences: UserPreferences
   tier: 'free' | 'paid'
-  screens_used_this_month: number
+  screens_used_total: number
   is_beta_user: boolean
   updated_at: string
   referred_by: string | null
@@ -389,7 +389,7 @@ export default function ProfilePage() {
 
       setFullName(profile.full_name ?? '')
       setTier(profile.tier)
-      setScreensUsed(profile.screens_used_this_month)
+      setScreensUsed(profile.screens_used_total)
       setIsBetaUser(profile.is_beta_user)
       setReferredBy(profile.referred_by)
 
