@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { buildCandidateEvidence } from '@/lib/rag/candidate-evidence'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024        // 5 MB
 const MAX_TEXT_CHARS = 50_000                  // ~25 pages of text
@@ -222,6 +224,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'AI returned unparseable response. Try again.' }, { status: 500 })
   }
 
+  // Phase 1: persist the resume and rebuild this user's private evidence
+  // knowledge base. The parse result still succeeds if the migration has not
+  // reached an environment yet; screening falls back to the legacy scorer.
+  const service = createServiceClient()
+  const { error: profileSaveError } = await service
+    .from('profiles')
+    .upsert({
+      id: user.id,
+      email: user.email ?? '',
+      full_name: parsed.full_name ?? undefined,
+      resume_text: resumeText,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' })
+
+  if (profileSaveError) {
+    console.error('Resume persistence failed:', profileSaveError.message)
+    return NextResponse.json({ error: 'Resume was parsed but could not be saved. Try again.' }, { status: 500 })
+  }
+
+  const evidence = buildCandidateEvidence(user.id, resumeText, parsed)
+  let evidenceIndexed = false
+  const { error: deleteEvidenceError } = await service
+    .from('candidate_evidence')
+    .delete()
+    .eq('user_id', user.id)
+
+  if (deleteEvidenceError) {
+    console.warn('Candidate evidence cleanup skipped:', deleteEvidenceError.message)
+  } else if (evidence.length > 0) {
+    const { error: evidenceInsertError } = await service.from('candidate_evidence').insert(evidence)
+    if (evidenceInsertError) {
+      console.warn('Candidate evidence indexing skipped:', evidenceInsertError.message)
+    } else {
+      evidenceIndexed = true
+    }
+  }
+
   const wordCount = resumeText.split(/\s+/).filter(Boolean).length
-  return NextResponse.json({ parsed, word_count: wordCount })
+  return NextResponse.json({ parsed, word_count: wordCount, evidence_indexed: evidenceIndexed })
 }

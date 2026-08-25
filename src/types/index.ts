@@ -107,6 +107,17 @@ export interface AnalysisResult {
   gap_analysis: string;
   recommendation: string;
   fake_em_detection?: FakeEmDetection;
+  rag_score?: number;
+  retrieved_evidence?: RetrievedEvidence[];
+}
+
+export interface RetrievedEvidence {
+  evidence_id?: string | null;
+  evidence_type: string;
+  content: string;
+  skills: string[];
+  score: number;
+  matched_requirements: string[];
 }
 
 export interface SkillFrequency {

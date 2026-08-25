@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { normalizeJobUrl, isSafeJobUrl } from '@/lib/utils/url'
 import { checkScreenLimit } from '@/lib/utils/screen-limits'
+import { buildCandidateEvidence, type CandidateEvidenceInput } from '@/lib/rag/candidate-evidence'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile } from '@/types'
 
 // Explicit rather than implicit-default — this route's crash/timeout safety
@@ -310,6 +311,45 @@ export async function POST(request: NextRequest) {
   const storedResume = (profile.resume_text as string | null) ?? ''
   const effectiveResumeText = storedResume.trim() || buildResumeFromPreferences(profile)
 
+  // Phase 1/2 bridge: load the user's private evidence KB once per incoming
+  // request, not once per JD. Existing profiles are indexed lazily so the
+  // migration does not require an expensive one-shot backfill.
+  let candidateEvidence: CandidateEvidenceInput[] = []
+  const { data: evidenceRows, error: evidenceReadError } = await supabase
+    .from('candidate_evidence')
+    .select('id, evidence_type, content, skills, embedding, metadata')
+    .eq('user_id', user.id)
+    .order('chunk_index', { ascending: true })
+    .limit(64)
+
+  if (evidenceReadError) {
+    console.warn('Candidate evidence unavailable; using legacy scoring:', evidenceReadError.message)
+  } else if (evidenceRows?.length) {
+    candidateEvidence = evidenceRows as CandidateEvidenceInput[]
+  } else if (storedResume.trim()) {
+    const preferences = (profile.preferences ?? {}) as Record<string, unknown>
+    const filters = (profile.hard_reject_filters ?? {}) as Record<string, unknown>
+    const generated = buildCandidateEvidence(user.id, storedResume, {
+      preferred_tech_stack: (preferences.preferred_tech_stack as string[] | undefined) ?? [],
+      target_industries: (preferences.target_industries as string[] | undefined) ?? [],
+      title_floor: (filters.title_floor as string | undefined) ?? '',
+      geography_allowed: (filters.geography_allowed as string[] | undefined) ?? [],
+    })
+    if (generated.length) {
+      const service = createServiceClient()
+      const { data: inserted, error: lazyIndexError } = await service
+        .from('candidate_evidence')
+        .insert(generated)
+        .select('id, evidence_type, content, skills, embedding, metadata')
+      if (lazyIndexError) {
+        console.warn('Lazy candidate evidence indexing failed:', lazyIndexError.message)
+        candidateEvidence = generated
+      } else {
+        candidateEvidence = (inserted ?? generated) as CandidateEvidenceInput[]
+      }
+    }
+  }
+
   const apiUrl = process.env.NEXT_PUBLIC_SCREENING_API_URL!
   const results: ScreeningResult[] = []
   let count = 0
@@ -332,6 +372,7 @@ export async function POST(request: NextRequest) {
           api_provider: apiProvider,
           analysis_mode: 'fast',
           user_id: user!.id,
+          candidate_evidence: candidateEvidence,
         }),
         signal: controller.signal,
       })

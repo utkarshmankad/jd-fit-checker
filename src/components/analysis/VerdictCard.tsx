@@ -7,6 +7,7 @@ import { getVerdictDisplay } from '@/lib/utils/verdicts'
 import { calculateTimeSaved } from '@/lib/utils/time-saved'
 import {
   FakeEmBadge, FakeEmCallout, RequirementsChecklist, SoftConcernsCallout,
+  ProfileEvidenceCallout,
 } from './AnalysisDetail'
 
 // Converts the LLM's raw "APPLY — reasoning" / "SKIP — reasoning" /
@@ -90,7 +91,7 @@ function ScoreBreakdown({ result }: { result: ScreeningResult }) {
       ) : (
         <div className="text-xs font-mono text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded px-2 py-1.5 inline-block">
           <p className="mb-0.5 text-gray-500 dark:text-gray-400 font-sans font-semibold not-italic">How we calculated this</p>
-          Composite {result.composite_score} = (ATS {result.ats_score} × 0.45) + (Role {result.role_level_score} × 0.55) = {(result.ats_score * 0.45 + result.role_level_score * 0.55).toFixed(1)}
+          Composite {result.composite_score} = (Evidence-enhanced ATS {result.ats_score} × 0.55) + (Role {result.role_level_score} × 0.45) = {(result.ats_score * 0.55 + result.role_level_score * 0.45).toFixed(1)}
         </div>
       )}
     </div>
@@ -115,6 +116,10 @@ export function VerdictCard({ result, isExpanded, onToggle }: { result: Screenin
         <div className="mt-4 space-y-4 max-w-2xl">
           <FakeEmCallout detection={result.analysis_json?.fake_em_detection} />
           <RequirementsChecklist items={requirements} />
+          <ProfileEvidenceCallout
+            items={result.analysis_json?.retrieved_evidence}
+            score={result.analysis_json?.rag_score}
+          />
           <SoftConcernsCallout concerns={result.analysis_json?.soft_concerns} />
           {word && (
             <p className="font-bold text-base" style={{ color: '#1B3A5C' }}>{word}</p>
