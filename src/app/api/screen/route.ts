@@ -1,8 +1,11 @@
-import { NextRequest, NextResponse, after } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { normalizeJobUrl, isSafeJobUrl } from '@/lib/utils/url'
 import { checkScreenLimit } from '@/lib/utils/screen-limits'
+import { buildCandidateEvidence, type CandidateEvidenceInput } from '@/lib/rag/candidate-evidence'
+import { fetchJobLightweight, jobContentHash, type ExtractedJob } from '@/lib/jobs/fetch-job'
+import { scoreJobFast } from '@/lib/screening/fast-scorer'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile } from '@/types'
 
 // Explicit rather than implicit-default — this route's crash/timeout safety
@@ -37,7 +40,7 @@ export type FatalScreenError = {
 }
 
 // Called once by the client after its per-item screening loop finishes for a
-// batch_id. Not a new screen — doesn't touch screens_used_this_month or the
+// batch_id. Not a new screen — doesn't touch screening usage counters or the
 // free-tier limit. Reuses already-persisted screening_results rows rather than
 // requiring the client to accumulate jd_texts separately.
 async function finalizeBatch(
@@ -95,6 +98,7 @@ async function finalizeBatch(
 }
 
 export async function POST(request: NextRequest) {
+  const requestStarted = performance.now()
   const supabase = await createClient()
   const {
     data: { user },
@@ -117,7 +121,7 @@ export async function POST(request: NextRequest) {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select(
-      'resume_text, preferences, hard_reject_filters, api_key_encrypted, api_provider, tier, screens_used_this_month, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_bonus_screens'
+      'resume_text, preferences, hard_reject_filters, tier, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_bonus_screens'
     )
     .eq('id', user.id)
     .single()
@@ -310,12 +314,50 @@ export async function POST(request: NextRequest) {
   const storedResume = (profile.resume_text as string | null) ?? ''
   const effectiveResumeText = storedResume.trim() || buildResumeFromPreferences(profile)
 
+  // Phase 1/2 bridge: load the user's private evidence KB once per incoming
+  // request, not once per JD. Existing profiles are indexed lazily so the
+  // migration does not require an expensive one-shot backfill.
+  let candidateEvidence: CandidateEvidenceInput[] = []
+  const { data: evidenceRows, error: evidenceReadError } = await supabase
+    .from('candidate_evidence')
+    .select('id, evidence_type, content, skills, embedding, metadata')
+    .eq('user_id', user.id)
+    .order('chunk_index', { ascending: true })
+    .limit(64)
+
+  if (evidenceReadError) {
+    console.warn('Candidate evidence unavailable; using legacy scoring:', evidenceReadError.message)
+  } else if (evidenceRows?.length) {
+    candidateEvidence = evidenceRows as CandidateEvidenceInput[]
+  } else if (storedResume.trim()) {
+    const preferences = (profile.preferences ?? {}) as Record<string, unknown>
+    const filters = (profile.hard_reject_filters ?? {}) as Record<string, unknown>
+    const generated = buildCandidateEvidence(user.id, storedResume, {
+      preferred_tech_stack: (preferences.preferred_tech_stack as string[] | undefined) ?? [],
+      target_industries: (preferences.target_industries as string[] | undefined) ?? [],
+      title_floor: (filters.title_floor as string | undefined) ?? '',
+      geography_allowed: (filters.geography_allowed as string[] | undefined) ?? [],
+    })
+    if (generated.length) {
+      const service = createServiceClient()
+      const { data: inserted, error: lazyIndexError } = await service
+        .from('candidate_evidence')
+        .insert(generated)
+        .select('id, evidence_type, content, skills, embedding, metadata')
+      if (lazyIndexError) {
+        console.warn('Lazy candidate evidence indexing failed:', lazyIndexError.message)
+        candidateEvidence = generated
+      } else {
+        candidateEvidence = (inserted ?? generated) as CandidateEvidenceInput[]
+      }
+    }
+  }
+
   const apiUrl = process.env.NEXT_PUBLIC_SCREENING_API_URL!
   const results: ScreeningResult[] = []
-  let count = 0
   let fatalError: FatalScreenError | null = null
 
-  async function callFastAPI(body: Record<string, unknown>, apiKey: string, apiProvider: string): Promise<FastAPIResult | { _error: string; _status: number }> {
+  async function callFastAPI(body: Record<string, unknown>, apiKey: string, apiProvider: string, externalSignal?: AbortSignal): Promise<FastAPIResult | { _error: string; _status: number }> {
     let res: Response
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), FASTAPI_TIMEOUT_MS)
@@ -332,8 +374,9 @@ export async function POST(request: NextRequest) {
           api_provider: apiProvider,
           analysis_mode: 'fast',
           user_id: user!.id,
+          candidate_evidence: candidateEvidence,
         }),
-        signal: controller.signal,
+          signal: externalSignal ? AbortSignal.any([controller.signal, externalSignal]) : controller.signal,
       })
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') {
@@ -374,6 +417,52 @@ export async function POST(request: NextRequest) {
     return res.json() as Promise<FastAPIResult>
   }
 
+  const cache = createServiceClient()
+  const phaseTotals = { cacheMs: 0, localMs: 0, renderFallbacks: 0, cacheHits: 0 }
+  async function cachedJob(url: string): Promise<ExtractedJob | null> {
+    const started = performance.now()
+    const { data } = await cache.from('job_description_cache')
+      .select('canonical_url, provider, external_job_id, job_title, company, jd_text, extraction')
+      .eq('canonical_url', url).gt('expires_at', new Date().toISOString()).maybeSingle()
+    phaseTotals.cacheMs += performance.now() - started
+    if (!data) return null
+    phaseTotals.cacheHits += 1
+    return { canonicalUrl: data.canonical_url, provider: data.provider, externalJobId: data.external_job_id ?? undefined, jobTitle: data.job_title ?? undefined, company: data.company ?? undefined, jdText: data.jd_text, extraction: data.extraction === 'render' ? 'generic' : data.extraction }
+  }
+
+  async function rememberJob(job: ExtractedJob): Promise<void> {
+    const now = new Date(); const expires = new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    const { error } = await cache.from('job_description_cache').upsert({ canonical_url: job.canonicalUrl, provider: job.provider, external_job_id: job.externalJobId ?? null, job_title: job.jobTitle ?? null, company: job.company ?? null, jd_text: job.jdText, content_hash: jobContentHash(job.jdText), extraction: job.extraction, fetched_at: now.toISOString(), expires_at: expires.toISOString(), updated_at: now.toISOString() }, { onConflict: 'canonical_url' })
+    if (error) console.warn('job cache upsert failed:', error.message)
+  }
+
+  function scoreExtracted(job: ExtractedJob): FastAPIResult {
+    return { ...scoreJobFast({ jdText: job.jdText, resumeText: effectiveResumeText, filters: profile!.hard_reject_filters, jobTitle: job.jobTitle, company: job.company, evidence: candidateEvidence }), jd_text: job.jdText, job_title: job.jobTitle, company: job.company }
+  }
+
+  async function hybridScreen(url: string, apiKey: string, provider: string): Promise<FastAPIResult | { _error: string; _status: number }> {
+    const hit = await cachedJob(url)
+    if (hit) return scoreExtracted(hit)
+
+    const renderAbort = new AbortController()
+    const render = callFastAPI({ job_url: url }, apiKey, provider, renderAbort.signal).then((result) => {
+      if ('_error' in result) throw Object.assign(new Error(result._error), { result })
+      phaseTotals.renderFallbacks += 1
+      return result
+    })
+    const localStarted = performance.now()
+    const local = fetchJobLightweight(url).then(async (job) => { await rememberJob(job); const result = scoreExtracted(job); phaseTotals.localMs += performance.now() - localStarted; return result })
+    try {
+      const winner = await Promise.any([local, render])
+      if (winner.jd_text) renderAbort.abort()
+      return winner
+    } catch (failure) {
+      const errors = failure instanceof AggregateError ? failure.errors : [failure]
+      const backendError = errors.map((error) => (error as { result?: { _error: string; _status: number } }).result).find(Boolean)
+      return backendError ?? { _error: 'Could not retrieve this job. Paste the job description to continue.', _status: 400 }
+    }
+  }
+
   async function saveResult(
     analysis: FastAPIResult,
     overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }
@@ -402,6 +491,30 @@ export async function POST(request: NextRequest) {
       return null
     }
     return saved as ScreeningResult
+  }
+
+  const pendingSaves: Array<{ analysis: FastAPIResult; overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string } }> = []
+  function queueResult(analysis: FastAPIResult, overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }) {
+    pendingSaves.push({ analysis, overrides })
+  }
+
+  async function flushResults(): Promise<void> {
+    if (!pendingSaves.length) return
+    const rows = pendingSaves.map(({ analysis, overrides }) => ({
+      user_id: user!.id, batch_id, job_url: overrides.job_url ?? null,
+      job_title: overrides.job_title ?? analysis.job_title ?? null,
+      company: overrides.company ?? analysis.company ?? null,
+      jd_text: overrides.jd_text ?? analysis.jd_text ?? '', ats_score: analysis.ats_score,
+      role_level_score: analysis.role_level_score, composite_score: analysis.composite_score,
+      verdict: analysis.verdict, hard_reject_reasons: analysis.hard_reject_reasons, analysis_json: analysis,
+    }))
+    const { data: saved, error } = await supabase.from('screening_results').insert(rows).select()
+    if (error || !saved) {
+      console.error('screening_results batch insert failed:', error?.message)
+      pendingSaves.forEach(({ analysis, overrides }) => results.push(saveFailedPlaceholder({ job_url: overrides.job_url, job_title: overrides.job_title ?? analysis.job_title, company: overrides.company ?? analysis.company })))
+      return
+    }
+    results.push(...(saved as ScreeningResult[]))
   }
 
   function saveFailedPlaceholder(overrides: { job_url?: string | null; job_title?: string | null; company?: string | null }): ScreeningResult {
@@ -462,7 +575,7 @@ export async function POST(request: NextRequest) {
         return false
       }
 
-      const result = await callFastAPI({ job_url: url }, keyChoice.apiKey, keyChoice.provider)
+      const result = await hybridScreen(url, keyChoice.apiKey, keyChoice.provider)
       if ('_error' in result) {
         await refundIfReserved(keyChoice)
         if (result._status === 401) {
@@ -476,13 +589,7 @@ export async function POST(request: NextRequest) {
         results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
         return true
       }
-      const saved = await saveResult(result, { job_url: url })
-      if (!saved) {
-        results.push(saveFailedPlaceholder({ job_url: url, job_title: result.job_title, company: result.company }))
-        return true
-      }
-      results.push(saved)
-      count++
+      queueResult(result, { job_url: url })
       return true
     })
   } else if (jd_entries && Array.isArray(jd_entries) && jd_entries.length > 0) {
@@ -508,13 +615,7 @@ export async function POST(request: NextRequest) {
         results.push({ id: '', user_id: user.id, batch_id, job_url: null, job_title: entry.job_title ?? null, company: entry.company ?? null, jd_text: entry.jd_text, ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
         return true
       }
-      const saved = await saveResult(result, { jd_text: entry.jd_text, job_title: entry.job_title, company: entry.company })
-      if (!saved) {
-        results.push(saveFailedPlaceholder({ job_title: entry.job_title ?? result.job_title, company: entry.company ?? result.company }))
-        return true
-      }
-      results.push(saved)
-      count++
+      queueResult(result, { jd_text: entry.jd_text, job_title: entry.job_title, company: entry.company })
       return true
     })
   } else if (jd_text) {
@@ -534,31 +635,20 @@ export async function POST(request: NextRequest) {
         results.push(saveFailedPlaceholder({ job_title: job_title ?? result.job_title, company: company ?? result.company }))
       } else {
         results.push(saved)
-        count++
       }
     }
   } else {
     return NextResponse.json({ error: 'Provide urls or jd_text' }, { status: 400 })
   }
 
-  if (count > 0) {
-    // Legacy display-only field (profile page "screens used"), not
-    // limit-enforcing — doesn't gate the response, so it runs after the
-    // response is sent instead of adding a DB round-trip to the critical path.
-    const monthCount = (profile.screens_used_this_month as number) + count
-    after(async () => {
-      const service = createServiceClient()
-      const { error: updateError } = await service
-        .from('profiles')
-        .update({ screens_used_this_month: monthCount })
-        .eq('id', user.id)
-      if (updateError) {
-        console.error('screens_used_this_month update failed:', updateError)
-      }
-    })
-  }
+  await flushResults()
 
-  return NextResponse.json({ results, ...(fatalError ? { fatalError } : {}) })
+  const totalMs = performance.now() - requestStarted
+  console.info(JSON.stringify({ event: 'screen_batch_timing', batch_id, items: itemCount, total_ms: Math.round(totalMs), cache_ms: Math.round(phaseTotals.cacheMs), local_extract_score_ms: Math.round(phaseTotals.localMs), cache_hits: phaseTotals.cacheHits, render_fallbacks: phaseTotals.renderFallbacks }))
+  return NextResponse.json(
+    { results, ...(fatalError ? { fatalError } : {}), timing: { total_ms: Math.round(totalMs), cache_hits: phaseTotals.cacheHits, render_fallbacks: phaseTotals.renderFallbacks } },
+    { headers: { 'Server-Timing': `total;dur=${totalMs.toFixed(1)}, cache;dur=${phaseTotals.cacheMs.toFixed(1)}, local;dur=${phaseTotals.localMs.toFixed(1)}` } }
+  )
 }
 
 function buildResumeFromPreferences(profile: Record<string, unknown>): string {

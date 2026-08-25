@@ -13,7 +13,7 @@ interface ProfileData {
   hard_reject_filters: HardRejectFilters
   preferences: UserPreferences
   tier: 'free' | 'paid'
-  screens_used_this_month: number
+  screens_used_total: number
   is_beta_user: boolean
   updated_at: string
   referred_by: string | null
@@ -268,7 +268,7 @@ function ResumeUploader({
       {status === 'done' && (
         <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-lg px-3 py-2">
           <CheckCircle2 size={13} />
-          <span>Preferences autofilled from <strong>{fileName}</strong>. Resume not stored.</span>
+          <span>Preferences autofilled from <strong>{fileName}</strong>. Original file discarded after processing.</span>
         </div>
       )}
 
@@ -280,7 +280,7 @@ function ResumeUploader({
       )}
 
       {(status === 'idle' || status === 'error') && (
-        <p className="text-xs text-gray-400 dark:text-gray-500">Your resume is used only to autofill preferences — it is never stored.</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">The original file is discarded after processing. Extracted text and evidence are stored privately for job matching.</p>
       )}
     </div>
   )
@@ -389,7 +389,7 @@ export default function ProfilePage() {
 
       setFullName(profile.full_name ?? '')
       setTier(profile.tier)
-      setScreensUsed(profile.screens_used_this_month)
+      setScreensUsed(profile.screens_used_total)
       setIsBetaUser(profile.is_beta_user)
       setReferredBy(profile.referred_by)
 
@@ -730,7 +730,7 @@ export default function ProfilePage() {
       </Section>
 
       {/* Resume */}
-      <Section title="Your background." subtitle="Upload it once. We extract what matters and forget the file.">
+      <Section title="Your background." subtitle="Upload it once. We discard the file and privately retain extracted evidence for matching.">
         <ResumeUploader onParsed={applyParsed} existingResumeDate={resumeDate} />
         {detectedSkills.length > 0 && (
           <div className="flex items-center gap-2 text-xs text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2 mt-2">
