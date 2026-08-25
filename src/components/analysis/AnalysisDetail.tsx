@@ -1,5 +1,5 @@
 import { Info } from 'lucide-react'
-import type { ScreeningResult, RequirementCheck, FakeEmDetection } from '@/types'
+import type { ScreeningResult, RequirementCheck, FakeEmDetection, RetrievedEvidence } from '@/types'
 
 export { getVerdictDisplay, verdictPillClass } from '@/lib/utils/verdicts'
 
@@ -44,9 +44,35 @@ export function FakeEmCallout({ detection }: { detection?: FakeEmDetection }) {
 }
 
 export const SCORE_TOOLTIPS = {
-  ats: "How many of the JD's required skills appear in your resume, weighted by importance.",
+  ats: "Required-skill coverage blended with relevant evidence retrieved from your private profile knowledge base.",
   role: 'How well your seniority, scope, and team-size experience matches what this role needs.',
-  composite: 'Weighted blend: 45% ATS keyword match, 55% role-level fit.',
+  composite: 'Weighted blend: 55% evidence-enhanced ATS match, 45% role-level fit.',
+}
+
+export function ProfileEvidenceCallout({ items, score }: { items?: RetrievedEvidence[]; score?: number }) {
+  if (!items?.length) return null
+  return (
+    <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg px-3 py-3">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">Profile evidence used</p>
+        {typeof score === 'number' && (
+          <span className="text-xs font-mono text-indigo-600 dark:text-indigo-400">RAG {score}</span>
+        )}
+      </div>
+      <ul className="space-y-2">
+        {items.slice(0, 3).map((item, index) => (
+          <li key={item.evidence_id ?? index} className="text-sm text-indigo-900 dark:text-indigo-200">
+            <p className="leading-relaxed">{item.content}</p>
+            {item.matched_requirements.length > 0 && (
+              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-0.5">
+                Supports: {item.matched_requirements.join(', ')}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
 
 export function scoreTextClass(n: number) {
@@ -211,6 +237,10 @@ export function AnalysisDetailBody({ result }: { result: ScreeningResult }) {
 
       {/* b. Requirements + skills */}
       <RequirementsChecklist items={result.analysis_json?.requirements_met ?? []} />
+      <ProfileEvidenceCallout
+        items={result.analysis_json?.retrieved_evidence}
+        score={result.analysis_json?.rag_score}
+      />
       <SkillPills label="Matching skills" skills={result.analysis_json?.matching_skills ?? []} variant="match" />
       <SkillPills label="Missing skills" skills={result.analysis_json?.missing_skills ?? []} variant="miss" />
       <SoftConcernsCallout concerns={result.analysis_json?.soft_concerns} />
@@ -220,7 +250,7 @@ export function AnalysisDetailBody({ result }: { result: ScreeningResult }) {
       {/* c. Score breakdown (supplementary) */}
       {result.verdict !== 'REJECT' && (
         <p className="text-xs font-mono text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 rounded px-2 py-1 inline-block">
-          Composite {result.composite_score} = (ATS {result.ats_score} × 0.45) + (Role {result.role_level_score} × 0.55) = {(result.ats_score * 0.45 + result.role_level_score * 0.55).toFixed(1)}
+          Composite {result.composite_score} = (Evidence-enhanced ATS {result.ats_score} × 0.55) + (Role {result.role_level_score} × 0.45) = {(result.ats_score * 0.55 + result.role_level_score * 0.45).toFixed(1)}
         </p>
       )}
 
