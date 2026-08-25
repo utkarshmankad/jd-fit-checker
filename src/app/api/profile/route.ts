@@ -25,7 +25,7 @@ export async function GET() {
   const { data, error } = await service
     .from('profiles')
     .select(
-      'id, email, full_name, resume_text, hard_reject_filters, preferences, tier, screens_used_this_month, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_code, referred_by, referral_bonus_screens, invite_code_used, created_at, updated_at'
+      'id, email, full_name, resume_text, hard_reject_filters, preferences, tier, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_code, referred_by, referral_bonus_screens, invite_code_used, created_at, updated_at'
     )
     .eq('id', user.id)
     .single()
