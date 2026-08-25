@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse, after } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { normalizeJobUrl, isSafeJobUrl } from '@/lib/utils/url'
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select(
-      'resume_text, preferences, hard_reject_filters, api_provider, tier, screens_used_this_month, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_bonus_screens'
+      'resume_text, preferences, hard_reject_filters, tier, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_bonus_screens'
     )
     .eq('id', user.id)
     .single()
@@ -352,7 +352,6 @@ export async function POST(request: NextRequest) {
 
   const apiUrl = process.env.NEXT_PUBLIC_SCREENING_API_URL!
   const results: ScreeningResult[] = []
-  let count = 0
   let fatalError: FatalScreenError | null = null
 
   async function callFastAPI(body: Record<string, unknown>, apiKey: string, apiProvider: string): Promise<FastAPIResult | { _error: string; _status: number }> {
@@ -523,7 +522,6 @@ export async function POST(request: NextRequest) {
         return true
       }
       results.push(saved)
-      count++
       return true
     })
   } else if (jd_entries && Array.isArray(jd_entries) && jd_entries.length > 0) {
@@ -555,7 +553,6 @@ export async function POST(request: NextRequest) {
         return true
       }
       results.push(saved)
-      count++
       return true
     })
   } else if (jd_text) {
@@ -575,28 +572,10 @@ export async function POST(request: NextRequest) {
         results.push(saveFailedPlaceholder({ job_title: job_title ?? result.job_title, company: company ?? result.company }))
       } else {
         results.push(saved)
-        count++
       }
     }
   } else {
     return NextResponse.json({ error: 'Provide urls or jd_text' }, { status: 400 })
-  }
-
-  if (count > 0) {
-    // Legacy display-only field (profile page "screens used"), not
-    // limit-enforcing — doesn't gate the response, so it runs after the
-    // response is sent instead of adding a DB round-trip to the critical path.
-    const monthCount = (profile.screens_used_this_month as number) + count
-    after(async () => {
-      const service = createServiceClient()
-      const { error: updateError } = await service
-        .from('profiles')
-        .update({ screens_used_this_month: monthCount })
-        .eq('id', user.id)
-      if (updateError) {
-        console.error('screens_used_this_month update failed:', updateError)
-      }
-    })
   }
 
   return NextResponse.json({ results, ...(fatalError ? { fatalError } : {}) })
