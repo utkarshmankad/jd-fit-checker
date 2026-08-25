@@ -4,6 +4,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { normalizeJobUrl, isSafeJobUrl } from '@/lib/utils/url'
 import { checkScreenLimit } from '@/lib/utils/screen-limits'
 import { buildCandidateEvidence, type CandidateEvidenceInput } from '@/lib/rag/candidate-evidence'
+import { fetchJobLightweight, jobContentHash, type ExtractedJob } from '@/lib/jobs/fetch-job'
+import { scoreJobFast } from '@/lib/screening/fast-scorer'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile } from '@/types'
 
 // Explicit rather than implicit-default — this route's crash/timeout safety
@@ -96,6 +98,7 @@ async function finalizeBatch(
 }
 
 export async function POST(request: NextRequest) {
+  const requestStarted = performance.now()
   const supabase = await createClient()
   const {
     data: { user },
@@ -354,7 +357,7 @@ export async function POST(request: NextRequest) {
   const results: ScreeningResult[] = []
   let fatalError: FatalScreenError | null = null
 
-  async function callFastAPI(body: Record<string, unknown>, apiKey: string, apiProvider: string): Promise<FastAPIResult | { _error: string; _status: number }> {
+  async function callFastAPI(body: Record<string, unknown>, apiKey: string, apiProvider: string, externalSignal?: AbortSignal): Promise<FastAPIResult | { _error: string; _status: number }> {
     let res: Response
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), FASTAPI_TIMEOUT_MS)
@@ -373,7 +376,7 @@ export async function POST(request: NextRequest) {
           user_id: user!.id,
           candidate_evidence: candidateEvidence,
         }),
-        signal: controller.signal,
+          signal: externalSignal ? AbortSignal.any([controller.signal, externalSignal]) : controller.signal,
       })
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') {
@@ -414,6 +417,52 @@ export async function POST(request: NextRequest) {
     return res.json() as Promise<FastAPIResult>
   }
 
+  const cache = createServiceClient()
+  const phaseTotals = { cacheMs: 0, localMs: 0, renderFallbacks: 0, cacheHits: 0 }
+  async function cachedJob(url: string): Promise<ExtractedJob | null> {
+    const started = performance.now()
+    const { data } = await cache.from('job_description_cache')
+      .select('canonical_url, provider, external_job_id, job_title, company, jd_text, extraction')
+      .eq('canonical_url', url).gt('expires_at', new Date().toISOString()).maybeSingle()
+    phaseTotals.cacheMs += performance.now() - started
+    if (!data) return null
+    phaseTotals.cacheHits += 1
+    return { canonicalUrl: data.canonical_url, provider: data.provider, externalJobId: data.external_job_id ?? undefined, jobTitle: data.job_title ?? undefined, company: data.company ?? undefined, jdText: data.jd_text, extraction: data.extraction === 'render' ? 'generic' : data.extraction }
+  }
+
+  async function rememberJob(job: ExtractedJob): Promise<void> {
+    const now = new Date(); const expires = new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    const { error } = await cache.from('job_description_cache').upsert({ canonical_url: job.canonicalUrl, provider: job.provider, external_job_id: job.externalJobId ?? null, job_title: job.jobTitle ?? null, company: job.company ?? null, jd_text: job.jdText, content_hash: jobContentHash(job.jdText), extraction: job.extraction, fetched_at: now.toISOString(), expires_at: expires.toISOString(), updated_at: now.toISOString() }, { onConflict: 'canonical_url' })
+    if (error) console.warn('job cache upsert failed:', error.message)
+  }
+
+  function scoreExtracted(job: ExtractedJob): FastAPIResult {
+    return { ...scoreJobFast({ jdText: job.jdText, resumeText: effectiveResumeText, filters: profile!.hard_reject_filters, jobTitle: job.jobTitle, company: job.company, evidence: candidateEvidence }), jd_text: job.jdText, job_title: job.jobTitle, company: job.company }
+  }
+
+  async function hybridScreen(url: string, apiKey: string, provider: string): Promise<FastAPIResult | { _error: string; _status: number }> {
+    const hit = await cachedJob(url)
+    if (hit) return scoreExtracted(hit)
+
+    const renderAbort = new AbortController()
+    const render = callFastAPI({ job_url: url }, apiKey, provider, renderAbort.signal).then((result) => {
+      if ('_error' in result) throw Object.assign(new Error(result._error), { result })
+      phaseTotals.renderFallbacks += 1
+      return result
+    })
+    const localStarted = performance.now()
+    const local = fetchJobLightweight(url).then(async (job) => { await rememberJob(job); const result = scoreExtracted(job); phaseTotals.localMs += performance.now() - localStarted; return result })
+    try {
+      const winner = await Promise.any([local, render])
+      if (winner.jd_text) renderAbort.abort()
+      return winner
+    } catch (failure) {
+      const errors = failure instanceof AggregateError ? failure.errors : [failure]
+      const backendError = errors.map((error) => (error as { result?: { _error: string; _status: number } }).result).find(Boolean)
+      return backendError ?? { _error: 'Could not retrieve this job. Paste the job description to continue.', _status: 400 }
+    }
+  }
+
   async function saveResult(
     analysis: FastAPIResult,
     overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }
@@ -442,6 +491,30 @@ export async function POST(request: NextRequest) {
       return null
     }
     return saved as ScreeningResult
+  }
+
+  const pendingSaves: Array<{ analysis: FastAPIResult; overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string } }> = []
+  function queueResult(analysis: FastAPIResult, overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }) {
+    pendingSaves.push({ analysis, overrides })
+  }
+
+  async function flushResults(): Promise<void> {
+    if (!pendingSaves.length) return
+    const rows = pendingSaves.map(({ analysis, overrides }) => ({
+      user_id: user!.id, batch_id, job_url: overrides.job_url ?? null,
+      job_title: overrides.job_title ?? analysis.job_title ?? null,
+      company: overrides.company ?? analysis.company ?? null,
+      jd_text: overrides.jd_text ?? analysis.jd_text ?? '', ats_score: analysis.ats_score,
+      role_level_score: analysis.role_level_score, composite_score: analysis.composite_score,
+      verdict: analysis.verdict, hard_reject_reasons: analysis.hard_reject_reasons, analysis_json: analysis,
+    }))
+    const { data: saved, error } = await supabase.from('screening_results').insert(rows).select()
+    if (error || !saved) {
+      console.error('screening_results batch insert failed:', error?.message)
+      pendingSaves.forEach(({ analysis, overrides }) => results.push(saveFailedPlaceholder({ job_url: overrides.job_url, job_title: overrides.job_title ?? analysis.job_title, company: overrides.company ?? analysis.company })))
+      return
+    }
+    results.push(...(saved as ScreeningResult[]))
   }
 
   function saveFailedPlaceholder(overrides: { job_url?: string | null; job_title?: string | null; company?: string | null }): ScreeningResult {
@@ -502,7 +575,7 @@ export async function POST(request: NextRequest) {
         return false
       }
 
-      const result = await callFastAPI({ job_url: url }, keyChoice.apiKey, keyChoice.provider)
+      const result = await hybridScreen(url, keyChoice.apiKey, keyChoice.provider)
       if ('_error' in result) {
         await refundIfReserved(keyChoice)
         if (result._status === 401) {
@@ -516,12 +589,7 @@ export async function POST(request: NextRequest) {
         results.push({ id: '', user_id: user.id, batch_id, job_url: url, job_title: null, company: null, jd_text: '', ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
         return true
       }
-      const saved = await saveResult(result, { job_url: url })
-      if (!saved) {
-        results.push(saveFailedPlaceholder({ job_url: url, job_title: result.job_title, company: result.company }))
-        return true
-      }
-      results.push(saved)
+      queueResult(result, { job_url: url })
       return true
     })
   } else if (jd_entries && Array.isArray(jd_entries) && jd_entries.length > 0) {
@@ -547,12 +615,7 @@ export async function POST(request: NextRequest) {
         results.push({ id: '', user_id: user.id, batch_id, job_url: null, job_title: entry.job_title ?? null, company: entry.company ?? null, jd_text: entry.jd_text, ats_score: 0, role_level_score: 0, composite_score: 0, verdict: 'REJECT', hard_reject_reasons: [result._error], analysis_json: {} as AnalysisResult, created_at: new Date().toISOString() })
         return true
       }
-      const saved = await saveResult(result, { jd_text: entry.jd_text, job_title: entry.job_title, company: entry.company })
-      if (!saved) {
-        results.push(saveFailedPlaceholder({ job_title: entry.job_title ?? result.job_title, company: entry.company ?? result.company }))
-        return true
-      }
-      results.push(saved)
+      queueResult(result, { jd_text: entry.jd_text, job_title: entry.job_title, company: entry.company })
       return true
     })
   } else if (jd_text) {
@@ -578,7 +641,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Provide urls or jd_text' }, { status: 400 })
   }
 
-  return NextResponse.json({ results, ...(fatalError ? { fatalError } : {}) })
+  await flushResults()
+
+  const totalMs = performance.now() - requestStarted
+  console.info(JSON.stringify({ event: 'screen_batch_timing', batch_id, items: itemCount, total_ms: Math.round(totalMs), cache_ms: Math.round(phaseTotals.cacheMs), local_extract_score_ms: Math.round(phaseTotals.localMs), cache_hits: phaseTotals.cacheHits, render_fallbacks: phaseTotals.renderFallbacks }))
+  return NextResponse.json(
+    { results, ...(fatalError ? { fatalError } : {}), timing: { total_ms: Math.round(totalMs), cache_hits: phaseTotals.cacheHits, render_fallbacks: phaseTotals.renderFallbacks } },
+    { headers: { 'Server-Timing': `total;dur=${totalMs.toFixed(1)}, cache;dur=${phaseTotals.cacheMs.toFixed(1)}, local;dur=${phaseTotals.localMs.toFixed(1)}` } }
+  )
 }
 
 function buildResumeFromPreferences(profile: Record<string, unknown>): string {

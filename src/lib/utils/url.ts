@@ -14,6 +14,13 @@ export function normalizeJobUrl(url: string): string {
       const jobId = parsed.searchParams.get('currentJobId')!
       return `https://www.linkedin.com/jobs/view/${jobId}/`
     }
+    // Tracking/filter parameters do not identify a different posting. Keeping
+    // them would fragment the shared cache (the same Workday requisition was
+    // commonly submitted with and without locationCountry).
+    const trackingKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'source', 'sourceType', 'locationCountry']
+    trackingKeys.forEach((key) => parsed.searchParams.delete(key))
+    parsed.hash = ''
+    return parsed.toString()
   } catch {
     // not a valid URL, pass through as-is
   }
