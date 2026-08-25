@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select(
-      'resume_text, preferences, hard_reject_filters, api_key_encrypted, api_provider, tier, screens_used_this_month, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_bonus_screens'
+      'resume_text, preferences, hard_reject_filters, api_provider, tier, screens_used_this_month, is_beta_user, screens_used_total, screens_used_this_week, week_reset_at, referral_bonus_screens'
     )
     .eq('id', user.id)
     .single()
