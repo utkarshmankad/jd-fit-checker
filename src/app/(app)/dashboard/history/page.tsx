@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import type { ScreeningResult } from '@/types'
 import { SCORE_TOOLTIPS, getReasonLine, ScorePill, AnalysisDetailBody, FakeEmBadge } from '@/components/analysis/AnalysisDetail'
 import { getVerdictDisplay } from '@/lib/utils/verdicts'
+import { RecommendationCorrection } from '@/components/analysis/RecommendationCorrection'
 // Job Tracker — feature disabled, kept for later.
 // import TrackButton from '@/components/tracker/TrackButton'
 
@@ -241,6 +242,7 @@ export default function HistoryPage() {
                               {reasonLine && (
                                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{reasonLine}</p>
                               )}
+                              {r.analysis_json?.salary_range && <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mt-1">Salary: {r.analysis_json.salary_range.raw}</p>}
                             </div>
 
                             <div className="hidden md:flex items-center gap-3 shrink-0">
@@ -280,6 +282,7 @@ export default function HistoryPage() {
                           {isExpanded && (
                             <div className="bg-slate-50 dark:bg-gray-800/50 px-6 py-5">
                               <AnalysisDetailBody result={r as ScreeningResult} />
+                              <RecommendationCorrection resultId={r.id} currentVerdict={r.verdict} />
                             </div>
                           )}
                         </Fragment>

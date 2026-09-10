@@ -6,7 +6,7 @@ import { checkScreenLimit } from '@/lib/utils/screen-limits'
 import { buildCandidateEvidence, type CandidateEvidenceInput } from '@/lib/rag/candidate-evidence'
 import { fetchJobLightweight, jobContentHash, type ExtractedJob } from '@/lib/jobs/fetch-job'
 import { scoreJobFast } from '@/lib/screening/fast-scorer'
-import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile } from '@/types'
+import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile, RecommendationCorrection } from '@/types'
 
 // Explicit rather than implicit-default — this route's crash/timeout safety
 // (see prepareItem below) depends on knowing which serverless runtime
@@ -353,6 +353,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // User corrections are a separate memory from resume evidence: evidence
+  // proves capability, while corrections calibrate personal suitability.
+  const { data: correctionRows, error: correctionReadError } = await supabase
+    .from('recommendation_corrections')
+    .select('id, corrected_verdict, reason, job_title, company, jd_text, feature_tokens')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(100)
+  if (correctionReadError) console.warn('Recommendation corrections unavailable:', correctionReadError.message)
+  const recommendationCorrections = (correctionRows ?? []) as RecommendationCorrection[]
+
   const apiUrl = process.env.NEXT_PUBLIC_SCREENING_API_URL!
   const results: ScreeningResult[] = []
   let fatalError: FatalScreenError | null = null
@@ -375,6 +386,7 @@ export async function POST(request: NextRequest) {
           analysis_mode: 'fast',
           user_id: user!.id,
           candidate_evidence: candidateEvidence,
+          recommendation_corrections: recommendationCorrections,
         }),
           signal: externalSignal ? AbortSignal.any([controller.signal, externalSignal]) : controller.signal,
       })
@@ -437,7 +449,7 @@ export async function POST(request: NextRequest) {
   }
 
   function scoreExtracted(job: ExtractedJob): FastAPIResult {
-    return { ...scoreJobFast({ jdText: job.jdText, resumeText: effectiveResumeText, filters: profile!.hard_reject_filters, jobTitle: job.jobTitle, company: job.company, evidence: candidateEvidence }), jd_text: job.jdText, job_title: job.jobTitle, company: job.company }
+    return { ...scoreJobFast({ jdText: job.jdText, resumeText: effectiveResumeText, filters: profile!.hard_reject_filters, jobTitle: job.jobTitle, company: job.company, evidence: candidateEvidence, corrections: recommendationCorrections }), jd_text: job.jdText, job_title: job.jobTitle, company: job.company }
   }
 
   async function hybridScreen(url: string, apiKey: string, provider: string): Promise<FastAPIResult | { _error: string; _status: number }> {

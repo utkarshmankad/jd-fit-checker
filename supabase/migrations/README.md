@@ -53,3 +53,6 @@ predated the numbered-migration convention (see git history prior to
 2026-07-31 for context). All migrations through `006` are now the sum of
 `schema.sql`'s current state; keep them in sync going forward per rule 4
 above.
+`007` adds the private candidate evidence knowledge base.
+`008` adds the shared job-description cache.
+`20260910194017` adds private, per-user recommendation corrections. Each correction stores the reviewed JD and compact feature tokens so similar future jobs can calibrate the deterministic scorer without an extra LLM call.
