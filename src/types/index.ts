@@ -109,6 +109,26 @@ export interface AnalysisResult {
   fake_em_detection?: FakeEmDetection;
   rag_score?: number;
   retrieved_evidence?: RetrievedEvidence[];
+  salary_range?: SalaryRange | null;
+  correction_applied?: { correction_id: string; similarity: number; corrected_verdict: AnalysisResult['verdict'] } | null;
+}
+
+export interface SalaryRange {
+  raw: string;
+  currency: string | null;
+  minimum: string;
+  maximum: string;
+  period: 'year' | 'month' | 'hour' | 'day';
+}
+
+export interface RecommendationCorrection {
+  id: string;
+  corrected_verdict: AnalysisResult['verdict'];
+  reason: string;
+  job_title: string | null;
+  company: string | null;
+  jd_text: string;
+  feature_tokens: string[];
 }
 
 export interface RetrievedEvidence {

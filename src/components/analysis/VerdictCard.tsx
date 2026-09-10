@@ -9,6 +9,7 @@ import {
   FakeEmBadge, FakeEmCallout, RequirementsChecklist, SoftConcernsCallout,
   ProfileEvidenceCallout,
 } from './AnalysisDetail'
+import { RecommendationCorrection } from './RecommendationCorrection'
 
 // Converts the LLM's raw "APPLY — reasoning" / "SKIP — reasoning" /
 // "APPLY IF condition — reasoning" into the card's blunter final-word
@@ -111,6 +112,7 @@ export function VerdictCard({ result, isExpanded, onToggle }: { result: Screenin
         {display.verdictLine}
       </p>
       {headline && <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{headline}</p>}
+      {result.analysis_json?.salary_range && <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 mt-1">Salary: {result.analysis_json.salary_range.raw}</p>}
 
       {isExpanded && (
         <div className="mt-4 space-y-4 max-w-2xl">
@@ -131,6 +133,7 @@ export function VerdictCard({ result, isExpanded, onToggle }: { result: Screenin
               <ExternalLink size={12} /> Open posting
             </a>
           )}
+          <RecommendationCorrection resultId={result.id} currentVerdict={result.verdict} />
         </div>
       )}
     </CardChrome>
@@ -162,6 +165,8 @@ export function DismissedCard({ result }: { result: ScreeningResult }) {
               <p className="text-xs text-gray-500 dark:text-gray-400">Hard-reject rule triggered.</p>
             )}
             <p className="text-xs text-gray-400 dark:text-gray-500 italic">Next.</p>
+            {result.analysis_json?.salary_range && <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Salary: {result.analysis_json.salary_range.raw}</p>}
+            <RecommendationCorrection resultId={result.id} currentVerdict={result.verdict} />
           </div>
         </div>
         <span className="text-xs text-gray-300 dark:text-gray-600 whitespace-nowrap shrink-0">~{timeSaved} saved</span>

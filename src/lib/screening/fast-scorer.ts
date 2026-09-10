@@ -1,5 +1,6 @@
-import type { AnalysisResult, HardRejectFilters, RetrievedEvidence } from '@/types'
+import type { AnalysisResult, HardRejectFilters, RecommendationCorrection, RetrievedEvidence } from '@/types'
 import { createEvidenceEmbedding, type CandidateEvidenceInput } from '@/lib/rag/candidate-evidence'
+import { extractSalaryRange } from '@/lib/jobs/salary'
 
 const SKILL_ALIASES: Record<string, string[]> = {
   React: ['react', 'react.js', 'reactjs'], 'Node.js': ['node.js', 'nodejs', 'node js'],
@@ -58,6 +59,29 @@ function tokens(text: string): string[] {
   return (text.toLowerCase().match(/[a-z0-9+#.]{2,}/g) ?? []).filter((token) => !STOP.has(token))
 }
 
+export function correctionTokens(text: string): string[] {
+  return [...new Set(tokens(text))].slice(0, 120)
+}
+
+function calibrateWithCorrections(jdText: string, title: string | null | undefined, score: number, rows: RecommendationCorrection[]) {
+  const query = new Set(correctionTokens(`${title ?? ''} ${jdText}`))
+  const ranked = rows.map((row) => {
+    const memory = new Set(row.feature_tokens?.length ? row.feature_tokens : correctionTokens(`${row.job_title ?? ''} ${row.jd_text}`))
+    const overlap = [...query].filter((token) => memory.has(token)).length
+    const union = new Set([...query, ...memory]).size
+    const titleBoost = title && row.job_title && title.toLowerCase() === row.job_title.toLowerCase() ? .2 : 0
+    return { row, similarity: Math.min(1, overlap / Math.max(1, union) + titleBoost) }
+  }).sort((a, b) => b.similarity - a.similarity)
+  const best = ranked[0]
+  if (!best || best.similarity < .22) return { score, applied: null }
+  const target = { STRONG: 85, DECENT: 60, WEAK: 35, REJECT: 0 }[best.row.corrected_verdict]
+  const weight = Math.min(.45, best.similarity * .55)
+  return {
+    score: Math.round(score * (1 - weight) + target * weight),
+    applied: { correction_id: best.row.id, similarity: Math.round(best.similarity * 100), corrected_verdict: best.row.corrected_verdict },
+  }
+}
+
 function cosine(left: number[], right: number[]): number {
   if (!left.length || left.length !== right.length) return 0
   const ln = Math.sqrt(left.reduce((s, x) => s + x * x, 0)); const rn = Math.sqrt(right.reduce((s, x) => s + x * x, 0))
@@ -106,7 +130,7 @@ function rejectReasons(jdText: string, filters: HardRejectFilters, title?: strin
   return [...new Set(reasons)]
 }
 
-export function scoreJobFast(input: { jdText: string; resumeText: string; filters: HardRejectFilters; jobTitle?: string | null; company?: string | null; evidence: CandidateEvidenceInput[] }): AnalysisResult {
+export function scoreJobFast(input: { jdText: string; resumeText: string; filters: HardRejectFilters; jobTitle?: string | null; company?: string | null; evidence: CandidateEvidenceInput[]; corrections?: RecommendationCorrection[] }): AnalysisResult {
   const jdText = input.jdText.slice(0, 6000); const resumeText = input.resumeText.slice(0, 6000)
   const jdSkills = skills(jdText); const resumeSkills = skills(resumeText); const retrieval = retrieve(jdText, jdSkills, input.evidence)
   const matching = skillsInOrder(new Set([...jdSkills].filter((x) => resumeSkills.has(x))), jdText)
@@ -115,10 +139,13 @@ export function scoreJobFast(input: { jdText: string; resumeText: string; filter
   const ats = input.evidence.length ? Math.round(keywordScore * .75 + retrieval.score * .25) : keywordScore
   const gap = roleLevel(`${input.jobTitle ?? ''} ${jdText.slice(0, 1200)}`) - roleLevel(resumeText)
   const role = gap <= 0 ? 92 : gap === 1 ? 76 : gap === 2 ? 48 : 25
-  const rejects = rejectReasons(jdText, input.filters, input.jobTitle); const composite = rejects.length ? 0 : Math.round(ats * .55 + role * .45)
+  const rejects = rejectReasons(jdText, input.filters, input.jobTitle)
+  const baseComposite = rejects.length ? 0 : Math.round(ats * .55 + role * .45)
+  const calibration = rejects.length ? { score: baseComposite, applied: null } : calibrateWithCorrections(jdText, input.jobTitle, baseComposite, input.corrections ?? [])
+  const composite = calibration.score
   const verdict: AnalysisResult['verdict'] = rejects.length ? 'REJECT' : composite >= 70 && role >= 70 ? 'STRONG' : composite >= 50 ? 'DECENT' : 'WEAK'
   const keyword = verdict === 'STRONG' ? 'APPLY' : verdict === 'DECENT' ? 'APPLY IF' : 'SKIP'
   const headline = rejects.length ? `Skip this one. ${rejects[0]}.` : verdict === 'STRONG' ? "This one's worth it. Strong skills and seniority alignment." : verdict === 'DECENT' ? 'Worth a closer look, with a few gaps to verify.' : 'Probably skip. The important requirements do not line up well enough.'
   const gapText = missing.length ? `Missing: ${missing.slice(0, 4).join(', ')}.` : 'No major technology gap found.'
-  return { ats_score: ats, role_level_score: role, composite_score: composite, verdict, hard_reject_triggered: !!rejects.length, hard_reject_reasons: rejects, matching_skills: matching.slice(0, 6), missing_skills: missing.slice(0, 6), role_level_assessment: gap <= 0 ? 'Candidate seniority meets or exceeds the role.' : `Role appears ${gap} level${gap === 1 ? '' : 's'} above the resume evidence.`, gap_analysis: gapText, recommendation: `${keyword} — ${headline}`, headline, requirements_met: [...jdSkills].sort().slice(0, 4).map((skill) => { const support = retrieval.evidence.find((x) => x.matched_requirements.includes(skill)); const met = resumeSkills.has(skill) || !!support; return { requirement: skill, status: met ? 'met' as const : 'missing' as const, evidence: support?.content.slice(0, 180) ?? (met ? `Resume mentions ${skill}` : 'None found') } }), soft_concerns: missing.length ? [gapText] : [], rag_score: retrieval.score, retrieved_evidence: retrieval.evidence }
+  return { ats_score: ats, role_level_score: role, composite_score: composite, verdict, hard_reject_triggered: !!rejects.length, hard_reject_reasons: rejects, matching_skills: matching.slice(0, 6), missing_skills: missing.slice(0, 6), role_level_assessment: gap <= 0 ? 'Candidate seniority meets or exceeds the role.' : `Role appears ${gap} level${gap === 1 ? '' : 's'} above the resume evidence.`, gap_analysis: gapText, recommendation: `${keyword} — ${headline}`, headline, requirements_met: [...jdSkills].sort().slice(0, 4).map((skill) => { const support = retrieval.evidence.find((x) => x.matched_requirements.includes(skill)); const met = resumeSkills.has(skill) || !!support; return { requirement: skill, status: met ? 'met' as const : 'missing' as const, evidence: support?.content.slice(0, 180) ?? (met ? `Resume mentions ${skill}` : 'None found') } }), soft_concerns: missing.length ? [gapText] : [], rag_score: retrieval.score, retrieved_evidence: retrieval.evidence, salary_range: extractSalaryRange(jdText), correction_applied: calibration.applied }
 }
