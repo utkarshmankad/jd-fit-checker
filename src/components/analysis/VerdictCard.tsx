@@ -37,12 +37,14 @@ function CardChrome({
   isExpanded,
   onToggle,
   timeSavedChip,
+  applicationAction,
 }: {
   result: ScreeningResult
   children: React.ReactNode
   isExpanded: boolean
   onToggle: () => void
   timeSavedChip?: string
+  applicationAction?: React.ReactNode
 }) {
   const display = getVerdictDisplay(result.verdict)
   return (
@@ -61,6 +63,7 @@ function CardChrome({
             {children}
           </div>
           <div className="flex items-start gap-2 shrink-0">
+            {applicationAction}
             {timeSavedChip && (
               <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap mt-1">{timeSavedChip}</span>
             )}
@@ -100,14 +103,14 @@ function ScoreBreakdown({ result }: { result: ScreeningResult }) {
 }
 
 // Full card — used for the non-dismissed zone (STRONG / DECENT / WEAK).
-export function VerdictCard({ result, isExpanded, onToggle }: { result: ScreeningResult; isExpanded: boolean; onToggle: () => void }) {
+export function VerdictCard({ result, isExpanded, onToggle, applicationAction }: { result: ScreeningResult; isExpanded: boolean; onToggle: () => void; applicationAction?: React.ReactNode }) {
   const display = getVerdictDisplay(result.verdict)
   const headline = result.analysis_json?.headline
   const word = finalWord(result.analysis_json?.recommendation)
   const requirements = (result.analysis_json?.requirements_met ?? []).slice(0, 6)
 
   return (
-    <CardChrome result={result} isExpanded={isExpanded} onToggle={onToggle}>
+    <CardChrome result={result} isExpanded={isExpanded} onToggle={onToggle} applicationAction={applicationAction}>
       <p className="font-bold text-lg sm:text-xl leading-tight mt-2" style={{ color: display.barColor }}>
         {display.verdictLine}
       </p>
@@ -142,7 +145,7 @@ export function VerdictCard({ result, isExpanded, onToggle }: { result: Screenin
 
 // Reject-zone card — terse reasons list + "Next.", no expand chevron. A
 // person who's already decided doesn't linger — this card shouldn't either.
-export function DismissedCard({ result }: { result: ScreeningResult }) {
+export function DismissedCard({ result, applicationAction }: { result: ScreeningResult; applicationAction?: React.ReactNode }) {
   const display = getVerdictDisplay(result.verdict)
   const reasons = (result.hard_reject_reasons ?? []).slice(0, 4)
   const timeSaved = calculateTimeSaved(1)
@@ -169,7 +172,10 @@ export function DismissedCard({ result }: { result: ScreeningResult }) {
             <RecommendationCorrection resultId={result.id} currentVerdict={result.verdict} />
           </div>
         </div>
-        <span className="text-xs text-gray-300 dark:text-gray-600 whitespace-nowrap shrink-0">~{timeSaved} saved</span>
+        <div className="flex items-center gap-2 shrink-0">
+          {applicationAction}
+          <span className="text-xs text-gray-300 dark:text-gray-600 whitespace-nowrap">~{timeSaved} saved</span>
+        </div>
       </div>
     </div>
   )
