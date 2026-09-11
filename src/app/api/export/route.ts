@@ -25,6 +25,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to load results for export' }, { status: 500 })
   }
 
+  const resultIds = (data ?? []).map((row) => row.id)
+  const { data: tracked, error: trackerError } = resultIds.length === 0
+    ? { data: [], error: null }
+    : await supabase
+        .from('job_tracker')
+        .select('screening_result_id')
+        .eq('user_id', user.id)
+        .in('screening_result_id', resultIds)
+
+  if (trackerError) {
+    console.error('export tracker query failed:', trackerError.message)
+    return NextResponse.json({ error: 'Failed to load application statuses for export' }, { status: 500 })
+  }
+  const appliedIds = new Set((tracked ?? []).map((item) => item.screening_result_id))
+
   const rows = (data ?? []).map((r) => ({
     'Job Title': sanitizeCsvField(r.job_title ?? ''),
     Company: sanitizeCsvField(r.company ?? ''),
@@ -33,6 +48,7 @@ export async function GET(request: NextRequest) {
     'Role Level Score': r.role_level_score,
     'Composite Score': r.composite_score,
     Verdict: r.verdict,
+    'Application Status': appliedIds.has(r.id) ? 'Applied' : 'Not Applied',
     'Hard Reject Reasons': sanitizeCsvField(((r.hard_reject_reasons as string[]) ?? []).join('; ')),
     'Screened At': r.created_at,
   }))

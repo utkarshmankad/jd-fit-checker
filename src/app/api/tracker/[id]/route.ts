@@ -1,84 +1,27 @@
-// Job Tracker — feature disabled (kept for later, not deleted). Uncomment the
-// block below to re-enable, and re-add the TrackButton usages + nav entry that
-// call this. Next.js requires a route.ts to export at least one handler to be
-// a valid route module, so this stub 404s until re-enabled.
-import { NextResponse } from 'next/server'
-
-export async function GET() {
-  return NextResponse.json({ error: 'Not found' }, { status: 404 })
-}
-
-/*
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import type { TrackedJobStatus } from '@/types'
-
-const VALID_STATUSES: TrackedJobStatus[] = ['Applied', 'Interviewing', 'Offer', 'Rejected', 'Withdrawn']
-
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { id } = await params
-  const body = await request.json() as { status?: string; notes?: string }
-
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-
-  if (body.status !== undefined) {
-    if (!VALID_STATUSES.includes(body.status as TrackedJobStatus)) {
-      return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
-    }
-    updates.status = body.status
-  }
-  if (body.notes !== undefined) {
-    updates.notes = body.notes
-  }
-
-  const { data: updated, error } = await supabase
-    .from('job_tracker')
-    .update(updates)
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .select()
-    .single()
-
-  if (error || !updated) {
-    console.error('job_tracker update failed:', error)
-    return NextResponse.json({ error: 'Failed to update tracked job' }, { status: 500 })
-  }
-
-  return NextResponse.json({ item: updated })
-}
 
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
-
-  const { error } = await supabase
+  const { data: deleted, error } = await supabase
     .from('job_tracker')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id)
+    .select('id')
+    .maybeSingle()
 
   if (error) {
     console.error('job_tracker delete failed:', error)
-    return NextResponse.json({ error: 'Failed to untrack job' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update application status' }, { status: 500 })
   }
-
+  if (!deleted) return NextResponse.json({ error: 'Tracked job not found' }, { status: 404 })
   return NextResponse.json({ success: true })
 }
-*/

@@ -8,7 +8,7 @@ import {
   AlertTriangle, WifiOff,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import type { ScreeningResult, HardRejectFilters, BatchIntelligence } from '@/types'
+import type { ScreeningResult, HardRejectFilters, BatchIntelligence, TrackedJob } from '@/types'
 import type { FatalScreenError } from '@/app/api/screen/route'
 import UsageWidget from '@/components/dashboard/UsageWidget'
 import ReferralCard from '@/components/dashboard/ReferralCard'
@@ -21,8 +21,7 @@ import ReferralCard from '@/components/dashboard/ReferralCard'
 const BatchIntelligencePanel = dynamic(() => import('@/components/analysis/BatchIntelligencePanel'))
 const WhyNotChatGptModal = dynamic(() => import('@/components/dashboard/WhyNotChatGptModal'))
 const PaymentModal = dynamic(() => import('@/components/payment/PaymentModal'))
-// Job Tracker — feature disabled, kept for later.
-// import TrackButton from '@/components/tracker/TrackButton'
+import ApplicationStatusButton from '@/components/tracker/ApplicationStatusButton'
 import { SAMPLE_RESULTS } from '@/lib/sample-data'
 import { calculateTimeSaved } from '@/lib/utils/time-saved'
 import { VerdictCard, DismissedCard, ErrorCard, LoadingCard } from '@/components/analysis/VerdictCard'
@@ -149,7 +148,7 @@ export default function DashboardPage() {
   const [hardRejectFilters, setHardRejectFilters] = useState<HardRejectFilters | null>(null)
 
   const [screenError, setScreenError] = useState<ScreenError | null>(null)
-  // const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set())
+  const [trackedByResult, setTrackedByResult] = useState<Map<string, TrackedJob>>(new Map())
   const [batchIntelligence, setBatchIntelligence] = useState<BatchIntelligence | null>(null)
   const [showChatGptModal, setShowChatGptModal] = useState(false)
   const [showTierModal, setShowTierModal] = useState(false)
@@ -169,6 +168,35 @@ export default function DashboardPage() {
   useEffect(() => {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
   }, [])
+
+  useEffect(() => {
+    fetch('/api/tracker')
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('failed')))
+      .then((data: { items: TrackedJob[] }) => {
+        setTrackedByResult(new Map(
+          data.items
+            .filter((item) => item.screening_result_id)
+            .map((item) => [item.screening_result_id as string, item])
+        ))
+      })
+      .catch(() => toast.error('Could not load application statuses'))
+  }, [])
+
+  function applicationAction(result: ScreeningResult) {
+    if (isSampleData || !result.id) return undefined
+    return (
+      <ApplicationStatusButton
+        screeningResultId={result.id}
+        trackedItem={trackedByResult.get(result.id) ?? null}
+        onChange={(item) => setTrackedByResult((previous) => {
+          const next = new Map(previous)
+          if (item) next.set(result.id, item)
+          else next.delete(result.id)
+          return next
+        })}
+      />
+    )
+  }
 
   useEffect(() => {
     if (!screening) return
@@ -579,6 +607,7 @@ export default function DashboardPage() {
       'Role Fit %': r.role_level_score,
       'Composite %': r.composite_score,
       Verdict: r.verdict,
+      'Application Status': trackedByResult.has(r.id) ? 'Applied' : 'Not Applied',
     }))
     const rejectCount = results.filter((r) => r.verdict === 'REJECT').length
     const timeSavedComment = rejectCount > 0 ? `# ${calculateTimeSaved(rejectCount)} saved across this batch\n` : ''
@@ -914,6 +943,7 @@ export default function DashboardPage() {
                       setExpandedId(opening ? result.id : null)
                       if (opening) track.resultExpanded(result.verdict, result.company ?? '')
                     }}
+                    applicationAction={applicationAction(result)}
                   />
                 )
               })}
@@ -939,6 +969,7 @@ export default function DashboardPage() {
                       setExpandedId(opening ? result.id : null)
                       if (opening) track.resultExpanded(result.verdict, result.company ?? '')
                     }}
+                    applicationAction={applicationAction(result)}
                   />
                 )
               ))}
@@ -955,7 +986,7 @@ export default function DashboardPage() {
               </div>
               <div className="mt-3 space-y-2">
                 {(rejectedCollapsed ? rejectResults.slice(0, 3) : rejectResults).map((result) => (
-                  <DismissedCard key={result.id} result={result} />
+                  <DismissedCard key={result.id} result={result} applicationAction={applicationAction(result)} />
                 ))}
               </div>
               {rejectResults.length > 3 && (
