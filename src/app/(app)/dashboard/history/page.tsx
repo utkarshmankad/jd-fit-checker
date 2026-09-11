@@ -3,12 +3,11 @@
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { Download, History, Search, ChevronDown, ChevronUp, ExternalLink, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
-import type { ScreeningResult } from '@/types'
+import type { ScreeningResult, TrackedJob } from '@/types'
 import { SCORE_TOOLTIPS, getReasonLine, ScorePill, AnalysisDetailBody, FakeEmBadge } from '@/components/analysis/AnalysisDetail'
 import { getVerdictDisplay } from '@/lib/utils/verdicts'
 import { RecommendationCorrection } from '@/components/analysis/RecommendationCorrection'
-// Job Tracker — feature disabled, kept for later.
-// import TrackButton from '@/components/tracker/TrackButton'
+import ApplicationStatusButton from '@/components/tracker/ApplicationStatusButton'
 
 type HistoryRow = Omit<ScreeningResult, 'jd_text'>
 
@@ -21,6 +20,7 @@ interface Batch {
 
 const VERDICTS = ['ALL', 'STRONG', 'DECENT', 'WEAK', 'REJECT'] as const
 type VerdictFilter = (typeof VERDICTS)[number]
+type ApplicationFilter = 'ALL' | 'APPLIED' | 'NOT_APPLIED'
 
 function verdictFilterLabel(v: VerdictFilter) {
   return v === 'ALL' ? 'ALL' : getVerdictDisplay(v).label
@@ -58,17 +58,27 @@ export default function HistoryPage() {
 
   const [search, setSearch] = useState('')
   const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>('ALL')
+  const [applicationFilter, setApplicationFilter] = useState<ApplicationFilter>('ALL')
   const [collapsedBatches, setCollapsedBatches] = useState<Set<string>>(new Set())
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
-  // const [trackedIds, setTrackedIds] = useState<Set<string>>(new Set())
+  const [trackedByResult, setTrackedByResult] = useState<Map<string, TrackedJob>>(new Map())
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/screen/history')
-        if (!res.ok) throw new Error('Failed to load history')
-        const data = (await res.json()) as { batches: Batch[] }
+        const [historyResponse, trackerResponse] = await Promise.all([
+          fetch('/api/screen/history'),
+          fetch('/api/tracker'),
+        ])
+        if (!historyResponse.ok || !trackerResponse.ok) throw new Error('Failed to load history')
+        const data = (await historyResponse.json()) as { batches: Batch[] }
+        const trackerData = (await trackerResponse.json()) as { items: TrackedJob[] }
         setBatches(data.batches)
+        setTrackedByResult(new Map(
+          trackerData.items
+            .filter((item) => item.screening_result_id)
+            .map((item) => [item.screening_result_id as string, item])
+        ))
       } catch {
         toast.error('Could not load history')
       } finally {
@@ -76,15 +86,16 @@ export default function HistoryPage() {
       }
     }
     load()
-
-    // Job Tracker — feature disabled, kept for later.
-    // fetch('/api/tracker')
-    //   .then((r) => r.json())
-    //   .then((data: { items?: { screening_result_id: string | null }[] }) => {
-    //     setTrackedIds(new Set((data.items ?? []).filter((i) => i.screening_result_id).map((i) => i.screening_result_id as string)))
-    //   })
-    //   .catch(() => {})
   }, [])
+
+  function setApplicationStatus(resultId: string, item: TrackedJob | null) {
+    setTrackedByResult((previous) => {
+      const next = new Map(previous)
+      if (item) next.set(resultId, item)
+      else next.delete(resultId)
+      return next
+    })
+  }
 
   function handleExport(batch_id: string) {
     window.location.href = `/api/export?batch_id=${batch_id}`
@@ -108,6 +119,9 @@ export default function HistoryPage() {
         ...b,
         results: b.results.filter((r) => {
           if (verdictFilter !== 'ALL' && r.verdict !== verdictFilter) return false
+          const isApplied = trackedByResult.has(r.id)
+          if (applicationFilter === 'APPLIED' && !isApplied) return false
+          if (applicationFilter === 'NOT_APPLIED' && isApplied) return false
           if (q) {
             const inCompany = r.company?.toLowerCase().includes(q) ?? false
             const inTitle = r.job_title?.toLowerCase().includes(q) ?? false
@@ -117,7 +131,7 @@ export default function HistoryPage() {
         }),
       }))
       .filter((b) => b.results.length > 0)
-  }, [batches, search, verdictFilter])
+  }, [applicationFilter, batches, search, trackedByResult, verdictFilter])
 
   const filteredCount = useMemo(() => filteredBatches.reduce((sum, b) => sum + b.results.length, 0), [filteredBatches])
 
@@ -174,6 +188,22 @@ export default function HistoryPage() {
               className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${verdictFilterClass(v, verdictFilter === v)}`}
             >
               {verdictFilterLabel(v)}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1.5" aria-label="Filter by application status">
+          {(['ALL', 'APPLIED', 'NOT_APPLIED'] as ApplicationFilter[]).map((status) => (
+            <button
+              key={status}
+              onClick={() => setApplicationFilter(status)}
+              className={`px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${
+                applicationFilter === status
+                  ? 'border-green-600 bg-green-600 text-white'
+                  : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800'
+              }`}
+            >
+              {status === 'ALL' ? 'Any status' : status === 'APPLIED' ? 'Applied' : 'Not applied'}
             </button>
           ))}
         </div>
@@ -259,6 +289,11 @@ export default function HistoryPage() {
                             </span>
 
                             <div className="flex items-center gap-1 shrink-0">
+                              <ApplicationStatusButton
+                                screeningResultId={r.id}
+                                trackedItem={trackedByResult.get(r.id) ?? null}
+                                onChange={(item) => setApplicationStatus(r.id, item)}
+                              />
                               <button
                                 onClick={() => setExpandedRowId(isExpanded ? null : rowKey)}
                                 className={`p-1.5 rounded transition-colors ${isExpanded ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
@@ -266,16 +301,6 @@ export default function HistoryPage() {
                               >
                                 <Eye size={15} />
                               </button>
-                              {/* Job Tracker — feature disabled, kept for later.
-                              <TrackButton
-                                screeningResultId={r.id}
-                                jobTitle={r.job_title}
-                                company={r.company}
-                                jobUrl={r.job_url}
-                                tracked={trackedIds.has(r.id)}
-                                onTracked={(item) => setTrackedIds((prev) => new Set(prev).add(item.screening_result_id as string))}
-                              />
-                              */}
                             </div>
                           </div>
 
