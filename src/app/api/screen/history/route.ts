@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { inferJobMetadataFromUrl } from '@/lib/jobs/fetch-job'
 import type { ScreeningResult } from '@/types'
 
 // Lightweight row — omits jd_text (full JD text not needed for the history view)
@@ -24,12 +26,38 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to load history' }, { status: 500 })
   }
 
+  // Older rows may predate metadata extraction. Prefer the shared job cache,
+  // then fall back to conservative URL-derived labels so History never shows
+  // an unexplained empty dash when the source URL contains useful metadata.
+  const rows = (data ?? []) as HistoryRow[]
+  const missingUrls = [...new Set(rows
+    .filter((row) => row.job_url && (!row.job_title || !row.company))
+    .map((row) => row.job_url as string))]
+  const cachedByUrl = new Map<string, { job_title: string | null; company: string | null }>()
+  if (missingUrls.length) {
+    const service = createServiceClient()
+    const { data: cachedRows, error: cacheError } = await service
+      .from('job_description_cache')
+      .select('canonical_url, job_title, company')
+      .in('canonical_url', missingUrls)
+    if (cacheError) console.warn('History metadata cache lookup failed:', cacheError.message)
+    for (const cached of cachedRows ?? []) cachedByUrl.set(cached.canonical_url, cached)
+  }
+
+  for (const row of rows) {
+    if (!row.job_url || (row.job_title && row.company)) continue
+    const cached = cachedByUrl.get(row.job_url)
+    const inferred = inferJobMetadataFromUrl(row.job_url)
+    row.job_title ||= cached?.job_title ?? inferred.jobTitle ?? null
+    row.company ||= cached?.company ?? inferred.company ?? null
+  }
+
   const batchMap = new Map<
     string,
     { batch_id: string; created_at: string; results: HistoryRow[] }
   >()
 
-  for (const row of data ?? []) {
+  for (const row of rows) {
     const r = row as HistoryRow
     if (!batchMap.has(r.batch_id)) {
       batchMap.set(r.batch_id, { batch_id: r.batch_id, created_at: r.created_at, results: [] })
