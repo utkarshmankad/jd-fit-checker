@@ -572,7 +572,23 @@ export async function POST(request: NextRequest) {
 
   if (urls && Array.isArray(urls) && urls.length > 0) {
     const urlList = [...new Set(urls.filter((u) => u.trim()).map(normalizeJobUrl))]
-    await processInChunks(urlList, async (url): Promise<boolean> => {
+    // A client may retry a transiently failed chunk after the first request
+    // actually committed but its response was lost. Reuse those rows so the
+    // retry is idempotent: no duplicate history entries and no double charge.
+    const { data: existingRows, error: existingRowsError } = await supabase
+      .from('screening_results')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('batch_id', batch_id)
+      .in('job_url', urlList)
+    if (existingRowsError) console.warn('Existing batch result lookup failed:', existingRowsError.message)
+    const existingByUrl = new Map(
+      (existingRows ?? []).filter((row) => row.job_url).map((row) => [row.job_url as string, row as ScreeningResult])
+    )
+    results.push(...existingByUrl.values())
+
+    const pendingUrls = urlList.filter((url) => !existingByUrl.has(url))
+    await processInChunks(pendingUrls, async (url): Promise<boolean> => {
       if (!isSafeJobUrl(url)) {
         // Defense-in-depth before this ever reaches the screening service's
         // own server-side fetch — doesn't consume quota, just rejected outright.
