@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 
 export const EVIDENCE_EMBEDDING_DIMENSIONS = 192
+export const CANDIDATE_EVIDENCE_VERSION = 2
 const MAX_CHUNKS = 64
 const MAX_CHUNK_CHARS = 900
 
@@ -38,6 +39,7 @@ const KNOWN_SKILLS = [
   'MongoDB', 'Redis', 'GraphQL', 'REST APIs', 'Microservices', 'CI/CD', 'Jest',
   'Cypress', 'Tailwind CSS', 'System Design', 'Leadership', 'Kafka', 'Flink',
   'Spark', 'Airflow', 'Terraform', 'Databricks', 'Snowflake', 'Machine Learning',
+  'People Management', 'Stakeholder Management', 'Observability',
 ]
 
 const SKILL_ALIASES: Record<string, string[]> = {
@@ -51,8 +53,20 @@ const SKILL_ALIASES: Record<string, string[]> = {
   'Microservices': ['microservices', 'micro-services'],
   'CI/CD': ['ci/cd', 'continuous integration', 'github actions'],
   'System Design': ['system design', 'distributed systems', 'architecture'],
-  'Leadership': ['technical leadership', 'engineering leadership', 'mentoring', 'coaching'],
+  'Leadership': ['leadership', 'technical leadership', 'engineering leadership', 'mentoring', 'coaching'],
   'Machine Learning': ['machine learning', 'ml engineering', 'applied ai'],
+  'People Management': ['people management', 'direct reports', 'performance reviews'],
+  'Stakeholder Management': ['stakeholder management', 'executive stakeholders', 'cross-functional alignment'],
+  'Observability': ['observability', 'monitoring', 'distributed tracing'],
+}
+
+const IMPLICIT_SKILL_RULES: Record<string, RegExp[]> = {
+  Microservices: [/\bindependently deployable services?\b/i, /\bservice[- ]oriented architecture\b/i, /\bdistributed services?\b/i],
+  'System Design': [/\barchitect(?:ed|ing)?\b[\s\S]{0,100}\b(?:platform|system|solution)\b/i, /\bdesign(?:ed|ing)?\b[\s\S]{0,100}\b(?:scalable|distributed|highly available|high availability)\b/i],
+  Leadership: [/\bled (?:an? |the )?(?:engineering |technical )?team\b/i, /\bmanaged (?:an? |the )?team\b/i, /\bmentored|\bcoached|\bhired and (?:built|scaled)\b/i],
+  'People Management': [/\bmanaged (?:a |the )?team of \d+\b/i, /\bled (?:an? |the )?(?:engineering |technical )?team of \d+\b/i, /\bperformance (?:review|management)|\bdirect reports?\b/i],
+  'Stakeholder Management': [/\bpartnered with (?:product|design|business|sales|executive)\b/i, /\bcross[- ]functional (?:alignment|collaboration|team)\b/i, /\bpresented to (?:executives|leadership|the board)\b/i],
+  Observability: [/\b(?:reduced|improved) (?:mttr|incident response|production reliability)\b/i, /\bimplemented (?:metrics|logging|tracing|monitoring)\b/i],
 }
 
 function tokenise(text: string): string[] {
@@ -92,10 +106,14 @@ function containsPhrase(text: string, phrase: string): boolean {
 
 function extractSkills(text: string, preferred: string[]): string[] {
   const candidates = [...new Set([...KNOWN_SKILLS, ...preferred.filter(Boolean)])]
-  return candidates.filter((skill) => {
+  const explicit = candidates.filter((skill) => {
     const aliases = SKILL_ALIASES[skill] ?? [skill.toLowerCase()]
     return aliases.some((alias) => containsPhrase(text, alias))
   })
+  const implicit = Object.entries(IMPLICIT_SKILL_RULES)
+    .filter(([, patterns]) => patterns.some((pattern) => pattern.test(text)))
+    .map(([skill]) => skill)
+  return [...new Set([...explicit, ...implicit])]
 }
 
 function evidenceType(text: string): string {
@@ -160,7 +178,6 @@ export function buildCandidateEvidence(
     content,
     skills: extractSkills(content, preferredSkills),
     embedding: createEvidenceEmbedding(content),
-    metadata: { source: 'resume', version: 1 },
+    metadata: { source: 'resume', version: CANDIDATE_EVIDENCE_VERSION },
   }))
 }
-
