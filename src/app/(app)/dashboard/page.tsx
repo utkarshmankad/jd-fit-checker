@@ -60,6 +60,28 @@ const LOADING_MESSAGES = [
 ]
 
 const AVG_SCREEN_TIME_KEY = 'jobsnob-avg-screen-time-ms'
+const MAX_CONCURRENT_SCREEN_REQUESTS = 8
+const MAX_SCREEN_REQUEST_ATTEMPTS = 3
+
+async function runWithConcurrency<T>(
+  values: T[],
+  concurrency: number,
+  worker: (value: T) => Promise<void>
+): Promise<void> {
+  let nextIndex = 0
+  const workers = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (nextIndex < values.length) {
+      const value = values[nextIndex]
+      nextIndex += 1
+      await worker(value)
+    }
+  })
+  await Promise.all(workers)
+}
+
+function retryDelay(attempt: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 400 * 2 ** attempt))
+}
 
 
 const VERDICT_ORDER: Record<'STRONG' | 'DECENT' | 'WEAK' | 'REJECT', number> = {
@@ -497,11 +519,20 @@ export default function DashboardPage() {
         })),
       ]
 
-      await Promise.all(batches.map(async (batch) => {
-        let res: Response
-        try {
-          res = await fetch('/api/screen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(batch.payload) })
-        } catch {
+      await runWithConcurrency(batches, MAX_CONCURRENT_SCREEN_REQUESTS, async (batch) => {
+        let res: Response | undefined
+        for (let attempt = 0; attempt < MAX_SCREEN_REQUEST_ATTEMPTS; attempt += 1) {
+          try {
+            res = await fetch('/api/screen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(batch.payload) })
+            const retryableStatus = res.status === 408 || res.status === 429 || res.status >= 500
+            if (!retryableStatus || attempt === MAX_SCREEN_REQUEST_ATTEMPTS - 1) break
+          } catch {
+            if (attempt === MAX_SCREEN_REQUEST_ATTEMPTS - 1) break
+          }
+          await retryDelay(attempt)
+        }
+
+        if (!res) {
           setScreenError({ type: 'network', message: 'Connection error — check your internet connection and try again.' })
           track.screeningFailed('network', itemsToScreen.length)
           completedFully = false
@@ -554,7 +585,7 @@ export default function DashboardPage() {
           completedFully = false
           return
         }
-      }))
+      })
     } finally {
       setBatchTime(new Date().toISOString())
       setSkeletonCount(0)
