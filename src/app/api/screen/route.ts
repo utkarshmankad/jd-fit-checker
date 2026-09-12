@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { normalizeJobUrl, isSafeJobUrl } from '@/lib/utils/url'
 import { checkScreenLimit } from '@/lib/utils/screen-limits'
-import { buildCandidateEvidence, type CandidateEvidenceInput } from '@/lib/rag/candidate-evidence'
+import { buildCandidateEvidence, CANDIDATE_EVIDENCE_VERSION, type CandidateEvidenceInput } from '@/lib/rag/candidate-evidence'
 import { fetchJobLightweight, jobContentHash, type ExtractedJob } from '@/lib/jobs/fetch-job'
 import { scoreJobFast } from '@/lib/screening/fast-scorer'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile, RecommendationCorrection } from '@/types'
@@ -325,9 +325,12 @@ export async function POST(request: NextRequest) {
     .order('chunk_index', { ascending: true })
     .limit(64)
 
+  const evidenceNeedsRefresh = evidenceRows?.some(
+    (row) => (row.metadata as Record<string, unknown> | null)?.version !== CANDIDATE_EVIDENCE_VERSION
+  ) ?? false
   if (evidenceReadError) {
     console.warn('Candidate evidence unavailable; using legacy scoring:', evidenceReadError.message)
-  } else if (evidenceRows?.length) {
+  } else if (evidenceRows?.length && !evidenceNeedsRefresh) {
     candidateEvidence = evidenceRows as CandidateEvidenceInput[]
   } else if (storedResume.trim()) {
     const preferences = (profile.preferences ?? {}) as Record<string, unknown>
@@ -340,6 +343,10 @@ export async function POST(request: NextRequest) {
     })
     if (generated.length) {
       const service = createServiceClient()
+      if (evidenceNeedsRefresh) {
+        const { error: deleteError } = await service.from('candidate_evidence').delete().eq('user_id', user.id)
+        if (deleteError) console.warn('Stale candidate evidence cleanup failed:', deleteError.message)
+      }
       const { data: inserted, error: lazyIndexError } = await service
         .from('candidate_evidence')
         .insert(generated)
@@ -572,7 +579,23 @@ export async function POST(request: NextRequest) {
 
   if (urls && Array.isArray(urls) && urls.length > 0) {
     const urlList = [...new Set(urls.filter((u) => u.trim()).map(normalizeJobUrl))]
-    await processInChunks(urlList, async (url): Promise<boolean> => {
+    // A client may retry a transiently failed chunk after the first request
+    // actually committed but its response was lost. Reuse those rows so the
+    // retry is idempotent: no duplicate history entries and no double charge.
+    const { data: existingRows, error: existingRowsError } = await supabase
+      .from('screening_results')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('batch_id', batch_id)
+      .in('job_url', urlList)
+    if (existingRowsError) console.warn('Existing batch result lookup failed:', existingRowsError.message)
+    const existingByUrl = new Map(
+      (existingRows ?? []).filter((row) => row.job_url).map((row) => [row.job_url as string, row as ScreeningResult])
+    )
+    results.push(...existingByUrl.values())
+
+    const pendingUrls = urlList.filter((url) => !existingByUrl.has(url))
+    await processInChunks(pendingUrls, async (url): Promise<boolean> => {
       if (!isSafeJobUrl(url)) {
         // Defense-in-depth before this ever reaches the screening service's
         // own server-side fetch — doesn't consume quota, just rejected outright.
