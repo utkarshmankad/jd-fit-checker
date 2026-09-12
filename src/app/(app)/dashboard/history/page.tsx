@@ -55,6 +55,8 @@ function formatTime(iso: string) {
 export default function HistoryPage() {
   const [batches, setBatches] = useState<Batch[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  const [nextOffset, setNextOffset] = useState<number | null>(null)
 
   const [search, setSearch] = useState('')
   const [verdictFilter, setVerdictFilter] = useState<VerdictFilter>('ALL')
@@ -71,9 +73,10 @@ export default function HistoryPage() {
           fetch('/api/tracker'),
         ])
         if (!historyResponse.ok || !trackerResponse.ok) throw new Error('Failed to load history')
-        const data = (await historyResponse.json()) as { batches: Batch[] }
+        const data = (await historyResponse.json()) as { batches: Batch[]; next_offset: number | null }
         const trackerData = (await trackerResponse.json()) as { items: TrackedJob[] }
         setBatches(data.batches)
+        setNextOffset(data.next_offset)
         setTrackedByResult(new Map(
           trackerData.items
             .filter((item) => item.screening_result_id)
@@ -87,6 +90,37 @@ export default function HistoryPage() {
     }
     load()
   }, [])
+
+  async function loadOlder() {
+    if (nextOffset === null || loadingOlder) return
+    setLoadingOlder(true)
+    try {
+      const response = await fetch(`/api/screen/history?offset=${nextOffset}`)
+      if (!response.ok) throw new Error('Failed to load older history')
+      const data = (await response.json()) as { batches: Batch[]; next_offset: number | null }
+      setBatches((current) => {
+        const merged = new Map(current.map((batch) => [batch.batch_id, batch]))
+        for (const incoming of data.batches) {
+          const existing = merged.get(incoming.batch_id)
+          if (!existing) {
+            merged.set(incoming.batch_id, incoming)
+            continue
+          }
+          const knownIds = new Set(existing.results.map((result) => result.id))
+          const results = [...existing.results, ...incoming.results.filter((result) => !knownIds.has(result.id))]
+          merged.set(incoming.batch_id, { ...existing, count: results.length, results })
+        }
+        return Array.from(merged.values()).sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+      })
+      setNextOffset(data.next_offset)
+    } catch {
+      toast.error('Could not load older history')
+    } finally {
+      setLoadingOlder(false)
+    }
+  }
 
   function setApplicationStatus(resultId: string, item: TrackedJob | null) {
     setTrackedByResult((previous) => {
@@ -318,6 +352,19 @@ export default function HistoryPage() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {nextOffset !== null && (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={loadOlder}
+            disabled={loadingOlder}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            {loadingOlder ? 'Loading older results…' : 'Load older results'}
+          </button>
         </div>
       )}
     </div>
