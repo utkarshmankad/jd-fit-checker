@@ -13,11 +13,23 @@ const SKILL_ALIASES: Record<string, string[]> = {
   Microservices: ['microservices', 'micro-services'], 'CI/CD': ['ci/cd', 'continuous integration', 'github actions'],
   Jest: ['jest'], Cypress: ['cypress'], 'Tailwind CSS': ['tailwind'],
   'System Design': ['system design', 'distributed systems', 'architecture'],
-  Leadership: ['technical leadership', 'engineering leadership', 'mentoring', 'coaching'],
+  Leadership: ['leadership', 'technical leadership', 'engineering leadership', 'mentoring', 'coaching'],
   Kafka: ['kafka', 'event streaming', 'streaming platform'], Flink: ['flink', 'apache flink'],
   Spark: ['spark', 'apache spark', 'pyspark'], Airflow: ['airflow', 'apache airflow'],
   Terraform: ['terraform', 'infrastructure as code'], Databricks: ['databricks'], Snowflake: ['snowflake'],
   'Machine Learning': ['machine learning', 'ml engineering', 'applied ai'],
+  'People Management': ['people management', 'direct reports', 'performance reviews'],
+  'Stakeholder Management': ['stakeholder management', 'executive stakeholders', 'cross-functional alignment'],
+  Observability: ['observability', 'monitoring', 'distributed tracing'],
+}
+
+const IMPLICIT_SKILL_RULES: Record<string, RegExp[]> = {
+  Microservices: [/\bindependently deployable services?\b/i, /\bservice[- ]oriented architecture\b/i, /\bdistributed services?\b/i],
+  'System Design': [/\barchitect(?:ed|ing)?\b[\s\S]{0,100}\b(?:platform|system|solution)\b/i, /\bdesign(?:ed|ing)?\b[\s\S]{0,100}\b(?:scalable|distributed|highly available|high availability)\b/i],
+  Leadership: [/\bled (?:an? |the )?(?:engineering |technical )?team\b/i, /\bmanaged (?:an? |the )?team\b/i, /\bmentored|\bcoached|\bhired and (?:built|scaled)\b/i],
+  'People Management': [/\bmanaged (?:a |the )?team of \d+\b/i, /\bled (?:an? |the )?(?:engineering |technical )?team of \d+\b/i, /\bperformance (?:review|management)|\bdirect reports?\b/i],
+  'Stakeholder Management': [/\bpartnered with (?:product|design|business|sales|executive)\b/i, /\bcross[- ]functional (?:alignment|collaboration|team)\b/i, /\bpresented to (?:executives|leadership|the board)\b/i],
+  Observability: [/\b(?:reduced|improved) (?:mttr|incident response|production reliability)\b/i, /\bimplemented (?:metrics|logging|tracing|monitoring)\b/i],
 }
 
 const LEVELS: Array<[number, string[]]> = [
@@ -43,6 +55,10 @@ function contains(text: string, phrase: string): boolean {
 
 function skills(text: string): Set<string> {
   return new Set(Object.entries(SKILL_ALIASES).filter(([, aliases]) => aliases.some((alias) => contains(text, alias))).map(([name]) => name))
+}
+
+function implicitSkills(text: string): Set<string> {
+  return new Set(Object.entries(IMPLICIT_SKILL_RULES).filter(([, patterns]) => patterns.some((pattern) => pattern.test(text))).map(([name]) => name))
 }
 
 function skillsInOrder(values: Set<string>, text: string): string[] {
@@ -132,7 +148,7 @@ function rejectReasons(jdText: string, filters: HardRejectFilters, title?: strin
 
 export function scoreJobFast(input: { jdText: string; resumeText: string; filters: HardRejectFilters; jobTitle?: string | null; company?: string | null; evidence: CandidateEvidenceInput[]; corrections?: RecommendationCorrection[] }): AnalysisResult {
   const jdText = input.jdText.slice(0, 6000); const resumeText = input.resumeText.slice(0, 6000)
-  const jdSkills = skills(jdText); const resumeSkills = skills(resumeText); const retrieval = retrieve(jdText, jdSkills, input.evidence)
+  const jdSkills = skills(jdText); const explicitResumeSkills = skills(resumeText); const inferredResumeSkills = implicitSkills(resumeText); const resumeSkills = new Set([...explicitResumeSkills, ...inferredResumeSkills]); const retrieval = retrieve(jdText, jdSkills, input.evidence)
   const matching = skillsInOrder(new Set([...jdSkills].filter((x) => resumeSkills.has(x))), jdText)
   const missing = skillsInOrder(new Set([...jdSkills].filter((x) => !resumeSkills.has(x))), jdText)
   const keywordScore = Math.round((jdSkills.size ? matching.length / jdSkills.size : .65) * 100)
@@ -147,5 +163,5 @@ export function scoreJobFast(input: { jdText: string; resumeText: string; filter
   const keyword = verdict === 'STRONG' ? 'APPLY' : verdict === 'DECENT' ? 'APPLY IF' : 'SKIP'
   const headline = rejects.length ? `Skip this one. ${rejects[0]}.` : verdict === 'STRONG' ? "This one's worth it. Strong skills and seniority alignment." : verdict === 'DECENT' ? 'Worth a closer look, with a few gaps to verify.' : 'Probably skip. The important requirements do not line up well enough.'
   const gapText = missing.length ? `Missing: ${missing.slice(0, 4).join(', ')}.` : 'No major technology gap found.'
-  return { ats_score: ats, role_level_score: role, composite_score: composite, verdict, hard_reject_triggered: !!rejects.length, hard_reject_reasons: rejects, matching_skills: matching.slice(0, 6), missing_skills: missing.slice(0, 6), role_level_assessment: gap <= 0 ? 'Candidate seniority meets or exceeds the role.' : `Role appears ${gap} level${gap === 1 ? '' : 's'} above the resume evidence.`, gap_analysis: gapText, recommendation: `${keyword} — ${headline}`, headline, requirements_met: [...jdSkills].sort().slice(0, 4).map((skill) => { const support = retrieval.evidence.find((x) => x.matched_requirements.includes(skill)); const met = resumeSkills.has(skill) || !!support; return { requirement: skill, status: met ? 'met' as const : 'missing' as const, evidence: support?.content.slice(0, 180) ?? (met ? `Resume mentions ${skill}` : 'None found') } }), soft_concerns: missing.length ? [gapText] : [], rag_score: retrieval.score, retrieved_evidence: retrieval.evidence, salary_range: extractSalaryRange(jdText), correction_applied: calibration.applied }
+  return { ats_score: ats, role_level_score: role, composite_score: composite, verdict, hard_reject_triggered: !!rejects.length, hard_reject_reasons: rejects, matching_skills: matching.slice(0, 6), missing_skills: missing.slice(0, 6), role_level_assessment: gap <= 0 ? 'Candidate seniority meets or exceeds the role.' : `Role appears ${gap} level${gap === 1 ? '' : 's'} above the resume evidence.`, gap_analysis: gapText, recommendation: `${keyword} — ${headline}`, headline, requirements_met: [...jdSkills].sort().slice(0, 4).map((skill) => { const support = retrieval.evidence.find((x) => x.matched_requirements.includes(skill)); const met = resumeSkills.has(skill) || !!support; const inferred = inferredResumeSkills.has(skill) && !explicitResumeSkills.has(skill); return { requirement: skill, status: met ? 'met' as const : 'missing' as const, evidence: support?.content.slice(0, 180) ?? (inferred ? `Resume evidence implies ${skill}` : met ? `Resume mentions ${skill}` : 'None found') } }), soft_concerns: missing.length ? [gapText] : [], rag_score: retrieval.score, retrieved_evidence: retrieval.evidence, salary_range: extractSalaryRange(jdText), correction_applied: calibration.applied }
 }
