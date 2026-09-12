@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { inferJobMetadataFromUrl } from '@/lib/jobs/fetch-job'
 import type { ScreeningResult } from '@/types'
 
 // Lightweight row — omits jd_text (full JD text not needed for the history view)
@@ -30,12 +32,38 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to load history' }, { status: 500 })
   }
 
+  // Older rows may predate metadata extraction. Prefer the shared job cache,
+  // then fall back to conservative URL-derived labels so History never shows
+  // an unexplained empty dash when the source URL contains useful metadata.
+  const rows = (data ?? []) as HistoryRow[]
+  const missingUrls = [...new Set(rows
+    .filter((row) => row.job_url && (!row.job_title || !row.company))
+    .map((row) => row.job_url as string))]
+  const cachedByUrl = new Map<string, { job_title: string | null; company: string | null }>()
+  if (missingUrls.length) {
+    const service = createServiceClient()
+    const { data: cachedRows, error: cacheError } = await service
+      .from('job_description_cache')
+      .select('canonical_url, job_title, company')
+      .in('canonical_url', missingUrls)
+    if (cacheError) console.warn('History metadata cache lookup failed:', cacheError.message)
+    for (const cached of cachedRows ?? []) cachedByUrl.set(cached.canonical_url, cached)
+  }
+
+  for (const row of rows) {
+    if (!row.job_url || (row.job_title && row.company)) continue
+    const cached = cachedByUrl.get(row.job_url)
+    const inferred = inferJobMetadataFromUrl(row.job_url)
+    row.job_title ||= cached?.job_title ?? inferred.jobTitle ?? null
+    row.company ||= cached?.company ?? inferred.company ?? null
+  }
+
   const batchMap = new Map<
     string,
     { batch_id: string; created_at: string; results: HistoryRow[] }
   >()
 
-  const pageRows = (data ?? []).slice(0, PAGE_SIZE)
+  const pageRows = rows.slice(0, PAGE_SIZE)
   for (const row of pageRows) {
     const r = row as HistoryRow
     if (!batchMap.has(r.batch_id)) {

@@ -84,12 +84,50 @@ function meta(html: string, key: string): string | undefined {
   return decode(a?.[1] ?? b?.[1] ?? '') || undefined
 }
 
-function generic(html: string): { jdText: string; jobTitle?: string; company?: string } | null {
+function words(value: string): string {
+  return decodeURIComponent(value)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    .trim()
+}
+
+export function inferJobMetadataFromUrl(input: string): { jobTitle?: string; company?: string } {
+  try {
+    const url = new URL(input)
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+    const parts = url.pathname.split('/').filter(Boolean)
+    const workdayTenant = host.match(/^([^.]+)\.wd\d+\.myworkdayjobs\.com$/)?.[1]
+    const companyToken = workdayTenant
+      ?? host.split('.').find((part) => !['jobs', 'careers', 'explore', 'boards', 'job-boards'].includes(part))
+    let titleToken: string | undefined
+    const jobIndex = parts.findIndex((part) => part.toLowerCase() === 'job')
+    if (jobIndex >= 0) titleToken = parts[jobIndex + 2] ?? parts[jobIndex + 1]
+    else {
+      const candidate = parts.at(-1)
+      if (candidate && !/^\d+$/.test(candidate) && !/^(jobs?|careers?|search-results)$/i.test(candidate)) titleToken = candidate
+    }
+    titleToken = titleToken?.replace(/_[A-Z]?\d[\w-]*$/i, '')
+    return {
+      jobTitle: titleToken ? words(titleToken) : undefined,
+      company: companyToken ? words(companyToken) : undefined,
+    }
+  } catch {
+    return {}
+  }
+}
+
+function generic(html: string, url: string): { jdText: string; jobTitle?: string; company?: string } | null {
   const cleaned = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<nav[\s\S]*?<\/nav>/gi, '').replace(/<footer[\s\S]*?<\/footer>/gi, '')
   const candidates = [...cleaned.matchAll(/<(?:main|article|section|div)[^>]*(?:id|class)=["'][^"']*(?:job[-_ ]?(?:description|details|content)|posting[-_ ]?(?:description|content)|description)[^"']*["'][^>]*>([\s\S]*?)<\/(?:main|article|section|div)>/gi)].map((x) => decode(x[1])).filter((x) => x.split(/\s+/).length >= 80)
   const jdText = candidates.sort((a, b) => b.length - a.length)[0]
   if (!jdText) return null
-  return { jdText, jobTitle: meta(html, 'og:title'), company: meta(html, 'og:site_name') }
+  const inferred = inferJobMetadataFromUrl(url)
+  const titleTag = decode(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '') || undefined
+  return {
+    jdText,
+    jobTitle: meta(html, 'og:title') ?? titleTag ?? inferred.jobTitle,
+    company: meta(html, 'og:site_name') ?? inferred.company,
+  }
 }
 
 function identify(url: URL): { provider: string; externalJobId?: string; apiUrl?: string } {
@@ -105,7 +143,7 @@ async function ats(url: URL, identified: ReturnType<typeof identify>): Promise<E
   if (!identified.apiUrl) return null
   const response = await boundedFetch(identified.apiUrl, 'application/json'); const data = JSON.parse(response.text) as Record<string, unknown>
   let raw: string | undefined; let title: string | undefined; let company: string | undefined
-  if (identified.provider === 'workday') { const posting = data.jobPostingInfo as Record<string, unknown>; raw = posting?.jobDescription as string; title = posting?.title as string }
+  if (identified.provider === 'workday') { const posting = data.jobPostingInfo as Record<string, unknown>; raw = posting?.jobDescription as string; title = posting?.title as string; company = inferJobMetadataFromUrl(url.toString()).company }
   if (identified.provider === 'greenhouse') { raw = data.content as string; title = data.title as string; company = (data.company as Record<string, unknown> | undefined)?.name as string }
   if (identified.provider === 'lever') { raw = (data.descriptionPlain as string) || (data.description as string); title = data.text as string; company = (data.categories as Record<string, unknown> | undefined)?.team as string }
   const jdText = decode(raw ?? ''); if (jdText.split(/\s+/).length < 80) return null
@@ -115,7 +153,7 @@ async function ats(url: URL, identified: ReturnType<typeof identify>): Promise<E
 export async function fetchJobLightweight(input: string): Promise<ExtractedJob> {
   const canonicalUrl = normalizeJobUrl(input); const url = new URL(canonicalUrl); const identified = identify(url)
   const adapter = await ats(url, identified).catch(() => null); if (adapter) return adapter
-  const response = await boundedFetch(canonicalUrl); const structured = jsonLd(response.text); const extracted = structured ?? generic(response.text)
+  const response = await boundedFetch(canonicalUrl); const structured = jsonLd(response.text); const extracted = structured ?? generic(response.text, canonicalUrl)
   if (!extracted) throw new Error('Lightweight extraction could not find a complete job description')
   return { canonicalUrl, provider: identified.provider, externalJobId: identified.externalJobId, ...extracted, extraction: structured ? 'structured' : 'generic' }
 }
