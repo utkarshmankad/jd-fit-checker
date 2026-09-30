@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:demo": "playwright test tests/public-demo.spec.ts",
+    "test:demo:http": "node --test tests/public-demo-http.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.17",
@@ -38,6 +40,7 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -57,6 +57,9 @@ export default async function LandingPage() {
               Judge my jobs →
             </Link>
             <span className="text-sm text-blue-200">{freeSubtitle}. No credit card. No API key setup.</span>
+            <Link href="/demo" className="text-sm text-white underline underline-offset-4 hover:text-blue-100">
+              See a sample without signing in →
+            </Link>
           </div>
           <div className="mt-12 flex flex-col sm:flex-row sm:flex-wrap justify-center gap-2 sm:gap-3 w-full sm:w-auto">
             {[
