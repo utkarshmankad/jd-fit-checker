@@ -5,6 +5,11 @@ import { posthog } from '@/lib/posthog'
 // event names and payload shapes stay consistent (and greppable) across
 // call sites instead of drifting per-component.
 export const track = {
+  // Public examples are separate from real screening/activation events.
+  demoViewed: () => posthog.capture('demo_viewed'),
+
+  demoSignInClicked: () => posthog.capture('demo_sign_in_clicked'),
+
   // Profile setup
   profilePageViewed: () => posthog.capture('profile_page_viewed'),
 
