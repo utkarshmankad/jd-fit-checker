@@ -5,6 +5,15 @@ import { posthog } from '@/lib/posthog'
 // event names and payload shapes stay consistent (and greppable) across
 // call sites instead of drifting per-component.
 export const track = {
+  anonymousTryViewed: () => posthog.capture('anonymous_try_viewed'),
+
+  anonymousTryStarted: () => posthog.capture('anonymous_try_started'),
+
+  anonymousVerdictCompleted: (verdict: string, attemptNumber: number) =>
+    posthog.capture('anonymous_verdict_completed', { verdict, attempt_number: attemptNumber }),
+
+  anonymousUpgradeClicked: (verdict: string) =>
+    posthog.capture('anonymous_upgrade_clicked', { verdict }),
   // Profile setup
   profilePageViewed: () => posthog.capture('profile_page_viewed'),
 
