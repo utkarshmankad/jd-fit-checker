@@ -50,11 +50,14 @@ export default async function LandingPage() {
           </p>
           <div className="mt-10 flex flex-col items-center gap-3 w-full sm:w-auto">
             <Link
-              href="/auth/login"
+              href="/try"
               className="w-full sm:w-auto inline-block px-8 py-4 rounded-xl font-semibold text-lg bg-white hover:bg-gray-100 transition-colors text-center"
               style={{ color: '#1B3A5C' }}
             >
-              Judge my jobs →
+              Try one job without signing in →
+            </Link>
+            <Link href="/auth/login" className="text-sm text-white underline underline-offset-4 hover:text-blue-100">
+              Already ready for full screening? Sign in
             </Link>
             <span className="text-sm text-blue-200">{freeSubtitle}. No credit card. No API key setup.</span>
           </div>
