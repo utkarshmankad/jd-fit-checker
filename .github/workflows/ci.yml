@@ -27,6 +27,8 @@ jobs:
 
       - run: npm run lint
 
+      - run: npm run test:unit
+
       - name: build
         run: npm run build
         env:
