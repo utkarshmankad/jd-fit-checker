@@ -7,7 +7,13 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type') as EmailOtpType | null
-  const next = searchParams.get('next') ?? '/dashboard'
+  const requestedNext = searchParams.get('next')
+  // Only a same-site relative path is safe to redirect to — an absolute URL
+  // (https://attacker.example) or a protocol-relative one (//attacker.example)
+  // would send the user off-site after they authenticate.
+  const next = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+    ? requestedNext
+    : '/dashboard'
 
   if (!token_hash || !type) {
     return NextResponse.redirect(new URL('/auth/login?error=Invalid+confirmation+link', origin))
