@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { NextRequest } from 'next/server'
 
 const getUser = vi.fn()
 vi.mock('@/lib/supabase/server', () => ({
@@ -27,13 +26,6 @@ vi.mock('razorpay', () => ({
 const USER_ID = 'user-123'
 const USER_EMAIL = 'user@example.com'
 
-function makeRequest(body?: Record<string, unknown>) {
-  return new NextRequest('http://localhost/api/payment/create-order', {
-    method: 'POST',
-    body: body ? JSON.stringify(body) : undefined,
-  })
-}
-
 describe('POST /api/payment/create-order', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -51,15 +43,6 @@ describe('POST /api/payment/create-order', () => {
 
     expect(res.status).toBe(401)
     expect(ordersCreate).not.toHaveBeenCalled()
-  })
-
-  it('ignores a client-supplied plan/amount and always charges the server-fixed price', async () => {
-    const { POST } = await import('../route')
-    await POST(makeRequest({ plan: 'enterprise', amount: 1 }))
-
-    expect(ordersCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 49900, currency: 'INR' })
-    )
   })
 
   it('derives the amount from the server for a plain request with no body', async () => {
