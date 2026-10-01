@@ -56,3 +56,4 @@ above.
 `007` adds the private candidate evidence knowledge base.
 `008` adds the shared job-description cache.
 `20260910194017` adds private, per-user recommendation corrections. Each correction stores the reviewed JD and compact feature tokens so similar future jobs can calibrate the deterministic scorer without an extra LLM call.
+`009` locks down a payment-tier bypass and several unauthenticated-RPC abuse vectors found in a security review: `profiles` had no column-scoped UPDATE grant (any logged-in user could set their own `tier`/`pending_order_id` directly), and `reserve_screens`/`refund_screens`/`increment_referral_bonus`/`check_and_increment_invite_attempts` trusted caller-supplied amounts/limits/target ids with no EXECUTE revoke.

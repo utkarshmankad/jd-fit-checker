@@ -41,6 +41,26 @@ create policy "profiles_insert_own" on public.profiles
 create policy "profiles_update_own" on public.profiles
   for update using (auth.uid() = id);
 
+-- Column-scoped grant (see migration 009) — RLS alone only restricts which
+-- *row* an update can target, not which *columns* it can set. Without this,
+-- the default Supabase table-level UPDATE grant to `authenticated` lets any
+-- logged-in user set their own tier/pending_order_id/usage counters
+-- directly from the browser (anon key + their own session), bypassing
+-- Razorpay and every payment route entirely. Sensitive columns
+-- (tier, pending_order_id, screens_used_*, is_beta_user, referral_*,
+-- invite_*) are writable only via the service-role client, which bypasses
+-- grants entirely — same pattern as every other service-role write path
+-- in this schema.
+revoke update on public.profiles from authenticated;
+grant update (
+  full_name,
+  resume_text,
+  api_key_encrypted,
+  api_provider,
+  hard_reject_filters,
+  preferences
+) on public.profiles to authenticated;
+
 -- ──────────────────────────────────────────────────────────
 -- 2. Auto-create profile on sign-up
 --    Fires after every insert into auth.users.
@@ -360,6 +380,12 @@ $$;
 --       window (works across serverless instances, unlike an
 --       in-memory counter) so it can't be brute-forced.
 -- ──────────────────────────────────────────────────────────
+-- p_amount is clamped and the row is pinned to the caller's own auth.uid()
+-- (see migration 009) — these are SECURITY DEFINER and reachable directly
+-- via PostgREST RPC with the `authenticated` role's default EXECUTE grant,
+-- so without this a caller could send a negative p_amount (or target
+-- another user's id) straight to the RPC and drive the usage counters
+-- arbitrarily, bypassing the free-tier limit entirely.
 create or replace function public.reserve_screens(
   p_user_id uuid,
   p_amount integer,
@@ -368,47 +394,69 @@ create or replace function public.reserve_screens(
 ) returns boolean as $$
 declare
   affected integer;
+  safe_amount integer;
 begin
+  if auth.uid() is not null and auth.uid() != p_user_id then
+    return false;
+  end if;
+
+  safe_amount := greatest(1, least(p_amount, 50));
+
   if p_use_weekly then
     update public.profiles
-    set screens_used_total = screens_used_total + p_amount,
-        screens_used_this_week = screens_used_this_week + p_amount
+    set screens_used_total = screens_used_total + safe_amount,
+        screens_used_this_week = screens_used_this_week + safe_amount
     where id = p_user_id
-      and screens_used_this_week + p_amount <= p_limit;
+      and screens_used_this_week + safe_amount <= p_limit;
   else
     update public.profiles
-    set screens_used_total = screens_used_total + p_amount
+    set screens_used_total = screens_used_total + safe_amount
     where id = p_user_id
-      and screens_used_total + p_amount <= p_limit;
+      and screens_used_total + safe_amount <= p_limit;
   end if;
 
   get diagnostics affected = row_count;
   return affected > 0;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 create or replace function public.refund_screens(
   p_user_id uuid,
   p_amount integer,
   p_use_weekly boolean
 ) returns void as $$
+declare
+  safe_amount integer;
 begin
-  if p_amount <= 0 then
+  if auth.uid() is not null and auth.uid() != p_user_id then
     return;
   end if;
+
+  safe_amount := greatest(0, least(p_amount, 50));
+  if safe_amount <= 0 then
+    return;
+  end if;
+
   if p_use_weekly then
     update public.profiles
-    set screens_used_total = greatest(0, screens_used_total - p_amount),
-        screens_used_this_week = greatest(0, screens_used_this_week - p_amount)
+    set screens_used_total = greatest(0, screens_used_total - safe_amount),
+        screens_used_this_week = greatest(0, screens_used_this_week - safe_amount)
     where id = p_user_id;
   else
     update public.profiles
-    set screens_used_total = greatest(0, screens_used_total - p_amount)
+    set screens_used_total = greatest(0, screens_used_total - safe_amount)
     where id = p_user_id;
   end if;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
+-- Never revoked from public/anon/authenticated before this (see migration
+-- 009) — unlike every other privileged RPC in this schema, any logged-in
+-- user could call this directly with an arbitrary target_user_id/amount to
+-- grant themselves unlimited referral_bonus_screens or vandalize another
+-- user's balance. Only ever called from server code via the service-role
+-- client (src/lib/utils/referral.ts), which bypasses grants entirely, so it
+-- doesn't need to be callable by anon/authenticated at all.
 create or replace function public.increment_referral_bonus(
   target_user_id uuid,
   amount integer
@@ -418,7 +466,9 @@ begin
   set referral_bonus_screens = referral_bonus_screens + amount
   where id = target_user_id;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
+
+revoke all on function public.increment_referral_bonus(uuid, integer) from public, anon, authenticated;
 
 alter table public.profiles
   add column if not exists invite_attempt_count integer not null default 0,
@@ -427,6 +477,14 @@ alter table public.profiles
 -- Atomic check-and-increment for the invite-code attempt counter itself —
 -- `for update` locks the row so concurrent brute-force attempts from the
 -- same account serialize instead of all reading the same stale count.
+-- p_max_attempts/p_window_ms are caller-supplied but ignored below (see
+-- migration 009) — this is reachable directly via RPC with the
+-- `authenticated` role's default EXECUTE grant, and the whole point of this
+-- function is to rate-limit brute-forcing BETA_INVITE_CODE. A caller who
+-- controls the limit/window can just send p_window_ms = 0 before every
+-- guess to force the window to "expire" and reset the counter, which
+-- defeats the limiter entirely. The real limits are pinned in-function;
+-- the row is also pinned to the caller's own auth.uid().
 create or replace function public.check_and_increment_invite_attempts(
   p_user_id uuid,
   p_max_attempts integer,
@@ -437,21 +495,27 @@ declare
   current_count integer;
   window_expired boolean;
   allowed boolean;
+  real_max_attempts constant integer := 5;
+  real_window_ms constant bigint := 15 * 60 * 1000;
 begin
+  if auth.uid() is null or auth.uid() != p_user_id then
+    return false;
+  end if;
+
   select invite_attempt_window_started_at, invite_attempt_count
   into window_started, current_count
   from public.profiles
   where id = p_user_id
   for update;
 
-  window_expired := (extract(epoch from (now() - window_started)) * 1000) > p_window_ms;
+  window_expired := (extract(epoch from (now() - window_started)) * 1000) > real_window_ms;
 
   if window_expired then
     current_count := 0;
     window_started := now();
   end if;
 
-  allowed := current_count < p_max_attempts;
+  allowed := current_count < real_max_attempts;
 
   if allowed then
     update public.profiles
@@ -462,7 +526,7 @@ begin
 
   return allowed;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
 
 -- ──────────────────────────────────────────────────────────
 -- 11. feedback
