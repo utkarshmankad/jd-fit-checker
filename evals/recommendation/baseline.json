@@ -62,11 +62,11 @@
         }
       },
       "latency_ms": {
-        "per_job_p50": 0.084,
-        "per_job_p95": 0.105,
-        "per_job_max": 0.245,
-        "batch_median": 2.507,
-        "batch_max": 3.176
+        "per_job_p50": 0.083,
+        "per_job_p95": 0.119,
+        "per_job_max": 0.333,
+        "batch_median": 2.403,
+        "batch_max": 3.741
       },
       "derived_dimensions": [
         "role_identity_aligned",
@@ -211,11 +211,11 @@
         }
       },
       "latency_ms": {
-        "per_job_p50": 0.425,
-        "per_job_p95": 0.513,
-        "per_job_max": 0.523,
-        "batch_median": 11.453,
-        "batch_max": 11.663
+        "per_job_p50": 0.438,
+        "per_job_p95": 0.527,
+        "per_job_max": 0.558,
+        "batch_median": 11.93,
+        "batch_max": 12.165
       },
       "derived_dimensions": [
         "role_identity_aligned",
@@ -301,6 +301,107 @@
           "id": "tl-08-tl-to-em-borderline",
           "expected": "DECENT",
           "predicted": "STRONG"
+        }
+      ]
+    },
+    "v2:fit-verdict": {
+      "cases": 27,
+      "verdict_agreement": 0.7407,
+      "false_positive_rate": 0.2857,
+      "false_negative_rate": 0.0769,
+      "role_identity_accuracy": 0.8148,
+      "seniority_accuracy": 0.8519,
+      "deterministic_repeatability": 1,
+      "suite_fingerprint": "be766563e73a1556",
+      "counts": {
+        "expected_positive": 13,
+        "expected_negative": 14,
+        "false_positive": 4,
+        "false_negative": 1
+      },
+      "by_category": {
+        "borderline": {
+          "cases": 6,
+          "verdict_agreement": 0.5
+        },
+        "misleading_keyword": {
+          "cases": 13,
+          "verdict_agreement": 0.6923
+        },
+        "strong_match": {
+          "cases": 8,
+          "verdict_agreement": 1
+        }
+      },
+      "confusion": {
+        "STRONG": {
+          "STRONG": 7,
+          "DECENT": 0,
+          "WEAK": 0,
+          "REJECT": 0
+        },
+        "DECENT": {
+          "STRONG": 2,
+          "DECENT": 3,
+          "WEAK": 1,
+          "REJECT": 0
+        },
+        "WEAK": {
+          "STRONG": 0,
+          "DECENT": 4,
+          "WEAK": 8,
+          "REJECT": 0
+        },
+        "REJECT": {
+          "STRONG": 0,
+          "DECENT": 0,
+          "WEAK": 0,
+          "REJECT": 2
+        }
+      },
+      "latency_ms": {
+        "per_job_p50": 0.317,
+        "per_job_p95": 0.439,
+        "per_job_max": 0.501,
+        "batch_median": 9.313,
+        "batch_max": 9.871
+      },
+      "derived_dimensions": [],
+      "disagreements": [
+        {
+          "id": "ct-22-teacher-to-swe-borderline",
+          "expected": "DECENT",
+          "predicted": "WEAK"
+        },
+        {
+          "id": "em-11-consumer-to-data-infra-borderline",
+          "expected": "DECENT",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "ic-03-analyst-vs-data-engineer-misleading",
+          "expected": "WEAK",
+          "predicted": "DECENT"
+        },
+        {
+          "id": "ic-04-qa-vs-react-misleading",
+          "expected": "WEAK",
+          "predicted": "DECENT"
+        },
+        {
+          "id": "ic-05-java-to-go-fintech-borderline",
+          "expected": "DECENT",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "sm-14-first-time-em-vs-senior-manager-misleading",
+          "expected": "WEAK",
+          "predicted": "DECENT"
+        },
+        {
+          "id": "st-17-keyword-list-vs-staff-misleading",
+          "expected": "WEAK",
+          "predicted": "DECENT"
         }
       ]
     }

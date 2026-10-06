@@ -10,7 +10,7 @@ decides how the matrix feeds the verdict.
 
 | File | Role |
 |---|---|
-| `schema.ts` | Matrix types and `MATCHING_ENGINE_VERSION` (`match-deterministic-1`) |
+| `schema.ts` | Matrix types and `MATCHING_ENGINE_VERSION` (`match-deterministic-2`) |
 | `concepts.ts` | Adjacency families (transferable, never equal), requirement phrase → capability rules |
 | `engine.ts` | Requirement building, per-requirement evaluation, weighting, summary, user-facing explanation |
 
@@ -18,7 +18,8 @@ decides how the matrix feeds the verdict.
 - **Requirement lines:** the role profile's mandatory and preferred lines.
   - Tools are split into groups: "Go **or** Java, Kafka and PostgreSQL" becomes `[Go|Java]`, `[Kafka]`, `[PostgreSQL]`.
   - Phrases map to capabilities: "on-call and incident response" → Incident Response; "managing engineering teams" →
-    People Management; "designing distributed systems" → System Design.
+    People Management; "managing managers" → Managing managers (added in `match-deterministic-2`); "designing
+    distributed systems" → System Design.
   - Years against an area ("3+ years of people management") become their own row.
 - **Tools named only in responsibilities** ("Build Go services on AWS") become *preferred* skill rows.
 - **Structural requirements** from the role profile:

@@ -34,7 +34,8 @@ export function sharedFamilies(a: string, b: string): string[] {
  * Ordered; a requirement can map to several. Kept deliberately narrow: an
  * unmapped requirement stays `unknown` instead of being guessed.
  */
-export const REQUIREMENT_CONCEPTS: Array<{ concept: string; kind: 'people_management' | 'technical_leadership' | 'architecture' | 'capability' | 'hands_on'; pattern: RegExp }> = [
+export const REQUIREMENT_CONCEPTS: Array<{ concept: string; kind: 'people_management' | 'manages_managers' | 'technical_leadership' | 'architecture' | 'capability' | 'hands_on'; pattern: RegExp }> = [
+  { concept: 'Managing managers', kind: 'manages_managers', pattern: /\b(?:manag(?:e|es|ing)|lead(?:ing)?) (?:\d+ |several |multiple )?(?:engineering )?managers\b|\bmanagers of managers\b/ },
   { concept: 'People Management', kind: 'people_management', pattern: /\b(?:people management|direct reports?|performance (?:reviews?|management)|manag(?:e|ing) (?:an? |the )?(?:[a-z-]+ ){0,2}(?:teams?|engineers|people)|grow(?:ing)? (?:and develop(?:ing)? )?(?:engineers|the team|talent)|career development)\b/ },
   { concept: 'Hiring', kind: 'capability', pattern: /\b(?:hir(?:e|ing)|recruit(?:ing)?)\b/ },
   { concept: 'Technical Leadership', kind: 'technical_leadership', pattern: /\b(?:technical (?:lead(?:ership)?|direction)|tech lead|lead(?:ing)? (?:the )?(?:design|architecture)|design reviews?|mentor(?:ing)?|leading small teams|lead(?:ing)? (?:small )?teams)\b/ },

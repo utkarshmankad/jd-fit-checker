@@ -8,6 +8,8 @@ import path from 'node:path'
 import { scoreJobFast } from '@/lib/screening/fast-scorer'
 import { extractCandidateProfile, tracedItems } from '@/lib/candidate-profile/extract'
 import { extractRoleProfile, roleTracedItems } from '@/lib/role-profile/extract'
+import { matchProfiles } from '@/lib/matching/engine'
+import { computeVerdictV2 } from '@/lib/verdict/engine'
 import type { HardRejectFilters } from '@/types'
 import { loadCases, type EvalCase } from './cases'
 import { compareToBaseline, computeMetrics, fingerprint, normalize, type Metrics, type ScorerOutput, type SuiteRun } from './metrics'
@@ -49,6 +51,46 @@ function runFrontend(cases: EvalCase[], repeats: number): SuiteRun {
     batchMs.push(performance.now() - batchStart)
   }
   return { scorer: 'frontend:scoreJobFast', repeats, batchMs, cases: cases.map((c) => { const s = perCase.get(c.id)!; return { id: c.id, fingerprints: s.fingerprints, latenciesMs: s.latenciesMs, prediction: normalize(s.output!) } }) }
+}
+
+/**
+ * Fit verdict v2 end to end, as the screen route would run it for a fresh job:
+ * candidate + role profile extraction, requirement matching, verdict. Hard-reject
+ * reasons come from the legacy filter rules so constraints are judged identically.
+ */
+function runV2(cases: EvalCase[], repeats: number): SuiteRun {
+  const pasted = { kind: 'pasted' as const, provider: null, canonical_url: null }
+  const score = (c: EvalCase): ScorerOutput & Record<string, unknown> => {
+    const legacy = scoreJobFast({ jdText: c.job.jd_text, resumeText: c.candidate.resume_text, filters: c.candidate.filters as unknown as HardRejectFilters, jobTitle: c.job.title, company: c.job.company, evidence: [], corrections: [] })
+    const candidate = extractCandidateProfile(c.candidate.resume_text)
+    const role = extractRoleProfile({ text: c.job.jd_text, title: c.job.title, source: pasted })
+    const matrix = matchProfiles(candidate, role)
+    const v2 = computeVerdictV2({ matrix, candidate, role, hardRejectReasons: legacy.hard_reject_reasons })
+    const identity = matrix.rows.find((r) => r.requirement.kind === 'identity')
+    const seniority = matrix.rows.find((r) => r.requirement.kind === 'seniority')
+    const level = candidate.seniority.demonstrated?.value ?? candidate.seniority.current?.value ?? null
+    return {
+      ...v2, hard_reject_reasons: legacy.hard_reject_reasons,
+      role_level_score: v2.dimensions.seniority.score ?? 0,
+      // Unknown identity/seniority defaults to aligned/fit (no evidence of a mismatch).
+      role_identity_aligned: !identity || !['explicit_gap', 'transferable'].includes(identity.status),
+      seniority_fit: !seniority || seniority.status === 'strong' || seniority.status === 'unknown' ? 'fit'
+        : level !== null && seniority.requirement.required !== null && level > seniority.requirement.required ? 'over' : 'under',
+    }
+  }
+  cases.forEach(score) // untimed warm-up
+  const perCase = new Map(cases.map((c) => [c.id, { fingerprints: [] as string[], latenciesMs: [] as number[], output: null as ScorerOutput | null }]))
+  const batchMs: number[] = []
+  for (let r = 0; r < repeats; r += 1) {
+    const batchStart = performance.now()
+    for (const c of cases) {
+      const t0 = performance.now(); const output = score(c); const elapsed = performance.now() - t0
+      const slot = perCase.get(c.id)!
+      slot.fingerprints.push(fingerprint(output)); slot.latenciesMs.push(elapsed); slot.output = output
+    }
+    batchMs.push(performance.now() - batchStart)
+  }
+  return { scorer: 'v2:fit-verdict', repeats, batchMs, cases: cases.map((c) => { const s = perCase.get(c.id)!; return { id: c.id, fingerprints: s.fingerprints, latenciesMs: s.latenciesMs, prediction: normalize(s.output!) } }) }
 }
 
 function runBackend(cases: EvalCase[], repeats: number, apiDir: string): SuiteRun {
@@ -146,6 +188,8 @@ function main() {
     const backend = runBackend(cases, options.repeats, options.apiDir)
     results[backend.scorer] = computeMetrics(cases, backend)
   }
+  const v2 = runV2(cases, options.repeats)
+  results[v2.scorer] = computeMetrics(cases, v2)
   console.log(`Recommendation eval: ${cases.length} cases x ${options.repeats} repeats  (node ${process.version}, ${process.platform}/${process.arch})`)
   for (const [name, metrics] of Object.entries(results)) printSummary(name, metrics)
   if (!options.apiDir) console.log('\n(backend scorer skipped: set JD_FIT_API_DIR or --api-dir to include jd-fit-api)')
