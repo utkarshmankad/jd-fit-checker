@@ -1,0 +1,27 @@
+{
+  "id": "m13-student-leadership",
+  "title": "Hackathon captaincy vs technical leadership",
+  "group": "adversarial_overlap",
+  "candidate": {
+    "label": "Candidate M1-13",
+    "resume_text": "Associate Software Engineer at Kestrel Apps (fictional), 2023 - 2025\nBuilt React features.\nShowed leadership as captain of a university hackathon team and mentoring students in a coding club."
+  },
+  "job": {
+    "title": "Tech Lead",
+    "text": "Tech Lead\nRequirements:\nProven technical leadership of a team of engineers.\n5+ years of software engineering experience."
+  },
+  "expected": [
+    {
+      "kind": "technical_leadership",
+      "concept": "Technical Leadership",
+      "status": "unsupported",
+      "why": "Leadership only in student contexts"
+    },
+    {
+      "kind": "experience_years",
+      "concept": null,
+      "status": "explicit_gap",
+      "why": "2 years vs 5+"
+    }
+  ]
+}

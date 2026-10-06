@@ -1,0 +1,39 @@
+{
+  "id": "m02-incident-response-wording",
+  "title": "On-call phrased as runbooks and MTTR",
+  "group": "equivalent_wording",
+  "candidate": {
+    "label": "Candidate M0-02",
+    "resume_text": "Senior Software Engineer at Oxbow Health (fictional), 2018 - 2024\nBuilt Python services on AWS for patient scheduling.\nWrote runbooks and reduced MTTR by 40% for the scheduling platform."
+  },
+  "job": {
+    "title": "Senior Backend Engineer",
+    "text": "Senior Backend Engineer\nRequirements:\n5+ years of software engineering experience.\nComfortable with on-call and production incident response.\nExperience with Python and AWS."
+  },
+  "expected": [
+    {
+      "kind": "capability",
+      "concept": "Incident Response",
+      "status": "strong",
+      "why": "Runbooks and MTTR reduction demonstrate incident response"
+    },
+    {
+      "kind": "skill",
+      "concept": "Python",
+      "status": "strong",
+      "why": "Used in work"
+    },
+    {
+      "kind": "skill",
+      "concept": "AWS",
+      "status": "strong",
+      "why": "Used in work"
+    },
+    {
+      "kind": "experience_years",
+      "concept": null,
+      "status": "strong",
+      "why": "2018-2024 is 6 years"
+    }
+  ]
+}

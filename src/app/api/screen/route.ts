@@ -9,6 +9,7 @@ import { scoreJobFast } from '@/lib/screening/fast-scorer'
 import { ensureCandidateProfile, profileReference, type ProfileTable } from '@/lib/candidate-profile/store'
 import { ensureRoleProfiles, roleProfileReference, type RoleProfileTable } from '@/lib/role-profile/store'
 import { providerFromUrl } from '@/lib/role-profile/extract'
+import { matchProfiles, matrixReference } from '@/lib/matching/engine'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile, RecommendationCorrection } from '@/types'
 
 // Explicit rather than implicit-default — this route's crash/timeout safety
@@ -512,7 +513,14 @@ export async function POST(request: NextRequest) {
         title: overrides.job_title ?? analysis.job_title ?? null,
         source: { kind: overrides.job_url ? 'url' as const : 'pasted' as const, provider: providerFromUrl(overrides.job_url), canonical_url: overrides.job_url ?? null },
       })))
-      pendingSaves.forEach((pending, index) => { pending.analysis.role_profile = roleProfileReference(roleProfiles[index]) })
+      const candidate = candidateProfile.profile
+      pendingSaves.forEach((pending, index) => {
+        pending.analysis.role_profile = roleProfileReference(roleProfiles[index])
+        // Evidence-to-requirement matrix (deterministic, sub-millisecond once both
+        // profiles exist). Stored as a quote-free reference; not used in the verdict yet.
+        const role = roleProfiles[index].profile
+        if (candidate && role) pending.analysis.requirement_match = matrixReference(matchProfiles(candidate, role))
+      })
     } catch (roleProfileError) {
       console.warn('Role profiles skipped:', roleProfileError instanceof Error ? roleProfileError.name : 'error')
     }

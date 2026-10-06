@@ -1,0 +1,27 @@
+{
+  "id": "m14-certificate-only",
+  "title": "Spark from a certificate",
+  "group": "adversarial_overlap",
+  "candidate": {
+    "label": "Candidate M1-14",
+    "resume_text": "Operations Analyst at Ferrybridge Logistics (fictional), 2019 - 2025\nProduced weekly shipment reports in Excel.\nCompleted a certificate in Apache Spark and Python."
+  },
+  "job": {
+    "title": "Data Engineer",
+    "text": "Data Engineer\nRequirements:\nExperience building Spark pipelines in Python."
+  },
+  "expected": [
+    {
+      "kind": "skill",
+      "concept": "Spark",
+      "status": "unsupported",
+      "why": "Certificate only"
+    },
+    {
+      "kind": "skill",
+      "concept": "Python",
+      "status": "unsupported",
+      "why": "Certificate only"
+    }
+  ]
+}

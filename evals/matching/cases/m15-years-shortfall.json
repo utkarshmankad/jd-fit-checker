@@ -1,0 +1,27 @@
+{
+  "id": "m15-years-shortfall",
+  "title": "Four years for a five-year role",
+  "group": "partial",
+  "candidate": {
+    "label": "Candidate M1-15",
+    "resume_text": "Software Engineer at Bramblecote (fictional), 2021 - 2025\nBuilt Python APIs on AWS and owned the release process."
+  },
+  "job": {
+    "title": "Senior Software Engineer",
+    "text": "Senior Software Engineer\nRequirements:\n5+ years of software engineering experience.\nExperience with Python."
+  },
+  "expected": [
+    {
+      "kind": "experience_years",
+      "concept": null,
+      "status": "partial",
+      "why": "4 of 5 years"
+    },
+    {
+      "kind": "skill",
+      "concept": "Python",
+      "status": "strong",
+      "why": "Used in work"
+    }
+  ]
+}

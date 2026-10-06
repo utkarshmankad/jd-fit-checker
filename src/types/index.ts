@@ -112,6 +112,8 @@ export interface AnalysisResult {
   salary_range?: SalaryRange | null;
   // Role Intelligence Profile reference (informational; not used in the verdict yet).
   role_profile?: import('@/lib/role-profile/schema').RoleProfileReference | null;
+  // Requirement-matching summary (informational until Sprint 4; the verdict above is unchanged).
+  requirement_match?: import('@/lib/matching/schema').RequirementMatchReference | null;
   correction_applied?: { correction_id: string; similarity: number; corrected_verdict: AnalysisResult['verdict'] } | null;
 }
 
