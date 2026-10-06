@@ -6,6 +6,7 @@ import { checkScreenLimit } from '@/lib/utils/screen-limits'
 import { buildCandidateEvidence, CANDIDATE_EVIDENCE_VERSION, type CandidateEvidenceInput } from '@/lib/rag/candidate-evidence'
 import { fetchJobLightweight, jobContentHash, type ExtractedJob } from '@/lib/jobs/fetch-job'
 import { scoreJobFast } from '@/lib/screening/fast-scorer'
+import { ensureCandidateProfile, profileReference, type ProfileTable } from '@/lib/candidate-profile/store'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile, RecommendationCorrection } from '@/types'
 
 // Explicit rather than implicit-default — this route's crash/timeout safety
@@ -364,6 +365,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Candidate Intelligence Profile: normally built at upload; rebuilt here only
+  // when missing or stale (new resume, schema or extractor version). It is not
+  // used for scoring yet — results are returned alongside for inspection.
+  const candidateProfile = storedResume.trim()
+    ? await ensureCandidateProfile(createServiceClient() as unknown as ProfileTable, user.id, storedResume)
+    : { status: 'unavailable' as const, profile: null }
+
   // User corrections are a separate memory from resume evidence: evidence
   // proves capability, while corrections calibrate personal suitability.
   const { data: correctionRows, error: correctionReadError } = await supabase
@@ -685,7 +693,7 @@ export async function POST(request: NextRequest) {
   const totalMs = performance.now() - requestStarted
   console.info(JSON.stringify({ event: 'screen_batch_timing', batch_id, items: itemCount, total_ms: Math.round(totalMs), cache_ms: Math.round(phaseTotals.cacheMs), local_extract_score_ms: Math.round(phaseTotals.localMs), cache_hits: phaseTotals.cacheHits, render_fallbacks: phaseTotals.renderFallbacks }))
   return NextResponse.json(
-    { results, ...(fatalError ? { fatalError } : {}), timing: { total_ms: Math.round(totalMs), cache_hits: phaseTotals.cacheHits, render_fallbacks: phaseTotals.renderFallbacks } },
+    { results, ...(fatalError ? { fatalError } : {}), candidate_profile: profileReference(candidateProfile), timing: { total_ms: Math.round(totalMs), cache_hits: phaseTotals.cacheHits, render_fallbacks: phaseTotals.renderFallbacks } },
     { headers: { 'Server-Timing': `total;dur=${totalMs.toFixed(1)}, cache;dur=${phaseTotals.cacheMs.toFixed(1)}, local;dur=${phaseTotals.localMs.toFixed(1)}` } }
   )
 }

@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { scoreJobFast } from '@/lib/screening/fast-scorer'
+import { extractCandidateProfile, tracedItems } from '@/lib/candidate-profile/extract'
 import type { HardRejectFilters } from '@/types'
 import { loadCases, type EvalCase } from './cases'
 import { compareToBaseline, computeMetrics, fingerprint, normalize, type Metrics, type ScorerOutput, type SuiteRun } from './metrics'
@@ -65,6 +66,39 @@ function runBackend(cases: EvalCase[], repeats: number, apiDir: string): SuiteRu
 
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`
 
+// Fixture candidate identities -> Candidate Intelligence Profile identities. Career
+// transitions are judged per case elsewhere, so they are excluded from identity accuracy.
+const PROFILE_IDENTITY: Record<string, string> = {
+  ic: 'ic', staff_ic: 'ic', principal_ic: 'ic', analyst: 'ic', qa: 'ic', tech_lead: 'technical_lead',
+  people_manager: 'people_manager', senior_people_manager: 'people_manager',
+}
+
+/** Informational (not gated): how well the candidate profile recovers fixture ground truth. */
+function profileReport(cases: EvalCase[]) {
+  const started = performance.now()
+  const profiles = cases.map((c) => ({ c, p: extractCandidateProfile(c.candidate.resume_text) }))
+  const ms = performance.now() - started
+  const identityCases = profiles.filter(({ c }) => PROFILE_IDENTITY[c.candidate.role_identity])
+  const identityHits = identityCases.filter(({ c, p }) => p.identity?.value === PROFILE_IDENTITY[c.candidate.role_identity])
+  const levelHits = profiles.filter(({ c, p }) => p.seniority.current?.value === c.candidate.level)
+  const levelNear = profiles.filter(({ c, p }) => p.seniority.current && Math.abs(p.seniority.current.value - c.candidate.level) <= 1)
+  const transitions = profiles.filter(({ c }) => c.profile_type === 'career_transition')
+  const items = profiles.flatMap(({ p }) => tracedItems(p))
+  return {
+    cases: cases.length,
+    identity_accuracy: identityHits.length / identityCases.length,
+    identity_cases: identityCases.length,
+    identity_misses: identityCases.filter((x) => !identityHits.includes(x)).map(({ c, p }) => `${c.id} ${PROFILE_IDENTITY[c.candidate.role_identity]}->${p.identity?.value ?? 'unknown'}`),
+    current_level_exact: levelHits.length / cases.length,
+    current_level_within_1: levelNear.length / cases.length,
+    transitions_detected: transitions.filter(({ p }) => p.career_transition).length,
+    transitions: transitions.length,
+    traced_items: items.length,
+    traced_items_with_evidence: items.filter(({ item }) => item.evidence.length > 0 && item.confidence > 0).length,
+    extraction_ms_total: Number(ms.toFixed(2)),
+  }
+}
+
 function printSummary(name: string, m: Metrics) {
   console.log(`\n${name}  (${m.cases} cases, fingerprint ${m.suite_fingerprint})`)
   console.log(`  verdict agreement      ${pct(m.verdict_agreement)}   by category: ${Object.entries(m.by_category).map(([k, v]) => `${k} ${pct(v.verdict_agreement)}`).join(', ')}`)
@@ -91,8 +125,14 @@ function main() {
   console.log(`Recommendation eval: ${cases.length} cases x ${options.repeats} repeats  (node ${process.version}, ${process.platform}/${process.arch})`)
   for (const [name, metrics] of Object.entries(results)) printSummary(name, metrics)
   if (!options.apiDir) console.log('\n(backend scorer skipped: set JD_FIT_API_DIR or --api-dir to include jd-fit-api)')
+  const profile = profileReport(cases)
+  console.log(`\ncandidate profile (informational, not gated; not used for scoring yet)`)
+  console.log(`  identity accuracy      ${pct(profile.identity_accuracy)} of ${profile.identity_cases} non-transition cases${profile.identity_misses.length ? `  misses: ${profile.identity_misses.join('; ')}` : ''}`)
+  console.log(`  current level          exact ${pct(profile.current_level_exact)}, within one level ${pct(profile.current_level_within_1)}`)
+  console.log(`  career transitions     ${profile.transitions_detected}/${profile.transitions} detected`)
+  console.log(`  traced items           ${profile.traced_items_with_evidence}/${profile.traced_items} carry evidence and confidence; extraction ${profile.extraction_ms_total}ms for all ${profile.cases} resumes`)
 
-  if (options.json) writeFileSync(options.json, `${JSON.stringify(results, null, 2)}\n`)
+  if (options.json) writeFileSync(options.json, `${JSON.stringify({ ...results, candidate_profile: profile }, null, 2)}\n`)
   if (options.writeBaseline) {
     writeFileSync(BASELINE_PATH, `${JSON.stringify({ recorded_with: { cases: cases.length, repeats: options.repeats, node: process.version, platform: `${process.platform}/${process.arch}` }, scorers: results }, null, 2)}\n`)
     console.log(`\nWrote ${path.relative(process.cwd(), BASELINE_PATH)}`)
