@@ -34,14 +34,24 @@ begin;
 --    INSERT and UPDATE on every column, so RLS (row ownership) was the
 --    only guard and `update({ tier: 'paid' })` from the browser worked.
 revoke insert, update on table public.profiles from anon, authenticated;
-grant update (
-  full_name,
-  resume_text,
-  api_key_encrypted,
-  api_provider,
-  hard_reject_filters,
-  preferences
-) on table public.profiles to authenticated;
+-- Only grant columns that exist: dev's profiles has no api_key_encrypted /
+-- api_provider (schema drift), and a missing column would abort the whole
+-- migration.
+do $$
+declare
+  cols text;
+begin
+  select string_agg(quote_ident(c), ', ' order by c) into cols
+  from unnest(array['full_name', 'resume_text', 'api_key_encrypted', 'api_provider',
+                    'hard_reject_filters', 'preferences']) as c
+  where exists (
+    select 1 from pg_attribute
+    where attrelid = 'public.profiles'::regclass and attname = c
+      and attnum > 0 and not attisdropped
+  );
+  execute format('grant update (%s) on table public.profiles to authenticated', cols);
+end
+$$;
 
 -- b) reserve_screens / refund_screens: server-only, validated amounts.
 create or replace function public.reserve_screens(

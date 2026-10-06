@@ -4,6 +4,7 @@
 # drops and recreates the public schema.
 #
 #   BASELINE=legacy|modern bash supabase/tests/009_acceptance.sh
+#   DROP_DEV_DRIFT_COLS=1 also drops the profiles columns missing on dev
 #
 # legacy = public-schema defaults that grant anon/authenticated/service_role
 #          full table privileges + function EXECUTE (older Supabase projects)
@@ -74,6 +75,7 @@ SQL
   for f in 001 002 003 004 005 006 007 008 20260910194017; do
     psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -f "$MIG"/${f}_*.sql >/dev/null 2>&1 || { echo "setup failed at $f"; exit 2; }
   done
+  [ -n "${DROP_DEV_DRIFT_COLS:-}" ] && q "alter table public.profiles drop column api_key_encrypted, drop column api_provider, drop column screens_used_this_month"
   q "insert into auth.users (id, email, aud, role, raw_user_meta_data) values ('$U1','u1@test.local','authenticated','authenticated','{}'), ('$U2','u2@test.local','authenticated','authenticated','{}')"
   q "update public.profiles set is_beta_user=false, tier='free', screens_used_total=2, screens_used_this_week=2, referral_bonus_screens=0, invite_attempt_count=0"
   q "notify pgrst, 'reload schema'"; sleep 1

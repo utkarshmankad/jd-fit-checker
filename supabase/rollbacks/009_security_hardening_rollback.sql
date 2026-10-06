@@ -20,6 +20,12 @@
 -- If profiles' relacl showed no `a`/`w` for anon/authenticated, skip
 -- section 1 (re-granting would be MORE permissive than before).
 --
+-- Verified against live snapshots on 2026-10-06: dev (avbufhugdkjmsypaifjx)
+-- and prod (jbyowtffnhdvjnhzwest) both match this script exactly — same
+-- 005 function bodies, proconfig null, function ACL
+-- {=X,postgres,anon,authenticated,service_role}, profiles relacl
+-- arwdDxtm for anon/authenticated/service_role, no column ACLs.
+--
 -- Each section below states the hole it reopens. Sections are
 -- independent; delete any you don't need before running. Atomic.
 --
@@ -34,14 +40,21 @@ begin;
 --    REOPENS: any signed-in user can
 --    `update({ tier: 'paid', screens_used_this_week: 0 })` on their own row
 --    from the browser (payment bypass, quota reset), and insert a profile row.
-revoke update (
-  full_name,
-  resume_text,
-  api_key_encrypted,
-  api_provider,
-  hard_reject_filters,
-  preferences
-) on table public.profiles from authenticated;
+do $$
+declare
+  cols text;
+begin
+  select string_agg(quote_ident(c), ', ' order by c) into cols
+  from unnest(array['full_name', 'resume_text', 'api_key_encrypted', 'api_provider',
+                    'hard_reject_filters', 'preferences']) as c
+  where exists (
+    select 1 from pg_attribute
+    where attrelid = 'public.profiles'::regclass and attname = c
+      and attnum > 0 and not attisdropped
+  );
+  execute format('revoke update (%s) on table public.profiles from authenticated', cols);
+end
+$$;
 grant insert, update on table public.profiles to anon, authenticated;
 
 -- 2) reserve_screens / refund_screens.
