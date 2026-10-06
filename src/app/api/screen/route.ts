@@ -241,6 +241,10 @@ export async function POST(request: NextRequest) {
   // item — see the crash-safety note above): beta/launch users draw against
   // the flat beta allotment, everyone else against the weekly cap. Paid
   // tier is unlimited (no reservation at all).
+  // reserve_screens/refund_screens are EXECUTE-granted to service_role only
+  // (migration 009): a signed-in user calling refund_screens directly could
+  // otherwise erase their own usage. user.id comes from auth.getUser() above.
+  const quota = createServiceClient()
   type PreparedItem = { apiKey: string; provider: string; source: 'app'; reserved: boolean; useWeekly: boolean }
 
   async function prepareItem(): Promise<PreparedItem | { error: string; code?: 'no_api_key' }> {
@@ -251,7 +255,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (isBetaOrLaunch) {
-      const { data: ok, error } = await supabase.rpc('reserve_screens', {
+      const { data: ok, error } = await quota.rpc('reserve_screens', {
         p_user_id: user!.id,
         p_amount: 1,
         p_use_weekly: false,
@@ -268,7 +272,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Regular free tier: always weekly-capped.
-    const { data: ok, error } = await supabase.rpc('reserve_screens', {
+    const { data: ok, error } = await quota.rpc('reserve_screens', {
       p_user_id: user!.id,
       p_amount: 1,
       p_use_weekly: true,
@@ -303,7 +307,7 @@ export async function POST(request: NextRequest) {
   // once we know it failed, give it back immediately, same request.
   async function refundIfReserved(item: PreparedItem) {
     if (!item.reserved) return
-    const { error } = await supabase.rpc('refund_screens', { p_user_id: user!.id, p_amount: 1, p_use_weekly: item.useWeekly })
+    const { error } = await quota.rpc('refund_screens', { p_user_id: user!.id, p_amount: 1, p_use_weekly: item.useWeekly })
     if (error) {
       console.error('refund_screens failed:', error)
     }

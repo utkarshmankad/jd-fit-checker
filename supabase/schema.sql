@@ -41,6 +41,21 @@ create policy "profiles_insert_own" on public.profiles
 create policy "profiles_update_own" on public.profiles
   for update using (auth.uid() = id);
 
+-- Privileges (see migration 009). RLS only restricts which *row* a write
+-- can target, not which *columns*: Supabase's default table grants let any
+-- logged-in user `update({ tier: 'paid' })` on their own row. anon and
+-- authenticated get no INSERT; authenticated may UPDATE only the columns
+-- below. Every app write to profiles uses the service-role client.
+revoke insert, update on table public.profiles from anon, authenticated;
+grant update (
+  full_name,
+  resume_text,
+  api_key_encrypted,
+  api_provider,
+  hard_reject_filters,
+  preferences
+) on table public.profiles to authenticated;
+
 -- ──────────────────────────────────────────────────────────
 -- 2. Auto-create profile on sign-up
 --    Fires after every insert into auth.users.
@@ -360,15 +375,28 @@ $$;
 --       window (works across serverless instances, unlike an
 --       in-memory counter) so it can't be brute-forced.
 -- ──────────────────────────────────────────────────────────
+-- Server-only (see migration 009): EXECUTE is granted to service_role only;
+-- /api/screen calls these with the service-role client after authenticating
+-- the user. Amounts outside 1..50 raise instead of being clamped.
 create or replace function public.reserve_screens(
   p_user_id uuid,
   p_amount integer,
   p_use_weekly boolean,
   p_limit integer
-) returns boolean as $$
+) returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
 declare
   affected integer;
 begin
+  if p_user_id is null or p_use_weekly is null or p_limit is null
+     or p_amount is null or p_amount < 1 or p_amount > 50 then
+    raise exception 'reserve_screens: invalid arguments'
+      using errcode = '22023';
+  end if;
+
   if p_use_weekly then
     update public.profiles
     set screens_used_total = screens_used_total + p_amount,
@@ -385,17 +413,24 @@ begin
   get diagnostics affected = row_count;
   return affected > 0;
 end;
-$$ language plpgsql security definer;
+$$;
 
 create or replace function public.refund_screens(
   p_user_id uuid,
   p_amount integer,
   p_use_weekly boolean
-) returns void as $$
+) returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
 begin
-  if p_amount <= 0 then
-    return;
+  if p_user_id is null or p_use_weekly is null
+     or p_amount is null or p_amount < 1 or p_amount > 50 then
+    raise exception 'refund_screens: invalid arguments'
+      using errcode = '22023';
   end if;
+
   if p_use_weekly then
     update public.profiles
     set screens_used_total = greatest(0, screens_used_total - p_amount),
@@ -407,8 +442,15 @@ begin
     where id = p_user_id;
   end if;
 end;
-$$ language plpgsql security definer;
+$$;
 
+revoke all on function public.reserve_screens(uuid, integer, boolean, integer) from public, anon, authenticated;
+revoke all on function public.refund_screens(uuid, integer, boolean) from public, anon, authenticated;
+grant execute on function public.reserve_screens(uuid, integer, boolean, integer) to service_role;
+grant execute on function public.refund_screens(uuid, integer, boolean) to service_role;
+
+-- Service-role only (see migration 009); called from src/lib/utils/referral.ts.
+-- BYPASSRLS does not bypass EXECUTE, so service_role is granted explicitly.
 create or replace function public.increment_referral_bonus(
   target_user_id uuid,
   amount integer
@@ -418,7 +460,10 @@ begin
   set referral_bonus_screens = referral_bonus_screens + amount
   where id = target_user_id;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql security definer set search_path = public;
+
+revoke all on function public.increment_referral_bonus(uuid, integer) from public, anon, authenticated;
+grant execute on function public.increment_referral_bonus(uuid, integer) to service_role;
 
 alter table public.profiles
   add column if not exists invite_attempt_count integer not null default 0,
@@ -427,31 +472,45 @@ alter table public.profiles
 -- Atomic check-and-increment for the invite-code attempt counter itself —
 -- `for update` locks the row so concurrent brute-force attempts from the
 -- same account serialize instead of all reading the same stale count.
+-- p_max_attempts/p_window_ms are ignored (see migration 009): a caller
+-- sending p_window_ms = 0 used to reset the counter before every guess.
+-- Limits are pinned in-function and the row is pinned to auth.uid().
 create or replace function public.check_and_increment_invite_attempts(
   p_user_id uuid,
   p_max_attempts integer,
   p_window_ms bigint
-) returns boolean as $$
+) returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
 declare
   window_started timestamptz;
   current_count integer;
-  window_expired boolean;
   allowed boolean;
+  real_max_attempts constant integer := 5;
+  real_window constant interval := interval '15 minutes';
 begin
+  if auth.uid() is null or p_user_id is null or auth.uid() <> p_user_id then
+    return false;
+  end if;
+
   select invite_attempt_window_started_at, invite_attempt_count
   into window_started, current_count
   from public.profiles
   where id = p_user_id
   for update;
 
-  window_expired := (extract(epoch from (now() - window_started)) * 1000) > p_window_ms;
+  if not found then
+    return false;
+  end if;
 
-  if window_expired then
+  if now() - window_started > real_window then
     current_count := 0;
     window_started := now();
   end if;
 
-  allowed := current_count < p_max_attempts;
+  allowed := current_count < real_max_attempts;
 
   if allowed then
     update public.profiles
@@ -462,7 +521,10 @@ begin
 
   return allowed;
 end;
-$$ language plpgsql security definer;
+$$;
+
+revoke all on function public.check_and_increment_invite_attempts(uuid, integer, bigint) from public, anon, authenticated;
+grant execute on function public.check_and_increment_invite_attempts(uuid, integer, bigint) to authenticated, service_role;
 
 -- ──────────────────────────────────────────────────────────
 -- 11. feedback
