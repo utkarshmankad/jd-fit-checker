@@ -4,7 +4,7 @@
 import type { EvidenceRef } from '@/lib/candidate-profile/schema'
 
 /** Bump whenever matching rules or weights change. */
-export const MATCHING_ENGINE_VERSION = 'match-deterministic-1'
+export const MATCHING_ENGINE_VERSION = 'match-deterministic-2'
 
 export type MatchStatus =
   | 'strong'          // demonstrated in professional evidence at the required level

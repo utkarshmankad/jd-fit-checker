@@ -85,7 +85,7 @@ test('single jd_text: saved analysis_json.role_profile, verdict untouched, cache
   assert.deepEqual(first.json.results[0].analysis_json.role_profile, ref, 'response returns the saved row')
   const match = row.analysis_json.requirement_match
   assert.ok(match, 'analysis_json.requirement_match is stored')
-  assert.equal(match.engine_version, 'match-deterministic-1')
+  assert.equal(match.engine_version, 'match-deterministic-2')
   assert.equal(typeof match.fit_score, 'number')
   assert.ok(Object.values(match.mandatory).reduce((a, b) => a + b, 0) > 0)
   assert.ok(Array.isArray(match.explanation) && match.explanation.length > 0)
@@ -140,4 +140,76 @@ test('single jd_text save failure still returns a placeholder', async () => {
   } finally {
     console.error = originalError
   }
+})
+
+// ── Sprint 4: fit verdict v2 in shadow mode ─────────────────────────────────
+const writes = (db) => db.log.filter((q) => q.op !== 'select').map((q) => `${q.table}:${q.op}`).sort()
+
+async function screenWithMode(mode) {
+  if (mode === undefined) delete process.env.VERDICT_ENGINE
+  else process.env.VERDICT_ENGINE = mode
+  const db = freshDb()
+  const logged = []
+  const originalInfo = console.info
+  console.info = (...args) => logged.push(args.join(' '))
+  try {
+    const res = await post({ jd_text: JD, job_title: 'Engineering Manager', company: 'Fictional Co', batch_id: `batch-${mode ?? 'default'}` })
+    assert.equal(res.status, 200)
+    return { db, res, row: db.tables.screening_results[0], logged }
+  } finally {
+    console.info = originalInfo
+    delete process.env.VERDICT_ENGINE
+  }
+}
+
+test('shadow is the default: v2 is stored, the user-visible verdict stays legacy', async () => {
+  const { row, res } = await screenWithMode(undefined)
+  assert.equal(row.verdict, 'DECENT', 'legacy verdict from the scorer is what users see')
+  assert.equal(row.analysis_json.verdict, 'DECENT')
+  assert.equal(row.analysis_json.scoring_version, 'legacy-fast-1')
+  const v2 = row.analysis_json.verdict_v2
+  assert.equal(v2.status, 'computed')
+  assert.equal(v2.scoring_version, 'fit-v2-1')
+  assert.ok(['STRONG', 'DECENT', 'WEAK', 'REJECT'].includes(v2.verdict))
+  assert.ok(v2.dimensions.identity && v2.blockers && v2.explanation.length)
+  assert.equal(row.analysis_json.legacy_verdict, undefined)
+  assert.deepEqual(res.json.results[0].analysis_json.verdict_v2.verdict, v2.verdict)
+})
+
+test('legacy mode computes no shadow verdict', async () => {
+  const { row } = await screenWithMode('legacy')
+  assert.equal(row.analysis_json.verdict_v2, undefined)
+  assert.equal(row.analysis_json.scoring_version, 'legacy-fast-1')
+})
+
+test('shadow execution causes no extra quota, payment, profile or tracker mutation', async () => {
+  const legacy = await screenWithMode('legacy')
+  const shadow = await screenWithMode('shadow')
+  assert.deepEqual(shadow.db.rpcs.map(([name]) => name), legacy.db.rpcs.map(([name]) => name), 'identical RPC calls (quota reserve/refund, resets)')
+  assert.deepEqual(writes(shadow.db), writes(legacy.db), 'identical write operations')
+  for (const db of [legacy.db, shadow.db]) {
+    for (const table of ['profiles', 'job_tracker', 'payments', 'orders', 'subscriptions']) {
+      assert.ok(!db.log.some((q) => q.table === table && q.op !== 'select'), `${table} not written`)
+    }
+  }
+  assert.deepEqual(shadow.db.tables.profiles, legacy.db.tables.profiles, 'quota counters untouched by shadow')
+})
+
+test('comparison telemetry is logged without resume or job contents', async () => {
+  const { logged } = await screenWithMode('shadow')
+  const line = logged.find((l) => l.includes('"event":"verdict_shadow"'))
+  assert.ok(line, 'telemetry emitted')
+  const event = JSON.parse(line)
+  assert.equal(event.items, 1)
+  assert.equal(event.comparisons[0].legacy_verdict, 'DECENT')
+  for (const leak of ['Brookvale', 'Python services', 'individual contributor', 'data pipelines', '140,000', USER.id, USER.email]) assert.ok(!line.includes(leak), `telemetry leaked "${leak}"`)
+})
+
+test('rollout guard: only VERDICT_ENGINE=v2 switches the visible verdict, keeping the legacy one', async () => {
+  const { row } = await screenWithMode('v2')
+  const v2 = row.analysis_json.verdict_v2
+  assert.equal(row.verdict, v2.verdict)
+  assert.equal(row.analysis_json.scoring_version, 'fit-v2-1')
+  assert.equal(row.analysis_json.legacy_verdict, 'DECENT')
+  assert.deepEqual([row.ats_score, row.composite_score], [61, 68], 'legacy scores preserved for comparison')
 })

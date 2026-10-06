@@ -10,6 +10,9 @@ import { ensureCandidateProfile, profileReference, type ProfileTable } from '@/l
 import { ensureRoleProfiles, roleProfileReference, type RoleProfileTable } from '@/lib/role-profile/store'
 import { providerFromUrl } from '@/lib/role-profile/extract'
 import { matchProfiles, matrixReference } from '@/lib/matching/engine'
+import { computeVerdictV2 } from '@/lib/verdict/engine'
+import { comparisonEvent, unavailable, verdictEngineMode, type ComparisonEvent, type ShadowRecord } from '@/lib/verdict/rollout'
+import { LEGACY_SCORING_VERSION } from '@/lib/verdict/schema'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile, RecommendationCorrection } from '@/types'
 
 // Explicit rather than implicit-default — this route's crash/timeout safety
@@ -514,13 +517,45 @@ export async function POST(request: NextRequest) {
         source: { kind: overrides.job_url ? 'url' as const : 'pasted' as const, provider: providerFromUrl(overrides.job_url), canonical_url: overrides.job_url ?? null },
       })))
       const candidate = candidateProfile.profile
+      const mode = verdictEngineMode()
+      const comparisons: ComparisonEvent[] = []
       pendingSaves.forEach((pending, index) => {
         pending.analysis.role_profile = roleProfileReference(roleProfiles[index])
+        pending.analysis.scoring_version = LEGACY_SCORING_VERSION
         // Evidence-to-requirement matrix (deterministic, sub-millisecond once both
-        // profiles exist). Stored as a quote-free reference; not used in the verdict yet.
+        // profiles exist). Stored as a quote-free reference.
         const role = roleProfiles[index].profile
-        if (candidate && role) pending.analysis.requirement_match = matrixReference(matchProfiles(candidate, role))
+        const matrix = candidate && role ? matchProfiles(candidate, role) : null
+        if (matrix) pending.analysis.requirement_match = matrixReference(matrix)
+        if (mode === 'legacy') return
+        // Fit verdict v2 in shadow: pure computation over data already in memory —
+        // no quota, payment, tracker or other writes beyond this result's own row.
+        let shadow: ShadowRecord
+        if (!candidate) shadow = unavailable('no_candidate_profile')
+        else if (!role) shadow = unavailable('no_role_profile')
+        else if (role.page.value !== 'job_page' || !matrix) shadow = unavailable('not_a_job_page')
+        else {
+          try {
+            const started = performance.now()
+            const v2 = computeVerdictV2({ matrix, candidate, role, hardRejectReasons: pending.analysis.hard_reject_reasons ?? [] })
+            shadow = { status: 'computed', latency_ms: Number((performance.now() - started).toFixed(3)), ...v2 }
+          } catch {
+            shadow = unavailable('error')
+          }
+        }
+        pending.analysis.verdict_v2 = shadow
+        comparisons.push(comparisonEvent({ verdict: pending.analysis.verdict, composite_score: pending.analysis.composite_score }, shadow))
+        // Rollout guard: only VERDICT_ENGINE=v2 changes the user-visible verdict.
+        if (mode === 'v2' && shadow.status === 'computed') {
+          pending.analysis.legacy_verdict = pending.analysis.verdict
+          pending.analysis.verdict = shadow.verdict
+          pending.analysis.scoring_version = shadow.scoring_version
+          pending.analysis.headline = shadow.explanation[0]
+          pending.analysis.recommendation = `${shadow.verdict === 'STRONG' ? 'APPLY' : shadow.verdict === 'DECENT' ? 'APPLY IF' : 'SKIP'} — ${shadow.explanation[0]}`
+        }
       })
+      // Comparison telemetry: enums and numbers only (no resume/job text, quotes or ids).
+      if (comparisons.length) console.info(JSON.stringify({ event: 'verdict_shadow', mode, items: comparisons.length, agree: comparisons.filter((c) => c.agree).length, comparisons }))
     } catch (roleProfileError) {
       console.warn('Role profiles skipped:', roleProfileError instanceof Error ? roleProfileError.name : 'error')
     }
