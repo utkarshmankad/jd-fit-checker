@@ -24,10 +24,11 @@ export const MAX_CHUNK_CHARS = 1200
 const MAX_QUOTE_CHARS = 240
 const MAX_EVIDENCE_PER_ITEM = 3
 
-interface Unit { chunk: number; start: number; end: number; text: string; lower: string; line: number }
+export interface Unit { chunk: number; start: number; end: number; text: string; lower: string; line: number }
 
 // ── Normalisation and chunking ──────────────────────────────────────────────
 
+/** Normalises line endings and spacing; shared by candidate and role profiles. */
 export function normaliseResume(text: string): string {
   return text
     .replace(/\r\n?/g, '\n')
@@ -61,7 +62,7 @@ export function chunkResume(text: string, max = MAX_CHUNK_CHARS): Array<{ index:
   return chunks
 }
 
-function splitUnits(text: string): Unit[] {
+export function splitUnits(text: string): Unit[] {
   const units: Unit[] = []
   const lineStarts = [0]
   for (let i = 0; i < text.length; i += 1) if (text[i] === '\n') lineStarts.push(i + 1)
@@ -82,17 +83,17 @@ function splitUnits(text: string): Unit[] {
   return units
 }
 
-function ref(source: string, unit: Unit): EvidenceRef {
+export function ref(source: string, unit: Unit): EvidenceRef {
   const end = Math.min(unit.end, unit.start + MAX_QUOTE_CHARS)
   return { chunk: unit.chunk, start: unit.start, end, quote: source.slice(unit.start, end) }
 }
 
-const clamp = (value: number, max = 0.95) => Number(Math.min(max, Math.max(0.05, value)).toFixed(2))
+export const clamp = (value: number, max = 0.95) => Number(Math.min(max, Math.max(0.05, value)).toFixed(2))
 
 // ── Context classification ──────────────────────────────────────────────────
 
 /** Statements that something did NOT happen must not count as evidence for it. */
-function negatedBefore(lower: string, index: number): boolean {
+export function negatedBefore(lower: string, index: number): boolean {
   return /\b(?:no|not|never|without|none)\b[^.,;]{0,30}$/.test(lower.slice(Math.max(0, index - 40), index))
 }
 
@@ -108,7 +109,7 @@ function skillsListLine(unit: Unit): boolean {
 
 // ── Taxonomies ──────────────────────────────────────────────────────────────
 
-const SKILLS: Record<string, string[]> = {
+export const SKILLS: Record<string, string[]> = {
   React: ['react', 'react.js', 'reactjs'], 'Node.js': ['node.js', 'nodejs', 'node js'], TypeScript: ['typescript'],
   JavaScript: ['javascript'], Python: ['python', 'pyspark'], Java: ['java'], 'C#': ['c#', 'c sharp'], '.NET': ['.net'],
   PHP: ['php'], Go: ['golang', 'go language'], Ruby: ['ruby', 'rails'], SQL: ['sql'],
@@ -141,7 +142,7 @@ const CAPABILITIES: CapabilityRule[] = [
   { name: 'Design System Ownership', patterns: [/\bdesign system\b/] },
 ]
 
-const DOMAINS: Record<string, RegExp> = {
+export const DOMAINS: Record<string, RegExp> = {
   'payments / fintech': /\b(?:payments?|fintech|banking|bank|ledger|card settlement|lending|trading)\b/,
   insurance: /\binsurance\b/,
   healthcare: /\b(?:health(?:care|-tech)?|clinical|patients?|care)\b/,
@@ -168,7 +169,7 @@ const SCOPE_RULES: Record<keyof CandidateIntelligenceProfile['scopes'], RegExp[]
 
 const TITLE_NOUN = /\b(?:engineer|developer|programmer|manager|lead|director|architect|analyst|scientist|officer|teacher|cto|vp|vice president|head of [a-z ]+|intern|trainee|consultant|designer|founder)\b/
 
-function titleLevel(title: string): SeniorityLevel {
+export function titleLevel(title: string): SeniorityLevel {
   const t = title.toLowerCase()
   if (/\b(?:principal|distinguished|fellow|vp|vice president|cto|chief)\b/.test(t)) return 6
   if (/\b(?:senior staff|staff|director|head of|senior (?:engineering )?manager|group manager)\b/.test(t)) return 5
@@ -178,7 +179,7 @@ function titleLevel(title: string): SeniorityLevel {
   return 3
 }
 
-function titleFamily(title: string): RoleFamily {
+export function titleFamily(title: string): RoleFamily {
   const t = title.toLowerCase()
   if (/\bproduct (?:manager|owner)\b/.test(t)) return 'product'
   if (/\b(?:qa|quality|test(?:ing)?|sdet)\b/.test(t)) return 'qa'

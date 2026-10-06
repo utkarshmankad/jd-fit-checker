@@ -7,6 +7,8 @@ import { buildCandidateEvidence, CANDIDATE_EVIDENCE_VERSION, type CandidateEvide
 import { fetchJobLightweight, jobContentHash, type ExtractedJob } from '@/lib/jobs/fetch-job'
 import { scoreJobFast } from '@/lib/screening/fast-scorer'
 import { ensureCandidateProfile, profileReference, type ProfileTable } from '@/lib/candidate-profile/store'
+import { ensureRoleProfiles, roleProfileReference, type RoleProfileTable } from '@/lib/role-profile/store'
+import { providerFromUrl } from '@/lib/role-profile/extract'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile, RecommendationCorrection } from '@/types'
 
 // Explicit rather than implicit-default — this route's crash/timeout safety
@@ -494,36 +496,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  async function saveResult(
-    analysis: FastAPIResult,
-    overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }
-  ): Promise<ScreeningResult | null> {
-    const { data: saved, error } = await supabase
-      .from('screening_results')
-      .insert({
-        user_id: user!.id,
-        batch_id,
-        job_url: overrides.job_url ?? null,
-        job_title: overrides.job_title ?? analysis.job_title ?? null,
-        company: overrides.company ?? analysis.company ?? null,
-        jd_text: overrides.jd_text ?? analysis.jd_text ?? '',
-        ats_score: analysis.ats_score,
-        role_level_score: analysis.role_level_score,
-        composite_score: analysis.composite_score,
-        verdict: analysis.verdict,
-        hard_reject_reasons: analysis.hard_reject_reasons,
-        analysis_json: analysis,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('screening_results insert failed:', error.message)
-      return null
-    }
-    return saved as ScreeningResult
-  }
-
   const pendingSaves: Array<{ analysis: FastAPIResult; overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string } }> = []
   function queueResult(analysis: FastAPIResult, overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }) {
     pendingSaves.push({ analysis, overrides })
@@ -531,6 +503,19 @@ export async function POST(request: NextRequest) {
 
   async function flushResults(): Promise<void> {
     if (!pendingSaves.length) return
+    // Role Intelligence Profiles: one cache read (+ one write for new content) per
+    // flush, keyed by normalised job content. Informational only — the verdict
+    // formula above is unchanged — and never allowed to fail the save.
+    try {
+      const roleProfiles = await ensureRoleProfiles(createServiceClient() as unknown as RoleProfileTable, pendingSaves.map(({ analysis, overrides }) => ({
+        text: overrides.jd_text ?? analysis.jd_text ?? '',
+        title: overrides.job_title ?? analysis.job_title ?? null,
+        source: { kind: overrides.job_url ? 'url' as const : 'pasted' as const, provider: providerFromUrl(overrides.job_url), canonical_url: overrides.job_url ?? null },
+      })))
+      pendingSaves.forEach((pending, index) => { pending.analysis.role_profile = roleProfileReference(roleProfiles[index]) })
+    } catch (roleProfileError) {
+      console.warn('Role profiles skipped:', roleProfileError instanceof Error ? roleProfileError.name : 'error')
+    }
     const rows = pendingSaves.map(({ analysis, overrides }) => ({
       user_id: user!.id, batch_id, job_url: overrides.job_url ?? null,
       job_title: overrides.job_title ?? analysis.job_title ?? null,
@@ -677,12 +662,10 @@ export async function POST(request: NextRequest) {
       else if (result._status === 429) fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
       else return NextResponse.json({ error: result._error }, { status: result._status })
     } else {
-      const saved = await saveResult(result, { jd_text, job_title, company })
-      if (!saved) {
-        results.push(saveFailedPlaceholder({ job_title: job_title ?? result.job_title, company: company ?? result.company }))
-      } else {
-        results.push(saved)
-      }
+      // Same profiling-and-save path as batched entries (flushResults below), so a
+      // single pasted JD also gets analysis_json.role_profile and the same
+      // save-failure placeholder handling.
+      queueResult(result, { jd_text, job_title, company })
     }
   } else {
     return NextResponse.json({ error: 'Provide urls or jd_text' }, { status: 400 })

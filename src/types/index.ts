@@ -110,6 +110,8 @@ export interface AnalysisResult {
   rag_score?: number;
   retrieved_evidence?: RetrievedEvidence[];
   salary_range?: SalaryRange | null;
+  // Role Intelligence Profile reference (informational; not used in the verdict yet).
+  role_profile?: import('@/lib/role-profile/schema').RoleProfileReference | null;
   correction_applied?: { correction_id: string; similarity: number; corrected_verdict: AnalysisResult['verdict'] } | null;
 }
 
