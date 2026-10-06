@@ -496,36 +496,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  async function saveResult(
-    analysis: FastAPIResult,
-    overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }
-  ): Promise<ScreeningResult | null> {
-    const { data: saved, error } = await supabase
-      .from('screening_results')
-      .insert({
-        user_id: user!.id,
-        batch_id,
-        job_url: overrides.job_url ?? null,
-        job_title: overrides.job_title ?? analysis.job_title ?? null,
-        company: overrides.company ?? analysis.company ?? null,
-        jd_text: overrides.jd_text ?? analysis.jd_text ?? '',
-        ats_score: analysis.ats_score,
-        role_level_score: analysis.role_level_score,
-        composite_score: analysis.composite_score,
-        verdict: analysis.verdict,
-        hard_reject_reasons: analysis.hard_reject_reasons,
-        analysis_json: analysis,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('screening_results insert failed:', error.message)
-      return null
-    }
-    return saved as ScreeningResult
-  }
-
   const pendingSaves: Array<{ analysis: FastAPIResult; overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string } }> = []
   function queueResult(analysis: FastAPIResult, overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }) {
     pendingSaves.push({ analysis, overrides })
@@ -692,12 +662,10 @@ export async function POST(request: NextRequest) {
       else if (result._status === 429) fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
       else return NextResponse.json({ error: result._error }, { status: result._status })
     } else {
-      const saved = await saveResult(result, { jd_text, job_title, company })
-      if (!saved) {
-        results.push(saveFailedPlaceholder({ job_title: job_title ?? result.job_title, company: company ?? result.company }))
-      } else {
-        results.push(saved)
-      }
+      // Same profiling-and-save path as batched entries (flushResults below), so a
+      // single pasted JD also gets analysis_json.role_profile and the same
+      // save-failure placeholder handling.
+      queueResult(result, { jd_text, job_title, company })
     }
   } else {
     return NextResponse.json({ error: 'Provide urls or jd_text' }, { status: 400 })
