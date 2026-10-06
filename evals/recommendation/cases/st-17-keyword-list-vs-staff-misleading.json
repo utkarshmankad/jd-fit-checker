@@ -1,0 +1,40 @@
+{
+  "id": "st-17-keyword-list-vs-staff-misleading",
+  "title": "Skills-list senior engineer vs staff engineer",
+  "category": "misleading_keyword",
+  "profile_type": "staff_ic",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate ST-17",
+    "role_identity": "ic",
+    "level": 4,
+    "years_experience": 6,
+    "resume_text": "Senior Engineer at Moorgate Apps (fictional), 6 years. Skills: Kubernetes, Kafka, Golang, system design, distributed systems, Terraform, AWS. Built the notifications feature for one product team. No cross-team projects listed."
+  },
+  "job": {
+    "title": "Staff Engineer, Infrastructure",
+    "company": "Silverbirch Logistics",
+    "role_identity": "staff_ic",
+    "level": 5,
+    "jd_text": "Staff Engineer, Infrastructure. Define organization-wide technical strategy for Kubernetes, Kafka and Golang services on AWS with Terraform. Lead system design across 6+ teams and influence engineering leadership. 10+ years."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": true,
+    "seniority_fit": "under",
+    "leadership_scope_fit": "gap",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "weak",
+    "explicit_skills": [
+      "Kubernetes",
+      "Kafka",
+      "Go",
+      "Terraform",
+      "AWS",
+      "System Design"
+    ],
+    "implicit_capabilities": [],
+    "reason": "Every keyword appears only as a skills list; the evidence is one feature on one team against an org-wide staff role."
+  }
+}

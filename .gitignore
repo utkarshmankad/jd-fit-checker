@@ -42,3 +42,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 supabase/.temp/
+
+# python bytecode (evals/recommendation/adapters)
+__pycache__/

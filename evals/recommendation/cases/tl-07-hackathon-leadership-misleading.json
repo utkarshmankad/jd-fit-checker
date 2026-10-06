@@ -1,0 +1,36 @@
+{
+  "id": "tl-07-hackathon-leadership-misleading",
+  "title": "Junior engineer with leadership keywords vs tech lead",
+  "category": "misleading_keyword",
+  "profile_type": "tech_lead",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate TL-07",
+    "role_identity": "ic",
+    "level": 2,
+    "years_experience": 2,
+    "resume_text": "Associate Software Engineer at Kestrel Apps (fictional), 2 years. Built React and Node.js features. Showed leadership as captain of a university hackathon team and mentoring first-year students in a coding club. Interested in technical leadership and system design."
+  },
+  "job": {
+    "title": "Tech Lead, Web",
+    "company": "Pinecrest Travel",
+    "role_identity": "tech_lead",
+    "level": 4,
+    "jd_text": "Tech Lead, Web. Set technical direction for 7 engineers working in React and Node.js, own system design and architecture decisions, and provide technical leadership and mentoring. 7+ years of experience with at least 2 as a lead."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": false,
+    "seniority_fit": "under",
+    "leadership_scope_fit": "gap",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "weak",
+    "explicit_skills": [
+      "React",
+      "Node.js"
+    ],
+    "implicit_capabilities": [],
+    "reason": "Leadership and mentoring keywords come from student activities; two levels short with no professional lead scope."
+  }
+}

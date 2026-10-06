@@ -1,0 +1,40 @@
+{
+  "id": "sm-13-senior-em-strong",
+  "title": "Manager of managers to senior engineering manager",
+  "category": "strong_match",
+  "profile_type": "senior_people_manager",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate SM-13",
+    "role_identity": "senior_people_manager",
+    "level": 5,
+    "years_experience": 16,
+    "resume_text": "Senior Manager, Engineering at Oakhallow Health (fictional), 16 years. Managed 4 engineering managers and an organization of 35 engineers with direct reports across three product lines. Owned headcount planning, performance management calibration and executive stakeholder management. Organization ran Python and AWS services."
+  },
+  "job": {
+    "title": "Senior Engineering Manager",
+    "company": "Wyecombe Care",
+    "role_identity": "senior_people_manager",
+    "level": 5,
+    "jd_text": "Senior Engineering Manager. Lead 3-4 engineering managers and an org of about 30 engineers. Own headcount, performance management and executive stakeholders. Python and AWS platform. Experience managing managers required."
+  },
+  "expected": {
+    "verdict": "STRONG",
+    "role_identity_aligned": true,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "fit",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "strong",
+    "explicit_skills": [
+      "People Management",
+      "Stakeholder Management",
+      "Python",
+      "AWS"
+    ],
+    "implicit_capabilities": [
+      "organization design"
+    ],
+    "reason": "Same manager-of-managers scope and size with health-tech domain alignment."
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "tl-06-data-platform-strong",
+  "title": "Data platform tech lead to data platform tech lead",
+  "category": "strong_match",
+  "profile_type": "tech_lead",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate TL-06",
+    "role_identity": "tech_lead",
+    "level": 4,
+    "years_experience": 9,
+    "resume_text": "Tech Lead, Data Platform at Wrenfield Logistics (fictional), 9 years. Technical lead for a team of 5 engineers. Set the architecture for Kafka and Flink streaming pipelines and Spark batch jobs in Python, orchestrated with Airflow on AWS. Ran design reviews and mentored two engineers to senior."
+  },
+  "job": {
+    "title": "Tech Lead, Data Platform",
+    "company": "Ostrander Energy",
+    "role_identity": "tech_lead",
+    "level": 4,
+    "jd_text": "Tech Lead, Data Platform. Lead a team of 5-6 engineers while staying hands-on. Own architecture for Kafka and Flink streaming and Spark batch pipelines in Python with Airflow on AWS. Mentoring and technical leadership are core expectations."
+  },
+  "expected": {
+    "verdict": "STRONG",
+    "role_identity_aligned": true,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "fit",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "strong",
+    "explicit_skills": [
+      "Kafka",
+      "Flink",
+      "Spark",
+      "Python",
+      "Airflow",
+      "AWS",
+      "Leadership"
+    ],
+    "implicit_capabilities": [
+      "system design",
+      "mentoring"
+    ],
+    "reason": "Same role identity, team size, stack and domain with concrete leadership outcomes."
+  }
+}

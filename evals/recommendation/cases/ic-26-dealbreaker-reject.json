@@ -1,0 +1,42 @@
+{
+  "id": "ic-26-dealbreaker-reject",
+  "title": "Strong match blocked by a stack dealbreaker",
+  "category": "strong_match",
+  "profile_type": "ic",
+  "candidate": {
+    "filters": {
+      "tech_stack_dealbreakers": [
+        ".NET"
+      ]
+    },
+    "label": "Candidate IC-26",
+    "role_identity": "ic",
+    "level": 4,
+    "years_experience": 7,
+    "resume_text": "Senior Software Engineer at Kittiwake Labs (fictional), 7 years. Built C# services on Azure with PostgreSQL and REST APIs; moved to TypeScript and Node.js two years ago and does not want to return to the .NET stack."
+  },
+  "job": {
+    "title": "Senior Backend Engineer",
+    "company": "Harrowgate Insurance",
+    "role_identity": "ic",
+    "level": 4,
+    "jd_text": "Senior Backend Engineer. Build C# and .NET services on Azure with PostgreSQL and REST APIs. 5+ years."
+  },
+  "expected": {
+    "verdict": "REJECT",
+    "role_identity_aligned": true,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "n/a",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "strong",
+    "explicit_skills": [
+      "C#",
+      "Azure",
+      "PostgreSQL",
+      "REST APIs"
+    ],
+    "implicit_capabilities": [],
+    "reason": "Skills fit, but the candidate's own .NET dealbreaker must reject it."
+  }
+}

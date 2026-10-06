@@ -1,0 +1,40 @@
+{
+  "id": "st-18-adtech-to-ml-platform-borderline",
+  "title": "Staff backend engineer to staff ML platform engineer",
+  "category": "borderline",
+  "profile_type": "staff_ic",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate ST-18",
+    "role_identity": "staff_ic",
+    "level": 5,
+    "years_experience": 13,
+    "resume_text": "Staff Engineer at Copperleaf Ads (fictional), 13 years. Architected Python and Spark bidding pipelines on AWS processing 2B events a day. Led system design across four teams. Partnered with data scientists to productionize two models."
+  },
+  "job": {
+    "title": "Staff Engineer, ML Platform",
+    "company": "Greyfriars Bio",
+    "role_identity": "staff_ic",
+    "level": 5,
+    "jd_text": "Staff Engineer, ML Platform. Build machine learning training and serving infrastructure in Python and Spark on AWS. Cross-team system design. ML engineering experience required."
+  },
+  "expected": {
+    "verdict": "DECENT",
+    "role_identity_aligned": true,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "fit",
+    "hands_on_fit": "fit",
+    "domain_fit": "partial",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "Python",
+      "Spark",
+      "AWS",
+      "System Design"
+    ],
+    "implicit_capabilities": [
+      "cross-team influence"
+    ],
+    "reason": "Right level and infrastructure depth; ML platform experience is adjacent rather than direct."
+  }
+}

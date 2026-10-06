@@ -1,0 +1,40 @@
+{
+  "id": "ct-23-pm-vs-backend-misleading",
+  "title": "Product manager with tech keywords vs senior backend engineer",
+  "category": "misleading_keyword",
+  "profile_type": "career_transition",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate CT-23",
+    "role_identity": "career_transition",
+    "level": 4,
+    "years_experience": 8,
+    "resume_text": "Senior Product Manager at Brackenfold SaaS (fictional), 8 years. Owned the roadmap for React, Node.js and AWS products and a Kafka event migration. Wrote PRDs, ran stakeholder management with executive stakeholders, and completed an online Python course."
+  },
+  "job": {
+    "title": "Senior Backend Engineer",
+    "company": "Mistlecombe Freight",
+    "role_identity": "ic",
+    "level": 4,
+    "jd_text": "Senior Backend Engineer. Write Node.js and Python services on AWS with Kafka and PostgreSQL. Own design, code and production on-call. 5+ years of professional software engineering."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": false,
+    "seniority_fit": "under",
+    "leadership_scope_fit": "n/a",
+    "hands_on_fit": "gap",
+    "domain_fit": "fit",
+    "evidence_strength": "weak",
+    "explicit_skills": [
+      "Node.js",
+      "AWS",
+      "Kafka",
+      "Python"
+    ],
+    "implicit_capabilities": [
+      "stakeholder management"
+    ],
+    "reason": "Owning a roadmap that mentions technologies is not engineering experience; no professional coding evidence."
+  }
+}

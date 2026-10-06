@@ -1,0 +1,41 @@
+{
+  "id": "em-12-senior-ic-vs-em-misleading",
+  "title": "Senior IC with mentoring keywords vs people manager",
+  "category": "misleading_keyword",
+  "profile_type": "people_manager",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate EM-12",
+    "role_identity": "ic",
+    "level": 4,
+    "years_experience": 9,
+    "resume_text": "Senior Software Engineer at Driftwood Systems (fictional), 9 years. Built Java microservices on AWS with Kafka. Mentoring two junior engineers and leading design reviews. No direct reports; manager owns hiring and performance reviews."
+  },
+  "job": {
+    "title": "Engineering Manager, Order Platform",
+    "company": "Ravenscar Retail",
+    "role_identity": "people_manager",
+    "level": 4,
+    "jd_text": "Engineering Manager. Own 8 direct reports, performance reviews, hiring and team health. The team builds Java microservices on AWS with Kafka. Mentoring and coaching are core. 2+ years of people management required."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": false,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "gap",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "Java",
+      "Microservices",
+      "AWS",
+      "Kafka",
+      "Leadership"
+    ],
+    "implicit_capabilities": [
+      "mentoring"
+    ],
+    "reason": "Stack matches, but the role requires two years of people management and the candidate has none."
+  }
+}

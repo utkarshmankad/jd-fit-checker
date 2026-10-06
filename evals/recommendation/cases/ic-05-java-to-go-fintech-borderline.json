@@ -1,0 +1,42 @@
+{
+  "id": "ic-05-java-to-go-fintech-borderline",
+  "title": "Senior Java fintech IC to senior Go fintech role",
+  "category": "borderline",
+  "profile_type": "ic",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate IC-05",
+    "role_identity": "ic",
+    "level": 4,
+    "years_experience": 8,
+    "resume_text": "Senior Software Engineer at Corvale Payments (fictional), 8 years. Built Java microservices for card settlement on AWS with PostgreSQL and Kafka. Led design of an idempotent ledger service. Implemented distributed tracing and on-call runbooks."
+  },
+  "job": {
+    "title": "Senior Software Engineer, Ledger",
+    "company": "Ashcombe Mutual",
+    "role_identity": "ic",
+    "level": 4,
+    "jd_text": "Senior Software Engineer on the ledger team. Build Golang microservices on AWS with PostgreSQL and Kafka for payment settlement. Strong distributed systems fundamentals. 6+ years. Fintech experience strongly preferred."
+  },
+  "expected": {
+    "verdict": "DECENT",
+    "role_identity_aligned": true,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "n/a",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "strong",
+    "explicit_skills": [
+      "Java",
+      "AWS",
+      "PostgreSQL",
+      "Kafka",
+      "Microservices"
+    ],
+    "implicit_capabilities": [
+      "observability",
+      "ledger design"
+    ],
+    "reason": "Exact domain and level with strong distributed systems evidence; the Go language gap is learnable but real."
+  }
+}

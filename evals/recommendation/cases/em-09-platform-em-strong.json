@@ -1,0 +1,41 @@
+{
+  "id": "em-09-platform-em-strong",
+  "title": "Platform engineering manager to platform engineering manager",
+  "category": "strong_match",
+  "profile_type": "people_manager",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate EM-09",
+    "role_identity": "people_manager",
+    "level": 4,
+    "years_experience": 12,
+    "resume_text": "Engineering Manager at Glenrock Cloud (fictional), 12 years. Managed a team of 8 engineers with direct reports, ran performance reviews and hiring. The team owned Java and Kafka services on AWS. Partnered with product and executive stakeholders on platform roadmap; improved incident response MTTR by 45%."
+  },
+  "job": {
+    "title": "Engineering Manager, Platform",
+    "company": "Ivybridge Telecom",
+    "role_identity": "people_manager",
+    "level": 4,
+    "jd_text": "Engineering Manager, Platform. Manage 7-9 direct reports, own hiring and performance reviews, and lead platform delivery on Java, Kafka and AWS. Stakeholder management with product and executives. 10+ years including people management."
+  },
+  "expected": {
+    "verdict": "STRONG",
+    "role_identity_aligned": true,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "fit",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "strong",
+    "explicit_skills": [
+      "People Management",
+      "Java",
+      "Kafka",
+      "AWS",
+      "Stakeholder Management"
+    ],
+    "implicit_capabilities": [
+      "observability"
+    ],
+    "reason": "Same scope, team size and platform domain with measurable outcomes."
+  }
+}
