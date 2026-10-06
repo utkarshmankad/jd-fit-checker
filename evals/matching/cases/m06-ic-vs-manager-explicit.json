@@ -1,0 +1,39 @@
+{
+  "id": "m06-ic-vs-manager-explicit",
+  "title": "Senior IC with mentoring, explicitly no reports, vs EM",
+  "group": "ic_vs_manager",
+  "candidate": {
+    "label": "Candidate M0-06",
+    "resume_text": "Senior Software Engineer at Driftmere Systems (fictional), 2016 - present\nBuilt Java microservices on AWS with Kafka.\nMentored three junior engineers and led design reviews.\nNo direct reports; my manager owns hiring and performance reviews."
+  },
+  "job": {
+    "title": "Engineering Manager",
+    "text": "Engineering Manager\nResponsibilities:\nManage a team of 8 engineers with direct reports.\nOwn hiring and performance reviews.\nRequirements:\n2+ years of people management experience.\nExperience with Java and AWS."
+  },
+  "expected": [
+    {
+      "kind": "identity",
+      "concept": null,
+      "status": "explicit_gap",
+      "why": "IC applying to a people-management role"
+    },
+    {
+      "kind": "people_management",
+      "concept": null,
+      "status": "explicit_gap",
+      "why": "States no direct reports"
+    },
+    {
+      "kind": "experience_years",
+      "concept": "People Management",
+      "status": "explicit_gap",
+      "why": "No people management at all"
+    },
+    {
+      "kind": "skill",
+      "concept": "Java",
+      "status": "strong",
+      "why": "Used in work"
+    }
+  ]
+}

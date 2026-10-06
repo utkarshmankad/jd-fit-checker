@@ -1,0 +1,27 @@
+{
+  "id": "m01-people-management-wording",
+  "title": "Line management phrased differently",
+  "group": "equivalent_wording",
+  "candidate": {
+    "label": "Candidate M0-01",
+    "resume_text": "Engineering Manager at Larchfield Pay (fictional), 2019 - present\nLine-managed 7 engineers, ran performance reviews and hired 3 engineers.\nPartnered with product on the settlements roadmap."
+  },
+  "job": {
+    "title": "Engineering Manager",
+    "text": "Engineering Manager\nResponsibilities:\nGrow and develop a team of 6 engineers and run their performance reviews.\nPartner with product managers on the roadmap.\nRequirements:\nExperience managing engineering teams."
+  },
+  "expected": [
+    {
+      "kind": "people_management",
+      "concept": null,
+      "status": "strong",
+      "why": "Line-managed 7 with reviews and hiring is people management in different words"
+    },
+    {
+      "kind": "identity",
+      "concept": null,
+      "status": "strong",
+      "why": "Manager to manager"
+    }
+  ]
+}

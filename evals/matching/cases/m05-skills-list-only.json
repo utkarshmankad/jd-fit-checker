@@ -1,0 +1,39 @@
+{
+  "id": "m05-skills-list-only",
+  "title": "Infrastructure keywords only in a skills list",
+  "group": "adversarial_overlap",
+  "candidate": {
+    "label": "Candidate M0-05",
+    "resume_text": "Frontend Engineer at Saltire Media (fictional), 2021 - 2025\nBuilt React and TypeScript interfaces for the newsroom.\nSkills: Kubernetes, Kafka, Terraform, Go, React, TypeScript"
+  },
+  "job": {
+    "title": "Senior Platform Engineer",
+    "text": "Senior Platform Engineer\nRequirements:\nStrong experience with Kubernetes and Terraform.\nExperience operating Kafka in production."
+  },
+  "expected": [
+    {
+      "kind": "skill",
+      "concept": "Kubernetes",
+      "status": "unsupported",
+      "why": "Only listed"
+    },
+    {
+      "kind": "skill",
+      "concept": "Terraform",
+      "status": "unsupported",
+      "why": "Only listed"
+    },
+    {
+      "kind": "skill",
+      "concept": "Kafka",
+      "status": "unsupported",
+      "why": "Only listed"
+    },
+    {
+      "kind": "role_family",
+      "concept": null,
+      "status": "strong",
+      "why": "Both engineering"
+    }
+  ]
+}

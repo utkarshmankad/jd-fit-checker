@@ -1,0 +1,27 @@
+{
+  "id": "m04-system-design-wording",
+  "title": "Architected platform vs distributed systems",
+  "group": "equivalent_wording",
+  "candidate": {
+    "label": "Candidate M0-04",
+    "resume_text": "Staff Engineer at Kestrelmoor Cloud (fictional), 2014 - 2025\nArchitected a highly available event platform adopted by 12 teams.\nBuilt Go services and reviewed designs across the organization."
+  },
+  "job": {
+    "title": "Staff Engineer",
+    "text": "Staff Engineer\nRequirements:\nExperience designing distributed systems at scale.\n10+ years of software engineering experience."
+  },
+  "expected": [
+    {
+      "kind": "architecture",
+      "concept": "System Design",
+      "status": "strong",
+      "why": "Architecting a highly available platform is distributed-systems design"
+    },
+    {
+      "kind": "experience_years",
+      "concept": null,
+      "status": "strong",
+      "why": "11 years"
+    }
+  ]
+}

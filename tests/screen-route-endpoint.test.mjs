@@ -83,6 +83,13 @@ test('single jd_text: saved analysis_json.role_profile, verdict untouched, cache
   assert.equal(ref.extractor_version, 'rip-deterministic-1')
   assert.ok(!JSON.stringify(ref).includes('data pipelines'), 'reference carries no job text')
   assert.deepEqual(first.json.results[0].analysis_json.role_profile, ref, 'response returns the saved row')
+  const match = row.analysis_json.requirement_match
+  assert.ok(match, 'analysis_json.requirement_match is stored')
+  assert.equal(match.engine_version, 'match-deterministic-1')
+  assert.equal(typeof match.fit_score, 'number')
+  assert.ok(Object.values(match.mandatory).reduce((a, b) => a + b, 0) > 0)
+  assert.ok(Array.isArray(match.explanation) && match.explanation.length > 0)
+  assert.ok(!JSON.stringify(match).includes('Brookvale'), 'reference carries no resume quotes')
 
   assert.equal(db.tables.role_profiles.length, 1, 'profile cached once')
   const cached = db.tables.role_profiles[0]

@@ -8,8 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./evals/recommendation/alias-hooks.mjs --test tests/anonymous-verdict-unit.test.mjs tests/recommendation-eval-unit.test.mjs tests/candidate-profile-unit.test.mjs tests/role-profile-unit.test.mjs tests/screen-route-endpoint.test.mjs",
-    "eval:recommendation": "node --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./evals/recommendation/alias-hooks.mjs evals/recommendation/run.ts"
+    "test:unit": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./evals/recommendation/alias-hooks.mjs --test tests/anonymous-verdict-unit.test.mjs tests/recommendation-eval-unit.test.mjs tests/candidate-profile-unit.test.mjs tests/role-profile-unit.test.mjs tests/screen-route-endpoint.test.mjs tests/matching-unit.test.mjs",
+    "eval:recommendation": "node --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./evals/recommendation/alias-hooks.mjs evals/recommendation/run.ts",
+    "eval:matching": "node --experimental-strip-types --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./evals/recommendation/alias-hooks.mjs evals/matching/run.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.17",
