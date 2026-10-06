@@ -1,0 +1,42 @@
+{
+  "id": "pr-19-principal-strong",
+  "title": "Principal engineer to principal engineer",
+  "category": "strong_match",
+  "profile_type": "principal_ic",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate PR-19",
+    "role_identity": "principal_ic",
+    "level": 6,
+    "years_experience": 18,
+    "resume_text": "Principal Engineer at Ravensworth Payments (fictional), 18 years. Owns multi-year architecture for distributed systems across a 200-engineer organization: Java microservices, Kafka and PostgreSQL on AWS. Designed the highly available ledger platform and chairs the architecture review board."
+  },
+  "job": {
+    "title": "Principal Engineer",
+    "company": "Tamberlane Bank",
+    "role_identity": "principal_ic",
+    "level": 6,
+    "jd_text": "Principal Engineer. Set multi-year technical direction for distributed systems across the engineering organization. Java microservices, Kafka and PostgreSQL on AWS. Lead architecture reviews and system design for highly available platforms. 15+ years."
+  },
+  "expected": {
+    "verdict": "STRONG",
+    "role_identity_aligned": true,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "fit",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "strong",
+    "explicit_skills": [
+      "Java",
+      "Microservices",
+      "Kafka",
+      "PostgreSQL",
+      "AWS",
+      "System Design"
+    ],
+    "implicit_capabilities": [
+      "org-wide influence"
+    ],
+    "reason": "Same principal scope and domain with direct architecture-board evidence."
+  }
+}

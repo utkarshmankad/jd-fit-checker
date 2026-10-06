@@ -29,6 +29,9 @@ jobs:
 
       - run: npm run test:unit
 
+      # Recommendation quality gate (frontend fast scorer); see evals/recommendation/README.md.
+      - run: npm run eval:recommendation -- --check-baseline
+
       - name: build
         run: npm run build
         env:

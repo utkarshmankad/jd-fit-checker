@@ -1,0 +1,38 @@
+{
+  "id": "pr-20-pca-principal-misleading",
+  "title": "'Principal component analysis' vs principal engineer",
+  "category": "misleading_keyword",
+  "profile_type": "principal_ic",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate PR-20",
+    "role_identity": "ic",
+    "level": 3,
+    "years_experience": 4,
+    "resume_text": "Data Engineer at Fieldmouse Insights (fictional), 4 years. Built Python and Spark pipelines with Airflow. Implemented principal component analysis features for a churn model. Maintained Snowflake tables for analysts."
+  },
+  "job": {
+    "title": "Principal Engineer, Data Platform",
+    "company": "Kingsmere Energy",
+    "role_identity": "principal_ic",
+    "level": 6,
+    "jd_text": "Principal Engineer, Data Platform. Set organization-wide architecture for Python, Spark and Airflow pipelines on Snowflake. Lead system design across many teams. 15+ years of experience."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": true,
+    "seniority_fit": "under",
+    "leadership_scope_fit": "gap",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "Python",
+      "Spark",
+      "Airflow",
+      "Snowflake"
+    ],
+    "implicit_capabilities": [],
+    "reason": "The only 'principal' in the resume is a statistics technique; a mid-level data engineer is three levels below the role."
+  }
+}

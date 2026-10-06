@@ -1,0 +1,308 @@
+{
+  "recorded_with": {
+    "cases": 27,
+    "repeats": 5,
+    "node": "v24.18.0",
+    "platform": "darwin/arm64"
+  },
+  "scorers": {
+    "frontend:scoreJobFast": {
+      "cases": 27,
+      "verdict_agreement": 0.4074,
+      "false_positive_rate": 0.8571,
+      "false_negative_rate": 0,
+      "role_identity_accuracy": 0.6296,
+      "seniority_accuracy": 0.5926,
+      "deterministic_repeatability": 1,
+      "suite_fingerprint": "46a28ab08ceae4bc",
+      "counts": {
+        "expected_positive": 13,
+        "expected_negative": 14,
+        "false_positive": 12,
+        "false_negative": 0
+      },
+      "by_category": {
+        "borderline": {
+          "cases": 6,
+          "verdict_agreement": 0.3333
+        },
+        "misleading_keyword": {
+          "cases": 13,
+          "verdict_agreement": 0.0769
+        },
+        "strong_match": {
+          "cases": 8,
+          "verdict_agreement": 1
+        }
+      },
+      "confusion": {
+        "STRONG": {
+          "STRONG": 7,
+          "DECENT": 0,
+          "WEAK": 0,
+          "REJECT": 0
+        },
+        "DECENT": {
+          "STRONG": 4,
+          "DECENT": 2,
+          "WEAK": 0,
+          "REJECT": 0
+        },
+        "WEAK": {
+          "STRONG": 12,
+          "DECENT": 0,
+          "WEAK": 0,
+          "REJECT": 0
+        },
+        "REJECT": {
+          "STRONG": 0,
+          "DECENT": 0,
+          "WEAK": 0,
+          "REJECT": 2
+        }
+      },
+      "latency_ms": {
+        "per_job_p50": 0.084,
+        "per_job_p95": 0.105,
+        "per_job_max": 0.245,
+        "batch_median": 2.507,
+        "batch_max": 3.176
+      },
+      "derived_dimensions": [
+        "role_identity_aligned",
+        "seniority_fit"
+      ],
+      "disagreements": [
+        {
+          "id": "ct-22-teacher-to-swe-borderline",
+          "expected": "DECENT",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "ct-23-pm-vs-backend-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "ct-25-logistics-officer-vs-senior-de-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "em-10-manager-vs-hands-on-lead-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "em-12-senior-ic-vs-em-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "ic-03-analyst-vs-data-engineer-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "ic-04-qa-vs-react-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "ic-05-java-to-go-fintech-borderline",
+          "expected": "DECENT",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "pr-20-pca-principal-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "pr-21-principal-vs-em-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "sm-14-first-time-em-vs-senior-manager-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "sm-15-senior-manager-vs-senior-ic-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "st-17-keyword-list-vs-staff-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "st-18-adtech-to-ml-platform-borderline",
+          "expected": "DECENT",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "tl-07-hackathon-leadership-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "tl-08-tl-to-em-borderline",
+          "expected": "DECENT",
+          "predicted": "STRONG"
+        }
+      ]
+    },
+    "backend:score_jd_fast": {
+      "cases": 27,
+      "verdict_agreement": 0.4074,
+      "false_positive_rate": 0.8571,
+      "false_negative_rate": 0,
+      "role_identity_accuracy": 0.6296,
+      "seniority_accuracy": 0.5926,
+      "deterministic_repeatability": 1,
+      "suite_fingerprint": "a39c8ae6c5d944ab",
+      "counts": {
+        "expected_positive": 13,
+        "expected_negative": 14,
+        "false_positive": 12,
+        "false_negative": 0
+      },
+      "by_category": {
+        "borderline": {
+          "cases": 6,
+          "verdict_agreement": 0.3333
+        },
+        "misleading_keyword": {
+          "cases": 13,
+          "verdict_agreement": 0.0769
+        },
+        "strong_match": {
+          "cases": 8,
+          "verdict_agreement": 1
+        }
+      },
+      "confusion": {
+        "STRONG": {
+          "STRONG": 7,
+          "DECENT": 0,
+          "WEAK": 0,
+          "REJECT": 0
+        },
+        "DECENT": {
+          "STRONG": 4,
+          "DECENT": 2,
+          "WEAK": 0,
+          "REJECT": 0
+        },
+        "WEAK": {
+          "STRONG": 12,
+          "DECENT": 0,
+          "WEAK": 0,
+          "REJECT": 0
+        },
+        "REJECT": {
+          "STRONG": 0,
+          "DECENT": 0,
+          "WEAK": 0,
+          "REJECT": 2
+        }
+      },
+      "latency_ms": {
+        "per_job_p50": 0.425,
+        "per_job_p95": 0.513,
+        "per_job_max": 0.523,
+        "batch_median": 11.453,
+        "batch_max": 11.663
+      },
+      "derived_dimensions": [
+        "role_identity_aligned",
+        "seniority_fit"
+      ],
+      "disagreements": [
+        {
+          "id": "ct-22-teacher-to-swe-borderline",
+          "expected": "DECENT",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "ct-23-pm-vs-backend-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "ct-25-logistics-officer-vs-senior-de-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "em-10-manager-vs-hands-on-lead-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "em-12-senior-ic-vs-em-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "ic-03-analyst-vs-data-engineer-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "ic-04-qa-vs-react-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "ic-05-java-to-go-fintech-borderline",
+          "expected": "DECENT",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "pr-20-pca-principal-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "pr-21-principal-vs-em-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "sm-14-first-time-em-vs-senior-manager-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "sm-15-senior-manager-vs-senior-ic-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "st-17-keyword-list-vs-staff-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "st-18-adtech-to-ml-platform-borderline",
+          "expected": "DECENT",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "tl-07-hackathon-leadership-misleading",
+          "expected": "WEAK",
+          "predicted": "STRONG"
+        },
+        {
+          "id": "tl-08-tl-to-em-borderline",
+          "expected": "DECENT",
+          "predicted": "STRONG"
+        }
+      ]
+    }
+  }
+}

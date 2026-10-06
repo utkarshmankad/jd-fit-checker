@@ -1,0 +1,40 @@
+{
+  "id": "ct-25-logistics-officer-vs-senior-de-misleading",
+  "title": "Logistics officer with a Python course vs senior data engineer",
+  "category": "misleading_keyword",
+  "profile_type": "career_transition",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate CT-25",
+    "role_identity": "career_transition",
+    "level": 2,
+    "years_experience": 0,
+    "resume_text": "Logistics Operations Officer (fictional service branch), 9 years; completed certificates in Python, SQL, Apache Spark and Airflow. Built a personal Kafka streaming demo. Led a team of 20 in operations."
+  },
+  "job": {
+    "title": "Senior Data Engineer",
+    "company": "Ploverhill Shipping",
+    "role_identity": "ic",
+    "level": 4,
+    "jd_text": "Senior Data Engineer. Build and operate Python, Spark, Airflow and Kafka pipelines in production. 6+ years of professional data engineering with on-call ownership. Logistics domain a plus."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": false,
+    "seniority_fit": "under",
+    "leadership_scope_fit": "n/a",
+    "hands_on_fit": "gap",
+    "domain_fit": "partial",
+    "evidence_strength": "weak",
+    "explicit_skills": [
+      "Python",
+      "Spark",
+      "Airflow",
+      "Kafka"
+    ],
+    "implicit_capabilities": [
+      "operations leadership"
+    ],
+    "reason": "Certificates and a demo match every keyword, but there is no professional engineering experience for a senior role."
+  }
+}

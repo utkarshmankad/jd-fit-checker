@@ -1,0 +1,40 @@
+{
+  "id": "ic-04-qa-vs-react-misleading",
+  "title": "QA automation keywords vs product React engineering",
+  "category": "misleading_keyword",
+  "profile_type": "ic",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate IC-04",
+    "role_identity": "qa",
+    "level": 3,
+    "years_experience": 5,
+    "resume_text": "QA Automation Engineer at Brindle Insurance (fictional), 5 years. Built Cypress and Jest suites for React and TypeScript applications. Maintained GitHub Actions CI/CD pipelines and Docker test environments. Triaged regressions with frontend developers."
+  },
+  "job": {
+    "title": "Senior React Engineer",
+    "company": "Larchmont Media",
+    "role_identity": "ic",
+    "level": 4,
+    "jd_text": "Senior React Engineer. Build product features in React and TypeScript, own component architecture and state management, and write Jest and Cypress tests for your code. CI/CD with GitHub Actions. 5+ years shipping production frontend features."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": false,
+    "seniority_fit": "under",
+    "leadership_scope_fit": "n/a",
+    "hands_on_fit": "gap",
+    "domain_fit": "fit",
+    "evidence_strength": "weak",
+    "explicit_skills": [
+      "Cypress",
+      "Jest",
+      "React",
+      "TypeScript",
+      "CI/CD",
+      "Docker"
+    ],
+    "implicit_capabilities": [],
+    "reason": "Testing React apps is not building them; no feature ownership or component architecture evidence despite near-total keyword overlap."
+  }
+}

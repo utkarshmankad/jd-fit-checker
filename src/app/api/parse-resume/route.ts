@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { buildCandidateEvidence } from '@/lib/rag/candidate-evidence'
+import { ensureCandidateProfile, profileReference, type ProfileTable } from '@/lib/candidate-profile/store'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024        // 5 MB
 const MAX_TEXT_CHARS = 50_000                  // ~25 pages of text
@@ -261,6 +262,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Candidate Intelligence Profile: derived once per resume version, here at
+  // upload time. Deterministic (no provider call), so it is built even when
+  // only the legacy parse above is degraded; a missing table is non-fatal.
+  const candidateProfile = await ensureCandidateProfile(service as unknown as ProfileTable, user.id, resumeText)
+
   const wordCount = resumeText.split(/\s+/).filter(Boolean).length
-  return NextResponse.json({ parsed, word_count: wordCount, evidence_indexed: evidenceIndexed })
+  return NextResponse.json({ parsed, word_count: wordCount, evidence_indexed: evidenceIndexed, candidate_profile: profileReference(candidateProfile) })
 }

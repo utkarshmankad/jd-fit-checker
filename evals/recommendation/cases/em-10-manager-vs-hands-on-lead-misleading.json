@@ -1,0 +1,37 @@
+{
+  "id": "em-10-manager-vs-hands-on-lead-misleading",
+  "title": "Non-coding manager vs 80% hands-on lead engineer",
+  "category": "misleading_keyword",
+  "profile_type": "people_manager",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate EM-10",
+    "role_identity": "people_manager",
+    "level": 4,
+    "years_experience": 14,
+    "resume_text": "Engineering Manager at Coldharbour Media (fictional), 14 years. Managed a team of 10 with direct reports and performance reviews. Teams built React and Node.js products. Has not written production code in the last 4 years; focused on hiring, delivery and stakeholder management."
+  },
+  "job": {
+    "title": "Lead Engineer, Web Platform",
+    "company": "Hazelmoor Games",
+    "role_identity": "ic",
+    "level": 4,
+    "jd_text": "Lead Engineer. Expect 80% hands-on coding in React, Node.js and TypeScript, reviewing pull requests daily and owning hard technical problems. No direct reports. Recent hands-on production experience required."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": false,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "over",
+    "hands_on_fit": "gap",
+    "domain_fit": "fit",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "React",
+      "Node.js",
+      "People Management"
+    ],
+    "implicit_capabilities": [],
+    "reason": "Shares the stack keywords, but the role is daily hands-on coding and the candidate has not coded in production for four years."
+  }
+}

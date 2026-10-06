@@ -6,6 +6,9 @@ import { checkScreenLimit } from '@/lib/utils/screen-limits'
 import { buildCandidateEvidence, CANDIDATE_EVIDENCE_VERSION, type CandidateEvidenceInput } from '@/lib/rag/candidate-evidence'
 import { fetchJobLightweight, jobContentHash, type ExtractedJob } from '@/lib/jobs/fetch-job'
 import { scoreJobFast } from '@/lib/screening/fast-scorer'
+import { ensureCandidateProfile, profileReference, type ProfileTable } from '@/lib/candidate-profile/store'
+import { ensureRoleProfiles, roleProfileReference, type RoleProfileTable } from '@/lib/role-profile/store'
+import { providerFromUrl } from '@/lib/role-profile/extract'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile, RecommendationCorrection } from '@/types'
 
 // Explicit rather than implicit-default — this route's crash/timeout safety
@@ -241,6 +244,10 @@ export async function POST(request: NextRequest) {
   // item — see the crash-safety note above): beta/launch users draw against
   // the flat beta allotment, everyone else against the weekly cap. Paid
   // tier is unlimited (no reservation at all).
+  // reserve_screens/refund_screens are EXECUTE-granted to service_role only
+  // (migration 009): a signed-in user calling refund_screens directly could
+  // otherwise erase their own usage. user.id comes from auth.getUser() above.
+  const quota = createServiceClient()
   type PreparedItem = { apiKey: string; provider: string; source: 'app'; reserved: boolean; useWeekly: boolean }
 
   async function prepareItem(): Promise<PreparedItem | { error: string; code?: 'no_api_key' }> {
@@ -251,7 +258,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (isBetaOrLaunch) {
-      const { data: ok, error } = await supabase.rpc('reserve_screens', {
+      const { data: ok, error } = await quota.rpc('reserve_screens', {
         p_user_id: user!.id,
         p_amount: 1,
         p_use_weekly: false,
@@ -268,7 +275,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Regular free tier: always weekly-capped.
-    const { data: ok, error } = await supabase.rpc('reserve_screens', {
+    const { data: ok, error } = await quota.rpc('reserve_screens', {
       p_user_id: user!.id,
       p_amount: 1,
       p_use_weekly: true,
@@ -303,7 +310,7 @@ export async function POST(request: NextRequest) {
   // once we know it failed, give it back immediately, same request.
   async function refundIfReserved(item: PreparedItem) {
     if (!item.reserved) return
-    const { error } = await supabase.rpc('refund_screens', { p_user_id: user!.id, p_amount: 1, p_use_weekly: item.useWeekly })
+    const { error } = await quota.rpc('refund_screens', { p_user_id: user!.id, p_amount: 1, p_use_weekly: item.useWeekly })
     if (error) {
       console.error('refund_screens failed:', error)
     }
@@ -359,6 +366,13 @@ export async function POST(request: NextRequest) {
       }
     }
   }
+
+  // Candidate Intelligence Profile: normally built at upload; rebuilt here only
+  // when missing or stale (new resume, schema or extractor version). It is not
+  // used for scoring yet — results are returned alongside for inspection.
+  const candidateProfile = storedResume.trim()
+    ? await ensureCandidateProfile(createServiceClient() as unknown as ProfileTable, user.id, storedResume)
+    : { status: 'unavailable' as const, profile: null }
 
   // User corrections are a separate memory from resume evidence: evidence
   // proves capability, while corrections calibrate personal suitability.
@@ -482,36 +496,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  async function saveResult(
-    analysis: FastAPIResult,
-    overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }
-  ): Promise<ScreeningResult | null> {
-    const { data: saved, error } = await supabase
-      .from('screening_results')
-      .insert({
-        user_id: user!.id,
-        batch_id,
-        job_url: overrides.job_url ?? null,
-        job_title: overrides.job_title ?? analysis.job_title ?? null,
-        company: overrides.company ?? analysis.company ?? null,
-        jd_text: overrides.jd_text ?? analysis.jd_text ?? '',
-        ats_score: analysis.ats_score,
-        role_level_score: analysis.role_level_score,
-        composite_score: analysis.composite_score,
-        verdict: analysis.verdict,
-        hard_reject_reasons: analysis.hard_reject_reasons,
-        analysis_json: analysis,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('screening_results insert failed:', error.message)
-      return null
-    }
-    return saved as ScreeningResult
-  }
-
   const pendingSaves: Array<{ analysis: FastAPIResult; overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string } }> = []
   function queueResult(analysis: FastAPIResult, overrides: { job_url?: string; job_title?: string; company?: string; jd_text?: string }) {
     pendingSaves.push({ analysis, overrides })
@@ -519,6 +503,19 @@ export async function POST(request: NextRequest) {
 
   async function flushResults(): Promise<void> {
     if (!pendingSaves.length) return
+    // Role Intelligence Profiles: one cache read (+ one write for new content) per
+    // flush, keyed by normalised job content. Informational only — the verdict
+    // formula above is unchanged — and never allowed to fail the save.
+    try {
+      const roleProfiles = await ensureRoleProfiles(createServiceClient() as unknown as RoleProfileTable, pendingSaves.map(({ analysis, overrides }) => ({
+        text: overrides.jd_text ?? analysis.jd_text ?? '',
+        title: overrides.job_title ?? analysis.job_title ?? null,
+        source: { kind: overrides.job_url ? 'url' as const : 'pasted' as const, provider: providerFromUrl(overrides.job_url), canonical_url: overrides.job_url ?? null },
+      })))
+      pendingSaves.forEach((pending, index) => { pending.analysis.role_profile = roleProfileReference(roleProfiles[index]) })
+    } catch (roleProfileError) {
+      console.warn('Role profiles skipped:', roleProfileError instanceof Error ? roleProfileError.name : 'error')
+    }
     const rows = pendingSaves.map(({ analysis, overrides }) => ({
       user_id: user!.id, batch_id, job_url: overrides.job_url ?? null,
       job_title: overrides.job_title ?? analysis.job_title ?? null,
@@ -665,12 +662,10 @@ export async function POST(request: NextRequest) {
       else if (result._status === 429) fatalError = { type: 'rate_limit', message: result._error, provider: keyChoice.provider, keySource: keyChoice.source }
       else return NextResponse.json({ error: result._error }, { status: result._status })
     } else {
-      const saved = await saveResult(result, { jd_text, job_title, company })
-      if (!saved) {
-        results.push(saveFailedPlaceholder({ job_title: job_title ?? result.job_title, company: company ?? result.company }))
-      } else {
-        results.push(saved)
-      }
+      // Same profiling-and-save path as batched entries (flushResults below), so a
+      // single pasted JD also gets analysis_json.role_profile and the same
+      // save-failure placeholder handling.
+      queueResult(result, { jd_text, job_title, company })
     }
   } else {
     return NextResponse.json({ error: 'Provide urls or jd_text' }, { status: 400 })
@@ -681,7 +676,7 @@ export async function POST(request: NextRequest) {
   const totalMs = performance.now() - requestStarted
   console.info(JSON.stringify({ event: 'screen_batch_timing', batch_id, items: itemCount, total_ms: Math.round(totalMs), cache_ms: Math.round(phaseTotals.cacheMs), local_extract_score_ms: Math.round(phaseTotals.localMs), cache_hits: phaseTotals.cacheHits, render_fallbacks: phaseTotals.renderFallbacks }))
   return NextResponse.json(
-    { results, ...(fatalError ? { fatalError } : {}), timing: { total_ms: Math.round(totalMs), cache_hits: phaseTotals.cacheHits, render_fallbacks: phaseTotals.renderFallbacks } },
+    { results, ...(fatalError ? { fatalError } : {}), candidate_profile: profileReference(candidateProfile), timing: { total_ms: Math.round(totalMs), cache_hits: phaseTotals.cacheHits, render_fallbacks: phaseTotals.renderFallbacks } },
     { headers: { 'Server-Timing': `total;dur=${totalMs.toFixed(1)}, cache;dur=${phaseTotals.cacheMs.toFixed(1)}, local;dur=${phaseTotals.localMs.toFixed(1)}` } }
   )
 }

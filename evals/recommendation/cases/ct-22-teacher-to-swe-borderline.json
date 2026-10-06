@@ -1,0 +1,40 @@
+{
+  "id": "ct-22-teacher-to-swe-borderline",
+  "title": "Teacher turned junior developer to mid software engineer",
+  "category": "borderline",
+  "profile_type": "career_transition",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate CT-22",
+    "role_identity": "career_transition",
+    "level": 2,
+    "years_experience": 1,
+    "resume_text": "Junior Software Engineer at Quarrybank Tutoring (fictional), 1 year, after 8 years as a secondary-school teacher and a 6-month bootcamp. Builds React and TypeScript features with Jest tests and consumes REST APIs. Designed lesson-planning tools used by 300 teachers."
+  },
+  "job": {
+    "title": "Software Engineer",
+    "company": "Dovecote Learning",
+    "role_identity": "ic",
+    "level": 3,
+    "jd_text": "Software Engineer. Build React and TypeScript product features for an education platform, write Jest tests and integrate REST APIs. 2+ years of professional experience. Education domain a plus."
+  },
+  "expected": {
+    "verdict": "DECENT",
+    "role_identity_aligned": true,
+    "seniority_fit": "under",
+    "leadership_scope_fit": "n/a",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "React",
+      "TypeScript",
+      "Jest",
+      "REST APIs"
+    ],
+    "implicit_capabilities": [
+      "education domain"
+    ],
+    "reason": "One level short on professional years, but exact stack and strong domain fit make it worth applying."
+  }
+}
