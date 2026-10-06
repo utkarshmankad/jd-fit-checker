@@ -696,3 +696,28 @@ drop policy if exists "candidate_profiles_select_own" on public.candidate_profil
 create policy "candidate_profiles_select_own" on public.candidate_profiles
   for select to authenticated
   using ((select auth.uid()) is not null and (select auth.uid()) = user_id);
+
+-- ──────────────────────────────────────────────────────────
+-- Role Intelligence Profile cache (migration 011)
+--    Server-only, content-addressed cache of job profiles.
+--    No anon/authenticated access; no user ids stored.
+-- ──────────────────────────────────────────────────────────
+create table if not exists public.role_profiles (
+  content_sha256    text primary key check (content_sha256 ~ '^[0-9a-f]{64}$'),
+  schema_version    integer not null check (schema_version > 0),
+  extractor_version text not null check (char_length(extractor_version) between 1 and 64),
+  page_kind         text not null check (page_kind in ('job_page', 'listing_page', 'search_page', 'closed_posting')),
+  source_kind       text not null check (source_kind in ('url', 'pasted')),
+  provider          text check (provider is null or char_length(provider) <= 255),
+  canonical_url     text check (canonical_url is null or char_length(canonical_url) <= 2048),
+  source_text       text not null check (char_length(source_text) <= 60000),
+  raw_sha256        text not null check (raw_sha256 ~ '^[0-9a-f]{64}$'),
+  profile           jsonb not null check (jsonb_typeof(profile) = 'object' and pg_column_size(profile) <= 524288),
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+alter table public.role_profiles enable row level security;
+
+revoke all on table public.role_profiles from public, anon, authenticated;
+grant select, insert, update, delete on table public.role_profiles to service_role;

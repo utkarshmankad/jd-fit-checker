@@ -7,6 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { scoreJobFast } from '@/lib/screening/fast-scorer'
 import { extractCandidateProfile, tracedItems } from '@/lib/candidate-profile/extract'
+import { extractRoleProfile, roleTracedItems } from '@/lib/role-profile/extract'
 import type { HardRejectFilters } from '@/types'
 import { loadCases, type EvalCase } from './cases'
 import { compareToBaseline, computeMetrics, fingerprint, normalize, type Metrics, type ScorerOutput, type SuiteRun } from './metrics'
@@ -112,6 +113,29 @@ function printSummary(name: string, m: Metrics) {
   if (m.disagreements.length) console.log(`  disagreements          ${m.disagreements.map((d) => `${d.id} ${d.expected}->${d.predicted}`).join('; ')}`)
 }
 
+/** Informational (not gated): how well the role profile recovers fixture job ground truth. */
+function roleReport(cases: EvalCase[]) {
+  const started = performance.now()
+  const profiles = cases.map((c) => ({ c, p: extractRoleProfile({ text: c.job.jd_text, title: c.job.title, source: { kind: 'pasted', provider: null, canonical_url: null } }) }))
+  const ms = performance.now() - started
+  const identityCases = profiles.filter(({ c }) => PROFILE_IDENTITY[c.job.role_identity])
+  const identityHits = identityCases.filter(({ c, p }) => p.identity?.value === PROFILE_IDENTITY[c.job.role_identity])
+  const items = profiles.flatMap(({ p }) => roleTracedItems(p))
+  return {
+    cases: cases.length,
+    job_pages: profiles.filter(({ p }) => p.page.value === 'job_page').length,
+    identity_accuracy: identityHits.length / identityCases.length,
+    identity_misses: identityCases.filter((x) => !identityHits.includes(x)).map(({ c, p }) => `${c.id} ${PROFILE_IDENTITY[c.job.role_identity]}->${p.identity?.value ?? 'unknown'}`),
+    target_level_exact: profiles.filter(({ c, p }) => p.seniority.target?.value === c.job.level).length / cases.length,
+    target_level_within_1: profiles.filter(({ c, p }) => p.seniority.target && Math.abs(p.seniority.target.value - c.job.level) <= 1).length / cases.length,
+    compensation_captured: profiles.filter(({ p }) => p.compensation).length,
+    contradictions: profiles.reduce((sum, { p }) => sum + p.contradictions.filter((x) => x.kind !== 'ambiguity').length, 0),
+    traced_items: items.length,
+    traced_items_with_evidence: items.filter(({ item }) => item.evidence.length > 0 && item.confidence > 0).length,
+    extraction_ms_total: Number(ms.toFixed(2)),
+  }
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2))
   const cases = loadCases()
@@ -132,7 +156,15 @@ function main() {
   console.log(`  career transitions     ${profile.transitions_detected}/${profile.transitions} detected`)
   console.log(`  traced items           ${profile.traced_items_with_evidence}/${profile.traced_items} carry evidence and confidence; extraction ${profile.extraction_ms_total}ms for all ${profile.cases} resumes`)
 
-  if (options.json) writeFileSync(options.json, `${JSON.stringify({ ...results, candidate_profile: profile }, null, 2)}\n`)
+  const role = roleReport(cases)
+  console.log(`\nrole profile (informational, not gated; not used for scoring yet)`)
+  console.log(`  job pages              ${role.job_pages}/${role.cases} pasted fixtures classified as job pages`)
+  console.log(`  identity accuracy      ${pct(role.identity_accuracy)}${role.identity_misses.length ? `  misses: ${role.identity_misses.join('; ')}` : ''}`)
+  console.log(`  target level           exact ${pct(role.target_level_exact)}, within one level ${pct(role.target_level_within_1)}`)
+  console.log(`  compensation captured  ${role.compensation_captured} (fixtures state no pay; any capture is a false positive)`)
+  console.log(`  contradictions         ${role.contradictions} title/scope contradictions flagged`)
+  console.log(`  traced items           ${role.traced_items_with_evidence}/${role.traced_items} carry evidence and confidence; extraction ${role.extraction_ms_total}ms for all ${role.cases} jobs`)
+  if (options.json) writeFileSync(options.json, `${JSON.stringify({ ...results, candidate_profile: profile, role_profile: role }, null, 2)}\n`)
   if (options.writeBaseline) {
     writeFileSync(BASELINE_PATH, `${JSON.stringify({ recorded_with: { cases: cases.length, repeats: options.repeats, node: process.version, platform: `${process.platform}/${process.arch}` }, scorers: results }, null, 2)}\n`)
     console.log(`\nWrote ${path.relative(process.cwd(), BASELINE_PATH)}`)

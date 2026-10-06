@@ -7,6 +7,8 @@ import { buildCandidateEvidence, CANDIDATE_EVIDENCE_VERSION, type CandidateEvide
 import { fetchJobLightweight, jobContentHash, type ExtractedJob } from '@/lib/jobs/fetch-job'
 import { scoreJobFast } from '@/lib/screening/fast-scorer'
 import { ensureCandidateProfile, profileReference, type ProfileTable } from '@/lib/candidate-profile/store'
+import { ensureRoleProfiles, roleProfileReference, type RoleProfileTable } from '@/lib/role-profile/store'
+import { providerFromUrl } from '@/lib/role-profile/extract'
 import type { AnalysisResult, ScreeningResult, BatchIntelligence, UserProfile, RecommendationCorrection } from '@/types'
 
 // Explicit rather than implicit-default — this route's crash/timeout safety
@@ -531,6 +533,19 @@ export async function POST(request: NextRequest) {
 
   async function flushResults(): Promise<void> {
     if (!pendingSaves.length) return
+    // Role Intelligence Profiles: one cache read (+ one write for new content) per
+    // flush, keyed by normalised job content. Informational only — the verdict
+    // formula above is unchanged — and never allowed to fail the save.
+    try {
+      const roleProfiles = await ensureRoleProfiles(createServiceClient() as unknown as RoleProfileTable, pendingSaves.map(({ analysis, overrides }) => ({
+        text: overrides.jd_text ?? analysis.jd_text ?? '',
+        title: overrides.job_title ?? analysis.job_title ?? null,
+        source: { kind: overrides.job_url ? 'url' as const : 'pasted' as const, provider: providerFromUrl(overrides.job_url), canonical_url: overrides.job_url ?? null },
+      })))
+      pendingSaves.forEach((pending, index) => { pending.analysis.role_profile = roleProfileReference(roleProfiles[index]) })
+    } catch (roleProfileError) {
+      console.warn('Role profiles skipped:', roleProfileError instanceof Error ? roleProfileError.name : 'error')
+    }
     const rows = pendingSaves.map(({ analysis, overrides }) => ({
       user_id: user!.id, batch_id, job_url: overrides.job_url ?? null,
       job_title: overrides.job_title ?? analysis.job_title ?? null,
