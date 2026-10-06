@@ -1,0 +1,44 @@
+{
+  "id": "ic-01-senior-backend-strong",
+  "title": "Senior backend IC to senior backend role",
+  "category": "strong_match",
+  "profile_type": "ic",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate IC-01",
+    "role_identity": "ic",
+    "level": 4,
+    "years_experience": 7,
+    "resume_text": "Senior Software Engineer at Tallowmere Systems (fictional), 7 years. Built TypeScript and Node.js services on AWS backed by PostgreSQL and Redis. Designed REST APIs used by 40 internal teams. Moved deployments to Docker with GitHub Actions CI/CD. Reduced p95 latency 38% by redesigning the caching layer. Wrote integration tests with Jest."
+  },
+  "job": {
+    "title": "Senior Backend Engineer",
+    "company": "Quillfern Commerce",
+    "role_identity": "ic",
+    "level": 4,
+    "jd_text": "Senior Backend Engineer. You will build TypeScript and Node.js services on AWS with PostgreSQL and Redis, design REST APIs, and own CI/CD with Docker. 5+ years of backend experience. Hands-on coding role on a product team."
+  },
+  "expected": {
+    "verdict": "STRONG",
+    "role_identity_aligned": true,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "n/a",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "strong",
+    "explicit_skills": [
+      "TypeScript",
+      "Node.js",
+      "AWS",
+      "PostgreSQL",
+      "Redis",
+      "REST APIs",
+      "Docker",
+      "CI/CD"
+    ],
+    "implicit_capabilities": [
+      "performance optimization"
+    ],
+    "reason": "Same role identity and level; every core technology is evidenced with concrete outcomes."
+  }
+}

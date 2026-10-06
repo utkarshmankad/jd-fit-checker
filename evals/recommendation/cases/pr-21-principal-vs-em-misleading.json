@@ -1,0 +1,39 @@
+{
+  "id": "pr-21-principal-vs-em-misleading",
+  "title": "Principal IC with no people management vs EM",
+  "category": "misleading_keyword",
+  "profile_type": "principal_ic",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate PR-21",
+    "role_identity": "principal_ic",
+    "level": 6,
+    "years_experience": 17,
+    "resume_text": "Principal Engineer at Ambergate Cloud (fictional), 17 years. Technical leadership across 12 teams for Kubernetes and Golang platforms. Mentoring staff engineers. Has never had direct reports or run performance reviews."
+  },
+  "job": {
+    "title": "Engineering Manager, Kubernetes Platform",
+    "company": "Westerleigh Systems",
+    "role_identity": "people_manager",
+    "level": 4,
+    "jd_text": "Engineering Manager. Own 8 direct reports, hiring and performance reviews for a Kubernetes and Golang platform team. Prior people management required."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": false,
+    "seniority_fit": "over",
+    "leadership_scope_fit": "gap",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "Kubernetes",
+      "Go",
+      "Leadership"
+    ],
+    "implicit_capabilities": [
+      "mentoring"
+    ],
+    "reason": "Deep technical leadership, but the role is people management with required prior reports, which the candidate has never held."
+  }
+}

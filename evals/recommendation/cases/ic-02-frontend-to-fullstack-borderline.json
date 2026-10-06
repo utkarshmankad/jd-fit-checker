@@ -1,0 +1,42 @@
+{
+  "id": "ic-02-frontend-to-fullstack-borderline",
+  "title": "Mid frontend IC stretching to senior full stack",
+  "category": "borderline",
+  "profile_type": "ic",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate IC-02",
+    "role_identity": "ic",
+    "level": 3,
+    "years_experience": 4,
+    "resume_text": "Software Engineer at Pebblecourt Labs (fictional), 4 years. Built React and TypeScript interfaces with Tailwind CSS. Wrote Cypress and Jest tests. Consumed GraphQL APIs owned by the platform team. Shipped a design system used by 6 product squads."
+  },
+  "job": {
+    "title": "Senior Full Stack Engineer",
+    "company": "Marrowgate Health",
+    "role_identity": "ic",
+    "level": 4,
+    "jd_text": "Senior Full Stack Engineer. Build React and TypeScript frontends and the Node.js and PostgreSQL services behind them. Own system design for new features end to end. 6+ years of experience, including backend ownership."
+  },
+  "expected": {
+    "verdict": "DECENT",
+    "role_identity_aligned": true,
+    "seniority_fit": "under",
+    "leadership_scope_fit": "n/a",
+    "hands_on_fit": "fit",
+    "domain_fit": "partial",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "React",
+      "TypeScript",
+      "Tailwind CSS",
+      "Jest",
+      "Cypress",
+      "GraphQL"
+    ],
+    "implicit_capabilities": [
+      "design system ownership"
+    ],
+    "reason": "Strong frontend evidence but no backend ownership and one level short; worth applying with gaps acknowledged."
+  }
+}

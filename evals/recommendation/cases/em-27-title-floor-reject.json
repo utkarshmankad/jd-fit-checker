@@ -1,0 +1,38 @@
+{
+  "id": "em-27-title-floor-reject",
+  "title": "Manager with an EM title floor vs senior IC role",
+  "category": "misleading_keyword",
+  "profile_type": "people_manager",
+  "candidate": {
+    "filters": {
+      "title_floor": "Engineering Manager"
+    },
+    "label": "Candidate EM-27",
+    "role_identity": "people_manager",
+    "level": 4,
+    "years_experience": 12,
+    "resume_text": "Engineering Manager at Shingle Bay Retail (fictional), 12 years. Managed a team of 8 with direct reports building Python and AWS services. Wants to stay in people management."
+  },
+  "job": {
+    "title": "Software Engineer",
+    "company": "Foxglove Media",
+    "role_identity": "ic",
+    "level": 3,
+    "jd_text": "Software Engineer. Build and maintain Python services on AWS for the content platform, write tests and join code reviews. Individual contributor role. 3+ years of experience."
+  },
+  "expected": {
+    "verdict": "REJECT",
+    "role_identity_aligned": false,
+    "seniority_fit": "over",
+    "leadership_scope_fit": "over",
+    "hands_on_fit": "gap",
+    "domain_fit": "fit",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "Python",
+      "AWS"
+    ],
+    "implicit_capabilities": [],
+    "reason": "The candidate's Engineering Manager title floor excludes this IC role regardless of skill overlap."
+  }
+}

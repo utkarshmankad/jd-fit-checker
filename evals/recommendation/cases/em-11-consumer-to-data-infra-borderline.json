@@ -1,0 +1,39 @@
+{
+  "id": "em-11-consumer-to-data-infra-borderline",
+  "title": "Consumer mobile EM to data infrastructure EM",
+  "category": "borderline",
+  "profile_type": "people_manager",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate EM-11",
+    "role_identity": "people_manager",
+    "level": 4,
+    "years_experience": 11,
+    "resume_text": "Engineering Manager at Juniper Lane Apps (fictional), 11 years. Managed a team of 7 with direct reports building consumer mobile features and Python backend services on GCP. Ran hiring and performance reviews; partnered with product and design."
+  },
+  "job": {
+    "title": "Engineering Manager, Data Infrastructure",
+    "company": "Bellwether Grid",
+    "role_identity": "people_manager",
+    "level": 4,
+    "jd_text": "Engineering Manager, Data Infrastructure. Manage 6-8 engineers with direct reports who run Kafka, Flink and Spark pipelines on GCP. You understand streaming data systems well enough to guide architecture. People management experience required."
+  },
+  "expected": {
+    "verdict": "DECENT",
+    "role_identity_aligned": true,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "fit",
+    "hands_on_fit": "partial",
+    "domain_fit": "gap",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "People Management",
+      "Python",
+      "GCP"
+    ],
+    "implicit_capabilities": [
+      "stakeholder management"
+    ],
+    "reason": "Right identity and scope, but no streaming data domain experience; a plausible apply with a clear domain gap."
+  }
+}

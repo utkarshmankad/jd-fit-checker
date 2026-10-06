@@ -1,0 +1,38 @@
+{
+  "id": "ic-03-analyst-vs-data-engineer-misleading",
+  "title": "Data analyst keywords vs data engineering role",
+  "category": "misleading_keyword",
+  "profile_type": "ic",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate IC-03",
+    "role_identity": "analyst",
+    "level": 3,
+    "years_experience": 5,
+    "resume_text": "Senior Data Analyst at Fennick Retail (fictional), 5 years. Wrote Python and SQL in notebooks, queried Snowflake, and explored data with PySpark in Databricks. Built executive dashboards. Partnered with product managers on A/B test readouts. Familiar with Airflow schedules owned by the data platform team."
+  },
+  "job": {
+    "title": "Senior Data Engineer",
+    "company": "Halloway Freight",
+    "role_identity": "ic",
+    "level": 4,
+    "jd_text": "Senior Data Engineer. Design and operate batch and streaming pipelines with Python, Spark, Airflow and Kafka. Own data platform reliability, Terraform infrastructure and on-call. 6+ years building production data systems."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": false,
+    "seniority_fit": "under",
+    "leadership_scope_fit": "n/a",
+    "hands_on_fit": "gap",
+    "domain_fit": "fit",
+    "evidence_strength": "weak",
+    "explicit_skills": [
+      "Python",
+      "Spark",
+      "Snowflake",
+      "Databricks"
+    ],
+    "implicit_capabilities": [],
+    "reason": "Shared tools, but the candidate analyzes data rather than building and operating pipelines; no streaming, infra or on-call evidence."
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "id": "ct-24-mech-to-data-engineer-strong",
+  "title": "Mechanical engineer turned data engineer",
+  "category": "strong_match",
+  "profile_type": "career_transition",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate CT-24",
+    "role_identity": "career_transition",
+    "level": 3,
+    "years_experience": 3,
+    "resume_text": "Data Engineer at Stonechat Manufacturing (fictional), 3 years, after 5 years as a mechanical engineer. Builds Python and Spark pipelines orchestrated by Airflow into Snowflake. Implemented monitoring for sensor data feeds and reduced pipeline failures by 60%."
+  },
+  "job": {
+    "title": "Data Engineer",
+    "company": "Gorsefield Industrial",
+    "role_identity": "ic",
+    "level": 3,
+    "jd_text": "Data Engineer. Build Python and Spark pipelines with Airflow into Snowflake for manufacturing sensor data. 3+ years of data engineering. Industrial domain experience is a plus."
+  },
+  "expected": {
+    "verdict": "STRONG",
+    "role_identity_aligned": true,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "n/a",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "strong",
+    "explicit_skills": [
+      "Python",
+      "Spark",
+      "Airflow",
+      "Snowflake"
+    ],
+    "implicit_capabilities": [
+      "observability",
+      "industrial domain"
+    ],
+    "reason": "Completed transition with three years of matching hands-on evidence and direct domain fit."
+  }
+}

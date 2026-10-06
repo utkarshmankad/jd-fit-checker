@@ -1,0 +1,38 @@
+{
+  "id": "sm-14-first-time-em-vs-senior-manager-misleading",
+  "title": "First-time manager vs manager of managers",
+  "category": "misleading_keyword",
+  "profile_type": "senior_people_manager",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate SM-14",
+    "role_identity": "people_manager",
+    "level": 4,
+    "years_experience": 7,
+    "resume_text": "Engineering Manager at Loftwick Studio (fictional), 7 years. First management role for one year with 3 direct reports. Owns performance reviews and stakeholder management with product. Team builds Python and AWS services."
+  },
+  "job": {
+    "title": "Senior Engineering Manager",
+    "company": "Northcote Learning",
+    "role_identity": "senior_people_manager",
+    "level": 5,
+    "jd_text": "Senior Engineering Manager. Manage 4 engineering managers across 40 engineers, own budget, org design and performance management. Executive stakeholder management. Python and AWS. 5+ years of people management including managing managers."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": true,
+    "seniority_fit": "under",
+    "leadership_scope_fit": "gap",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "People Management",
+      "Stakeholder Management",
+      "Python",
+      "AWS"
+    ],
+    "implicit_capabilities": [],
+    "reason": "Shared management keywords, but one year with three reports is far from managing managers, budget and org design."
+  }
+}

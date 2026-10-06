@@ -1,0 +1,40 @@
+{
+  "id": "tl-08-tl-to-em-borderline",
+  "title": "Tech lead moving into first engineering manager role",
+  "category": "borderline",
+  "profile_type": "tech_lead",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate TL-08",
+    "role_identity": "tech_lead",
+    "level": 4,
+    "years_experience": 10,
+    "resume_text": "Tech Lead at Saltmarsh Software (fictional), 10 years. Led a team of 6 engineers building Java services on AWS. Ran sprint planning, mentored engineers, and partnered with product on roadmap. Gave input on performance reviews for the team although the manager owned them."
+  },
+  "job": {
+    "title": "Engineering Manager, Payments Platform",
+    "company": "Thistledown Finance",
+    "role_identity": "people_manager",
+    "level": 4,
+    "jd_text": "Engineering Manager. Manage 6 direct reports, own performance reviews, hiring and career growth, and partner with product on roadmap. Background in Java and AWS services. Prior people management or strong lead experience required."
+  },
+  "expected": {
+    "verdict": "DECENT",
+    "role_identity_aligned": false,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "partial",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "Java",
+      "AWS",
+      "Leadership"
+    ],
+    "implicit_capabilities": [
+      "stakeholder management",
+      "mentoring"
+    ],
+    "reason": "Adjacent identity with partial people-management evidence; a credible first-manager step, not a clean match."
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "id": "sm-15-senior-manager-vs-senior-ic-misleading",
+  "title": "Senior manager vs hands-on senior IC role",
+  "category": "misleading_keyword",
+  "profile_type": "senior_people_manager",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate SM-15",
+    "role_identity": "senior_people_manager",
+    "level": 5,
+    "years_experience": 18,
+    "resume_text": "Director of Engineering at Ellsmoor Capital (fictional), 18 years. Led 5 managers and 50 engineers. Owned budget, hiring strategy and executive stakeholder management for TypeScript, Node.js and PostgreSQL product teams. Last hands-on coding role ended 8 years ago."
+  },
+  "job": {
+    "title": "Senior Software Engineer",
+    "company": "Cobblestone Analytics",
+    "role_identity": "ic",
+    "level": 4,
+    "jd_text": "Senior Software Engineer. Write TypeScript and Node.js services with PostgreSQL every day, ship features and join the on-call rotation. Individual contributor role with no reports."
+  },
+  "expected": {
+    "verdict": "WEAK",
+    "role_identity_aligned": false,
+    "seniority_fit": "over",
+    "leadership_scope_fit": "over",
+    "hands_on_fit": "gap",
+    "domain_fit": "fit",
+    "evidence_strength": "moderate",
+    "explicit_skills": [
+      "TypeScript",
+      "Node.js",
+      "PostgreSQL",
+      "People Management"
+    ],
+    "implicit_capabilities": [],
+    "reason": "Organization leader with no recent hands-on work applying to a daily-coding IC role; keyword overlap hides identity and level mismatch."
+  }
+}

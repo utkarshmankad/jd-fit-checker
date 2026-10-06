@@ -1,0 +1,41 @@
+{
+  "id": "st-16-staff-platform-strong",
+  "title": "Staff platform engineer to staff platform engineer",
+  "category": "strong_match",
+  "profile_type": "staff_ic",
+  "candidate": {
+    "filters": {},
+    "label": "Candidate ST-16",
+    "role_identity": "staff_ic",
+    "level": 5,
+    "years_experience": 12,
+    "resume_text": "Staff Engineer at Fairhaven Cloud (fictional), 12 years. Set cross-team architecture for distributed systems in Golang running on Kubernetes with Kafka. Designed a highly available control plane adopted by 9 teams. Wrote the org's service reliability standards and mentored senior engineers."
+  },
+  "job": {
+    "title": "Staff Engineer, Platform",
+    "company": "Hollowbrook Networks",
+    "role_identity": "staff_ic",
+    "level": 5,
+    "jd_text": "Staff Engineer, Platform. Drive cross-team technical strategy for distributed systems built in Golang on Kubernetes with Kafka. Own system design for highly available platforms and raise the bar through mentoring. 10+ years."
+  },
+  "expected": {
+    "verdict": "STRONG",
+    "role_identity_aligned": true,
+    "seniority_fit": "fit",
+    "leadership_scope_fit": "fit",
+    "hands_on_fit": "fit",
+    "domain_fit": "fit",
+    "evidence_strength": "strong",
+    "explicit_skills": [
+      "Go",
+      "Kubernetes",
+      "Kafka",
+      "System Design"
+    ],
+    "implicit_capabilities": [
+      "cross-team influence",
+      "mentoring"
+    ],
+    "reason": "Same staff-level scope with evidence of multi-team adoption."
+  }
+}
