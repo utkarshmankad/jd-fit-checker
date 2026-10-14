@@ -1,0 +1,27 @@
+{
+  "id": "m10-java-to-golang",
+  "title": "Java experience for a Golang role",
+  "group": "transferable",
+  "candidate": {
+    "label": "Candidate M1-10",
+    "resume_text": "Senior Software Engineer at Corvale Payments (fictional), 2016 - 2024\nBuilt Java microservices for card settlement on AWS."
+  },
+  "job": {
+    "title": "Senior Software Engineer",
+    "text": "Senior Software Engineer\nRequirements:\nStrong Golang experience.\nExperience with AWS."
+  },
+  "expected": [
+    {
+      "kind": "skill",
+      "concept": "Go",
+      "status": "transferable",
+      "why": "Java is a related backend language, not Go"
+    },
+    {
+      "kind": "skill",
+      "concept": "AWS",
+      "status": "strong",
+      "why": "Used in work"
+    }
+  ]
+}

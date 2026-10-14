@@ -1,0 +1,27 @@
+{
+  "id": "m07-mentoring-is-not-management",
+  "title": "Mentoring and design leadership vs people management",
+  "group": "ic_vs_manager",
+  "candidate": {
+    "label": "Candidate M0-07",
+    "resume_text": "Senior Software Engineer at Thornbury Labs (fictional), 2017 - present\nBuilt Python data services on GCP.\nMentored new hires and led the technical design of the ingestion platform."
+  },
+  "job": {
+    "title": "Engineering Manager",
+    "text": "Engineering Manager\nResponsibilities:\nManage and grow a team of 6 engineers; run performance reviews and hiring.\nRequirements:\nPrior people management experience."
+  },
+  "expected": [
+    {
+      "kind": "people_management",
+      "concept": null,
+      "status": "transferable",
+      "why": "Mentoring and design leadership are related but not people management"
+    },
+    {
+      "kind": "identity",
+      "concept": null,
+      "status": "explicit_gap",
+      "why": "IC applying to a manager role"
+    }
+  ]
+}

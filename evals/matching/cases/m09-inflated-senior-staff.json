@@ -1,0 +1,27 @@
+{
+  "id": "m09-inflated-senior-staff",
+  "title": "'Senior Staff' title with three years and one-feature scope",
+  "group": "inflated_title",
+  "candidate": {
+    "label": "Candidate M0-09",
+    "resume_text": "Senior Staff Engineer at Brightwick (fictional), 2022 - 2025\nBuilt the notifications feature for one product team in TypeScript."
+  },
+  "job": {
+    "title": "Staff Engineer, Platform",
+    "text": "Staff Engineer, Platform\nResponsibilities:\nDrive cross-team technical strategy and lead architecture reviews.\nRequirements:\n10+ years of software engineering experience."
+  },
+  "expected": [
+    {
+      "kind": "experience_years",
+      "concept": null,
+      "status": "explicit_gap",
+      "why": "3 years vs 10+"
+    },
+    {
+      "kind": "seniority",
+      "concept": null,
+      "status": "explicit_gap",
+      "why": "Title says senior staff, evidence says mid-level"
+    }
+  ]
+}

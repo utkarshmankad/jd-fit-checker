@@ -1,0 +1,27 @@
+{
+  "id": "m11-unknown-not-gap",
+  "title": "Unmentioned domain and degree stay unknown",
+  "group": "unknown_vs_gap",
+  "candidate": {
+    "label": "Candidate M1-11",
+    "resume_text": "Software Engineer at Tidewell Apps (fictional), 2019 - 2024\nBuilt React and Node.js features for a booking product."
+  },
+  "job": {
+    "title": "Software Engineer",
+    "text": "Software Engineer\nRequirements:\n3+ years of software engineering experience.\nBachelor's degree in Computer Science.\nNice to have:\nPayments or banking domain experience."
+  },
+  "expected": [
+    {
+      "kind": "education",
+      "concept": null,
+      "status": "unknown",
+      "why": "Resume does not mention education"
+    },
+    {
+      "kind": "experience_years",
+      "concept": null,
+      "status": "strong",
+      "why": "5 years"
+    }
+  ]
+}

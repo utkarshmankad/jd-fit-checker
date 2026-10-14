@@ -1,0 +1,27 @@
+{
+  "id": "m12-not-hands-on",
+  "title": "Manager who stopped coding vs 80% hands-on role",
+  "group": "ic_vs_manager",
+  "candidate": {
+    "label": "Candidate M1-12",
+    "resume_text": "Engineering Manager at Coldharbour Media (fictional), 2014 - present\nManaged a team of 10 with direct reports and performance reviews.\nI have not written production code in the last four years."
+  },
+  "job": {
+    "title": "Lead Engineer",
+    "text": "Lead Engineer\nThis is an individual contributor role with no direct reports.\nSpend 80% of your time writing code in React and Node.js.\nRequirements:\n6+ years of software engineering experience."
+  },
+  "expected": [
+    {
+      "kind": "hands_on",
+      "concept": null,
+      "status": "explicit_gap",
+      "why": "Explicitly not hands-on for four years"
+    },
+    {
+      "kind": "identity",
+      "concept": null,
+      "status": "explicit_gap",
+      "why": "Manager applying to an IC role"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "m03-postgres-alias",
+  "title": "Postgres vs PostgreSQL",
+  "group": "equivalent_wording",
+  "candidate": {
+    "label": "Candidate M0-03",
+    "resume_text": "Software Engineer at Quayside Billing (fictional), 2020 - 2025\nTuned Postgres queries and built Node.js billing services."
+  },
+  "job": {
+    "title": "Backend Engineer",
+    "text": "Backend Engineer\nRequirements:\nStrong PostgreSQL skills.\n3+ years of backend development experience."
+  },
+  "expected": [
+    {
+      "kind": "skill",
+      "concept": "PostgreSQL",
+      "status": "strong",
+      "why": "Postgres is PostgreSQL"
+    },
+    {
+      "kind": "experience_years",
+      "concept": null,
+      "status": "strong",
+      "why": "5 years"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "id": "m08-inflated-head-of",
+  "title": "'Head of Engineering' at a two-person startup vs Director",
+  "group": "inflated_title",
+  "candidate": {
+    "label": "Candidate M0-08",
+    "resume_text": "Head of Engineering at Pocketfern (fictional), 2023 - present\nBuilt the MVP in React and Node.js with two contractors.\nSet up CI/CD with GitHub Actions."
+  },
+  "job": {
+    "title": "Director of Engineering",
+    "text": "Director of Engineering\nResponsibilities:\nLead 4 engineering managers and an organization of 40 engineers.\nOwn hiring plans and performance management.\nRequirements:\n12+ years of software engineering experience including 5+ years managing managers."
+  },
+  "expected": [
+    {
+      "kind": "experience_years",
+      "concept": null,
+      "status": "explicit_gap",
+      "why": "About 2 years vs 12+"
+    },
+    {
+      "kind": "seniority",
+      "concept": null,
+      "status": "explicit_gap",
+      "why": "Demonstrated scope is far below director level"
+    },
+    {
+      "kind": "manages_managers",
+      "concept": null,
+      "status": "unknown",
+      "why": "No evidence of managing anyone, but nothing says otherwise"
+    }
+  ]
+}
