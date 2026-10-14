@@ -114,6 +114,12 @@ export interface AnalysisResult {
   role_profile?: import('@/lib/role-profile/schema').RoleProfileReference | null;
   // Requirement-matching summary (informational until Sprint 4; the verdict above is unchanged).
   requirement_match?: import('@/lib/matching/schema').RequirementMatchReference | null;
+  // Which engine produced `verdict` above. Absent on rows written before Sprint 4 (= legacy-fast-1).
+  scoring_version?: string;
+  // Shadow result of the v2 fit verdict (src/lib/verdict). Not user-visible unless VERDICT_ENGINE=v2.
+  verdict_v2?: import('@/lib/verdict/rollout').ShadowRecord | null;
+  // Set only when VERDICT_ENGINE=v2 replaced the verdict: the legacy verdict it replaced.
+  legacy_verdict?: AnalysisResult['verdict'];
   correction_applied?: { correction_id: string; similarity: number; corrected_verdict: AnalysisResult['verdict'] } | null;
 }
 
